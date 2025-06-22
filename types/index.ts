@@ -32,7 +32,8 @@ export type Trait = {
   traitName: string;
   type: '긍정' | '부정';
   weightType: string;
-  description: string;
+  displayText: string;
+  systemInstruction: string;
   iconUrl: string;
   isEditing?: boolean;
 };

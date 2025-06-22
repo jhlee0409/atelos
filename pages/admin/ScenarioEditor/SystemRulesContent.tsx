@@ -86,7 +86,8 @@ export default function SystemRulesContent({
       traitName: '',
       type: type === 'buffs' ? '긍정' : '부정',
       weightType: '',
-      description: '',
+      displayText: '',
+      systemInstruction: '',
       iconUrl: '',
       isEditing: true,
     };
@@ -921,21 +922,41 @@ const BuffCard = ({
             이미지를 불러오는데 실패했습니다.
           </div>
         )}
-
-        <div>
+        <div className="mb-2">
           <label className="mb-1 block text-xs font-medium text-gray-800">
-            설명
+            표시용 설명 (Display Text)
           </label>
+          <p className="mb-2 text-xs text-socratic-grey">
+            플레이어에게 보여질 서술적이고 몰입감 있는 설명입니다.
+          </p>
           <Textarea
-            value={trait.description}
+            value={trait.displayText}
             onChange={(e) =>
-              updateTrait('buffs', index, 'description', e.target.value)
+              updateTrait('buffs', index, 'displayText', e.target.value)
             }
             className="border-socratic-grey bg-white text-xs"
-            placeholder="특성 설명"
-            rows={2}
-            maxLength={200}
+            placeholder="예: 그의 존재만으로도 그룹은 쉽게 무너지지 않으며, 그의 지시는 왠지 모를 신뢰를 준다."
             disabled={!trait.isEditing}
+            maxLength={200}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            시스템 규칙 (System Instruction)
+          </label>
+          <p className="mb-2 text-xs text-socratic-grey">
+            AI가 특성 효과를 명확하게 이해하고 적용할 수 있도록, 구체적인 작동
+            방식을 서술합니다.
+          </p>
+          <Textarea
+            value={trait.systemInstruction}
+            onChange={(e) =>
+              updateTrait('buffs', index, 'systemInstruction', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="예: 이 특성을 가진 인물이 리더일 경우, 매일 아침 '공동체 응집력'이 5 이하로 떨어지지 않는다. '그룹 지시'의 성공률을 +10% 보정한다."
+            disabled={!trait.isEditing}
+            maxLength={300}
           />
         </div>
       </CardContent>
@@ -1116,20 +1137,41 @@ const DebuffCard = ({
             이미지를 불러오는데 실패했습니다.
           </div>
         )}
-        <div>
+        <div className="mb-2">
           <label className="mb-1 block text-xs font-medium text-gray-800">
-            설명
+            표시용 설명 (Display Text)
           </label>
+          <p className="mb-2 text-xs text-socratic-grey">
+            플레이어에게 보여질 서술적이고 몰입감 있는 설명입니다.
+          </p>
           <Textarea
-            value={trait.description}
+            value={trait.displayText}
             onChange={(e) =>
-              updateTrait('debuffs', index, 'description', e.target.value)
+              updateTrait('debuffs', index, 'displayText', e.target.value)
             }
             className="border-socratic-grey bg-white text-xs"
-            placeholder="특성 설명"
-            rows={2}
-            maxLength={200}
+            placeholder="예: 강압적인 선택을 할 경우, 일시적으로 효과는 좋으나 동료들은 점차 그를 불신하게 된다."
             disabled={!trait.isEditing}
+            maxLength={200}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            시스템 규칙 (System Instruction)
+          </label>
+          <p className="mb-2 text-xs text-socratic-grey">
+            AI가 특성 효과를 명확하게 이해하고 적용할 수 있도록, 구체적인 작동
+            방식을 서술합니다.
+          </p>
+          <Textarea
+            value={trait.systemInstruction}
+            onChange={(e) =>
+              updateTrait('debuffs', index, 'systemInstruction', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="예: 플레이어가 '강압적', '통제' 키워드를 포함한 선택을 할 경우, 해당 선택의 즉각적인 성공률을 +15% 높인다. 하지만 그 선택에 관련된 모든 동료들의 '숨겨진 관계도' 수치를 -10 감소시킨다."
+            disabled={!trait.isEditing}
+            maxLength={300}
           />
         </div>
       </CardContent>
