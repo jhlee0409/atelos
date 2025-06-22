@@ -1,9 +1,18 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Save, AlertCircle } from 'lucide-react';
 import { ScenarioData } from '@/types';
-import { SetStateAction } from 'react';
+import { SetStateAction, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogHeader,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 type Props = {
   scenario: ScenarioData;
@@ -20,8 +29,9 @@ export default function StickySidebar({
   handleTempSave,
   errors,
 }: Props) {
+  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   return (
-    <div className="w-80 p-8">
+    <div className="w-100 p-8">
       <div className="sticky top-8 space-y-6">
         {/* 시나리오 상태 */}
         <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
@@ -153,7 +163,7 @@ export default function StickySidebar({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-40 overflow-y-auto rounded bg-gray-900 p-3 font-mono text-xs text-green-400">
+            <div className="max-h-100 overflow-y-auto rounded bg-gray-900 p-3 font-mono text-xs text-green-400">
               <pre>
                 {JSON.stringify(scenario, null, 2).substring(0, 200)}...
               </pre>
@@ -171,9 +181,28 @@ export default function StickySidebar({
             >
               JSON 복사
             </Button>
+            <Button
+              className="mt-2 w-full border-socratic-grey text-socratic-grey hover:bg-socratic-grey hover:text-white"
+              onClick={() => {
+                setIsJsonDialogOpen(true);
+              }}
+              variant="outline"
+            >
+              JSON 전체 보기
+            </Button>
           </CardContent>
         </Card>
       </div>
+      <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
+        <DialogContent className="max-w-[50vw]">
+          <DialogHeader>
+            <DialogTitle>JSON 전체 보기</DialogTitle>
+          </DialogHeader>
+          <pre className="max-h-[70vh] overflow-y-auto bg-gray-900 font-mono text-xs text-green-400">
+            {JSON.stringify(scenario, null, 2)}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

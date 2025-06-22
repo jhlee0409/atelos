@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScenarioData, ScenarioStat, Trait } from '@/types';
-import { Dilemma } from '@/types';
+import Image from 'next/image';
+import { useState } from 'react';
 
 type Props = {
   scenario: ScenarioData;
@@ -477,43 +478,45 @@ export default function SystemRulesContent({
                   key={index}
                   className={`${stat.isEditing ? 'border-kairos-gold/50 bg-white/50' : 'border-socratic-grey/30 bg-gray-50/50'} relative`}
                 >
-                  {stat.isEditing ? (
-                    <div className="absolute right-3 top-3 flex gap-2">
-                      <Button
-                        onClick={() => saveStat(index)}
-                        size="sm"
-                        className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
-                      >
-                        저장
-                      </Button>
-                      <button
-                        onClick={() => removeStat(index)}
-                        className="text-socratic-grey hover:text-red-500"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="absolute right-3 top-3 flex gap-2">
-                      <Badge className="mr-2 border-green-300 bg-green-100 text-green-800">
-                        추가됨
-                      </Badge>
-                      <Button
-                        onClick={() => editStat(index)}
-                        size="sm"
-                        variant="outline"
-                        className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                      >
-                        수정
-                      </Button>
-                      <button
-                        onClick={() => removeStat(index)}
-                        className="text-socratic-grey hover:text-red-500"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                  <div className="absolute right-3 top-3 flex items-center gap-2">
+                    {stat.isEditing ? (
+                      <>
+                        <Button
+                          onClick={() => saveStat(index)}
+                          size="sm"
+                          className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
+                        >
+                          저장
+                        </Button>
+                        <button
+                          onClick={() => removeStat(index)}
+                          className="text-socratic-grey hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Badge className="border-green-300 bg-green-100 text-green-800">
+                          추가됨
+                        </Badge>
+                        <Button
+                          onClick={() => editStat(index)}
+                          size="sm"
+                          variant="outline"
+                          className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                        >
+                          수정
+                        </Button>
+                        <button
+                          onClick={() => removeStat(index)}
+                          className="text-socratic-grey hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
 
                   <CardContent className="pt-6">
                     <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -670,191 +673,15 @@ export default function SystemRulesContent({
               ) : (
                 <div className="space-y-3">
                   {scenario.traitPool.buffs.map((trait, index) => (
-                    <Card
+                    <BuffCard
                       key={index}
-                      className={`${trait.isEditing ? 'border-kairos-gold/50 bg-green-50' : 'border-green-200 bg-green-50/50'} relative`}
-                    >
-                      {trait.isEditing ? (
-                        <div className="absolute right-2 top-2 flex gap-1">
-                          <Button
-                            onClick={() => saveTrait('buffs', index)}
-                            size="sm"
-                            className="bg-kairos-gold px-2 py-1 text-xs text-telos-black hover:bg-kairos-gold/90"
-                          >
-                            저장
-                          </Button>
-                          <button
-                            onClick={() => removeTrait('buffs', index)}
-                            className="text-socratic-grey hover:text-red-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="absolute right-2 top-2 flex gap-1">
-                          <Badge className="border-green-300 bg-green-100 text-xs text-green-800">
-                            추가됨
-                          </Badge>
-                          <Button
-                            onClick={() => editTrait('buffs', index)}
-                            size="sm"
-                            variant="outline"
-                            className="border-kairos-gold px-2 py-1 text-xs text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                          >
-                            수정
-                          </Button>
-                          <button
-                            onClick={() => removeTrait('buffs', index)}
-                            className="text-socratic-grey hover:text-red-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-
-                      <CardContent className="pb-3 pt-4">
-                        <div className="mb-2 grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-800">
-                              특성 ID <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                              value={trait.traitId}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'buffs',
-                                  index,
-                                  'traitId',
-                                  e.target.value.toUpperCase(),
-                                )
-                              }
-                              className="border-socratic-grey bg-white text-xs"
-                              placeholder="LEADERSHIP"
-                              disabled={!trait.isEditing}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-800">
-                              특성 이름 <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                              value={trait.traitName}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'buffs',
-                                  index,
-                                  'traitName',
-                                  e.target.value,
-                                )
-                              }
-                              className="border-socratic-grey bg-white text-xs"
-                              placeholder="리더십"
-                              disabled={!trait.isEditing}
-                            />
-                          </div>
-                        </div>
-                        <div className="mb-2">
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            가중치 유형 <span className="text-red-500">*</span>
-                          </label>
-                          <Input
-                            value={trait.weightType}
-                            onChange={(e) =>
-                              updateTrait(
-                                'buffs',
-                                index,
-                                'weightType',
-                                e.target.value,
-                              )
-                            }
-                            className="border-socratic-grey bg-white text-xs"
-                            placeholder="리더십, 통제, 이타심"
-                            disabled={!trait.isEditing}
-                          />
-                        </div>
-                        <div className="mb-2">
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            아이콘 URL
-                          </label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={trait.iconUrl}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'buffs',
-                                  index,
-                                  'iconUrl',
-                                  e.target.value,
-                                )
-                              }
-                              className="flex-1 border-socratic-grey bg-white text-xs"
-                              placeholder="아이콘 URL"
-                              disabled={!trait.isEditing}
-                            />
-                            {trait.isEditing && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-kairos-gold px-2 text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                                onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
-                                  input.onchange = (e) => {
-                                    const file = (e.target as HTMLInputElement)
-                                      .files?.[0];
-                                    if (file) {
-                                      const url = URL.createObjectURL(file);
-                                      updateTrait(
-                                        'buffs',
-                                        index,
-                                        'iconUrl',
-                                        url,
-                                      );
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                              >
-                                파일
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {trait.iconUrl && (
-                          <img
-                            src={trait.iconUrl || '/placeholder.svg'}
-                            alt="특성 아이콘"
-                            className="mb-2 h-8 w-8 rounded border object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <div>
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            설명
-                          </label>
-                          <Textarea
-                            value={trait.description}
-                            onChange={(e) =>
-                              updateTrait(
-                                'buffs',
-                                index,
-                                'description',
-                                e.target.value,
-                              )
-                            }
-                            className="border-socratic-grey bg-white text-xs"
-                            placeholder="특성 설명"
-                            rows={2}
-                            maxLength={200}
-                            disabled={!trait.isEditing}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
+                      trait={trait}
+                      index={index}
+                      saveTrait={saveTrait}
+                      removeTrait={removeTrait}
+                      editTrait={editTrait}
+                      updateTrait={updateTrait}
+                    />
                   ))}
                 </div>
               )}
@@ -900,191 +727,15 @@ export default function SystemRulesContent({
               ) : (
                 <div className="space-y-3">
                   {scenario.traitPool.debuffs.map((trait, index) => (
-                    <Card
+                    <DebuffCard
                       key={index}
-                      className={`${trait.isEditing ? 'border-kairos-gold/50 bg-red-50' : 'border-red-200 bg-red-50/50'} relative`}
-                    >
-                      {trait.isEditing ? (
-                        <div className="absolute right-2 top-2 flex gap-1">
-                          <Button
-                            onClick={() => saveTrait('debuffs', index)}
-                            size="sm"
-                            className="bg-kairos-gold px-2 py-1 text-xs text-telos-black hover:bg-kairos-gold/90"
-                          >
-                            저장
-                          </Button>
-                          <button
-                            onClick={() => removeTrait('debuffs', index)}
-                            className="text-socratic-grey hover:text-red-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="absolute right-2 top-2 flex gap-1">
-                          <Badge className="border-green-300 bg-green-100 text-xs text-green-800">
-                            추가됨
-                          </Badge>
-                          <Button
-                            onClick={() => editTrait('debuffs', index)}
-                            size="sm"
-                            variant="outline"
-                            className="border-kairos-gold px-2 py-1 text-xs text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                          >
-                            수정
-                          </Button>
-                          <button
-                            onClick={() => removeTrait('debuffs', index)}
-                            className="text-socratic-grey hover:text-red-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-
-                      <CardContent className="pb-3 pt-4">
-                        <div className="mb-2 grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-800">
-                              특성 ID <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                              value={trait.traitId}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'debuffs',
-                                  index,
-                                  'traitId',
-                                  e.target.value.toUpperCase(),
-                                )
-                              }
-                              className="border-socratic-grey bg-white text-xs"
-                              placeholder="CYNICISM"
-                              disabled={!trait.isEditing}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-800">
-                              특성 이름 <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                              value={trait.traitName}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'debuffs',
-                                  index,
-                                  'traitName',
-                                  e.target.value,
-                                )
-                              }
-                              className="border-socratic-grey bg-white text-xs"
-                              placeholder="냉소주의"
-                              disabled={!trait.isEditing}
-                            />
-                          </div>
-                        </div>
-                        <div className="mb-2">
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            가중치 유형 <span className="text-red-500">*</span>
-                          </label>
-                          <Input
-                            value={trait.weightType}
-                            onChange={(e) =>
-                              updateTrait(
-                                'debuffs',
-                                index,
-                                'weightType',
-                                e.target.value,
-                              )
-                            }
-                            className="border-socratic-grey bg-white text-xs"
-                            placeholder="불신, 이기심"
-                            disabled={!trait.isEditing}
-                          />
-                        </div>
-                        <div className="mb-2">
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            아이콘 URL
-                          </label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={trait.iconUrl}
-                              onChange={(e) =>
-                                updateTrait(
-                                  'debuffs',
-                                  index,
-                                  'iconUrl',
-                                  e.target.value,
-                                )
-                              }
-                              className="flex-1 border-socratic-grey bg-white text-xs"
-                              placeholder="아이콘 URL"
-                              disabled={!trait.isEditing}
-                            />
-                            {trait.isEditing && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-kairos-gold px-2 text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                                onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
-                                  input.onchange = (e) => {
-                                    const file = (e.target as HTMLInputElement)
-                                      .files?.[0];
-                                    if (file) {
-                                      const url = URL.createObjectURL(file);
-                                      updateTrait(
-                                        'debuffs',
-                                        index,
-                                        'iconUrl',
-                                        url,
-                                      );
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                              >
-                                파일
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {trait.iconUrl && (
-                          <img
-                            src={trait.iconUrl || '/placeholder.svg'}
-                            alt="특성 아이콘"
-                            className="mb-2 h-8 w-8 rounded border object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <div>
-                          <label className="mb-1 block text-xs font-medium text-gray-800">
-                            설명
-                          </label>
-                          <Textarea
-                            value={trait.description}
-                            onChange={(e) =>
-                              updateTrait(
-                                'debuffs',
-                                index,
-                                'description',
-                                e.target.value,
-                              )
-                            }
-                            className="border-socratic-grey bg-white text-xs"
-                            placeholder="특성 설명"
-                            rows={2}
-                            maxLength={200}
-                            disabled={!trait.isEditing}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
+                      trait={trait}
+                      index={index}
+                      saveTrait={saveTrait}
+                      removeTrait={removeTrait}
+                      editTrait={editTrait}
+                      updateTrait={updateTrait}
+                    />
                   ))}
                 </div>
               )}
@@ -1095,3 +746,393 @@ export default function SystemRulesContent({
     </Card>
   );
 }
+
+type BuffCardProps = {
+  trait: Trait;
+  index: number;
+  saveTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  removeTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  editTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  updateTrait: (
+    type: 'buffs' | 'debuffs',
+    index: number,
+    field: keyof Trait,
+    value: any,
+  ) => void;
+};
+
+const BuffCard = ({
+  trait,
+  index,
+  saveTrait,
+  removeTrait,
+  editTrait,
+  updateTrait,
+}: BuffCardProps) => {
+  const [isImageError, setIsImageError] = useState(false);
+
+  return (
+    <Card
+      className={`${trait.isEditing ? 'border-kairos-gold/50 bg-green-50' : 'border-green-200 bg-green-50/50'} relative`}
+    >
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {trait.isEditing ? (
+          <>
+            <Button
+              onClick={() => saveTrait('buffs', index)}
+              size="sm"
+              className="bg-kairos-gold px-2 py-1 text-xs text-telos-black hover:bg-kairos-gold/90"
+            >
+              저장
+            </Button>
+            <button
+              onClick={() => removeTrait('buffs', index)}
+              className="text-socratic-grey hover:text-red-500"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </>
+        ) : (
+          <>
+            <Badge className="border-green-300 bg-green-100 text-xs text-green-800">
+              추가됨
+            </Badge>
+            <Button
+              onClick={() => editTrait('buffs', index)}
+              size="sm"
+              variant="outline"
+              className="border-kairos-gold px-2 py-1 text-xs text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+            >
+              수정
+            </Button>
+            <button
+              onClick={() => removeTrait('buffs', index)}
+              className="text-socratic-grey hover:text-red-500"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </>
+        )}
+      </div>
+      <CardContent className="pb-3 pt-8">
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-800">
+              특성 ID <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={trait.traitId}
+              onChange={(e) =>
+                updateTrait(
+                  'buffs',
+                  index,
+                  'traitId',
+                  e.target.value.toUpperCase(),
+                )
+              }
+              className="border-socratic-grey bg-white text-xs"
+              placeholder="LEADERSHIP"
+              disabled={!trait.isEditing}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-800">
+              특성 이름 <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={trait.traitName}
+              onChange={(e) =>
+                updateTrait('buffs', index, 'traitName', e.target.value)
+              }
+              className="border-socratic-grey bg-white text-xs"
+              placeholder="리더십"
+              disabled={!trait.isEditing}
+            />
+          </div>
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            가중치 유형 <span className="text-red-500">*</span>
+          </label>
+          <Input
+            value={trait.weightType}
+            onChange={(e) =>
+              updateTrait('buffs', index, 'weightType', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="리더십, 통제, 이타심"
+            disabled={!trait.isEditing}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            아이콘 URL
+          </label>
+          <div className="flex gap-2">
+            <Input
+              value={trait.iconUrl}
+              onChange={(e) =>
+                updateTrait('buffs', index, 'iconUrl', e.target.value)
+              }
+              className="flex-1 border-socratic-grey bg-white text-xs"
+              placeholder="아이콘 URL"
+              disabled={!trait.isEditing}
+            />
+            {trait.isEditing && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-kairos-gold px-2 text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) {
+                      const url = URL.createObjectURL(file);
+                      updateTrait('buffs', index, 'iconUrl', url);
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                파일
+              </Button>
+            )}
+          </div>
+        </div>
+        {trait.iconUrl && !isImageError && (
+          <Image
+            src={trait.iconUrl || '/placeholder.svg'}
+            alt="특성 아이콘"
+            className="mb-2 h-8 w-8 rounded border object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              setIsImageError(true);
+            }}
+            width={32}
+            height={32}
+          />
+        )}
+        {isImageError && (
+          <div className="mb-2 text-xs text-red-500">
+            이미지를 불러오는데 실패했습니다.
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            설명
+          </label>
+          <Textarea
+            value={trait.description}
+            onChange={(e) =>
+              updateTrait('buffs', index, 'description', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="특성 설명"
+            rows={2}
+            maxLength={200}
+            disabled={!trait.isEditing}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+type DebuffCardProps = {
+  trait: Trait;
+  index: number;
+  saveTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  removeTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  editTrait: (type: 'buffs' | 'debuffs', index: number) => void;
+  updateTrait: (
+    type: 'buffs' | 'debuffs',
+    index: number,
+    field: keyof Trait,
+    value: any,
+  ) => void;
+};
+const DebuffCard = ({
+  trait,
+  index,
+  saveTrait,
+  removeTrait,
+  editTrait,
+  updateTrait,
+}: DebuffCardProps) => {
+  const [isImageError, setIsImageError] = useState(false);
+
+  return (
+    <Card
+      className={`${trait.isEditing ? 'border-kairos-gold/50 bg-red-50' : 'border-red-200 bg-red-50/50'} relative`}
+    >
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {trait.isEditing ? (
+          <>
+            <Button
+              onClick={() => saveTrait('debuffs', index)}
+              size="sm"
+              className="bg-kairos-gold px-2 py-1 text-xs text-telos-black hover:bg-kairos-gold/90"
+            >
+              저장
+            </Button>
+            <button
+              onClick={() => removeTrait('debuffs', index)}
+              className="text-socratic-grey hover:text-red-500"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </>
+        ) : (
+          <>
+            <Badge className="border-green-300 bg-green-100 text-xs text-green-800">
+              추가됨
+            </Badge>
+            <Button
+              onClick={() => editTrait('debuffs', index)}
+              size="sm"
+              variant="outline"
+              className="border-kairos-gold px-2 py-1 text-xs text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+            >
+              수정
+            </Button>
+            <button
+              onClick={() => removeTrait('debuffs', index)}
+              className="text-socratic-grey hover:text-red-500"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </>
+        )}
+      </div>
+      <CardContent className="pb-3 pt-8">
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-800">
+              특성 ID <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={trait.traitId}
+              onChange={(e) =>
+                updateTrait(
+                  'debuffs',
+                  index,
+                  'traitId',
+                  e.target.value.toUpperCase(),
+                )
+              }
+              className="border-socratic-grey bg-white text-xs"
+              placeholder="CYNICISM"
+              disabled={!trait.isEditing}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-800">
+              특성 이름 <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={trait.traitName}
+              onChange={(e) =>
+                updateTrait('debuffs', index, 'traitName', e.target.value)
+              }
+              className="border-socratic-grey bg-white text-xs"
+              placeholder="냉소주의"
+              disabled={!trait.isEditing}
+            />
+          </div>
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            가중치 유형 <span className="text-red-500">*</span>
+          </label>
+          <Input
+            value={trait.weightType}
+            onChange={(e) =>
+              updateTrait('debuffs', index, 'weightType', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="불신, 이기심"
+            disabled={!trait.isEditing}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            아이콘 URL
+          </label>
+          <div className="flex gap-2">
+            <Input
+              value={trait.iconUrl}
+              onChange={(e) =>
+                updateTrait('debuffs', index, 'iconUrl', e.target.value)
+              }
+              className="flex-1 border-socratic-grey bg-white text-xs"
+              placeholder="아이콘 URL"
+              disabled={!trait.isEditing}
+            />
+            {trait.isEditing && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-kairos-gold px-2 text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) {
+                      const url = URL.createObjectURL(file);
+                      updateTrait('debuffs', index, 'iconUrl', url);
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                파일
+              </Button>
+            )}
+          </div>
+        </div>
+        {trait.iconUrl && !isImageError && (
+          <Image
+            src={trait.iconUrl || '/placeholder.svg'}
+            alt="특성 아이콘"
+            className="mb-2 h-8 w-8 rounded border object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              setIsImageError(true);
+            }}
+            width={32}
+            height={32}
+          />
+        )}
+        {isImageError && (
+          <div className="mb-2 text-xs text-red-500">
+            이미지를 불러오는데 실패했습니다.
+          </div>
+        )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-800">
+            설명
+          </label>
+          <Textarea
+            value={trait.description}
+            onChange={(e) =>
+              updateTrait('debuffs', index, 'description', e.target.value)
+            }
+            className="border-socratic-grey bg-white text-xs"
+            placeholder="특성 설명"
+            rows={2}
+            maxLength={200}
+            disabled={!trait.isEditing}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

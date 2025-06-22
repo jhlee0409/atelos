@@ -9,6 +9,8 @@ import { Plus, X } from 'lucide-react';
 import type { ScenarioData } from '@/types';
 import { SetStateAction, useState, useRef } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 type Props = {
   scenario: ScenarioData;
@@ -21,6 +23,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
   const [newKeyword, setNewKeyword] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImageError, setIsImageError] = useState(false);
 
   // Tag management
   const addTag = (type: 'genre' | 'coreKeywords', value: string) => {
@@ -149,14 +152,26 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
           </div>
           {scenario.posterImageUrl && (
             <div className="mt-3 rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">
-              <p className="text-sm text-kairos-gold">✓ 이미지 설정됨</p>
-              <img
-                src={scenario.posterImageUrl || '/placeholder.svg'}
+              <p
+                className={cn(
+                  'text-sm text-kairos-gold',
+                  isImageError && 'text-red-500',
+                )}
+              >
+                {scenario.posterImageUrl && !isImageError
+                  ? '✓ 이미지 설정됨'
+                  : '✗ 이미지를 찾을 수 없습니다'}
+              </p>
+              <Image
+                src={scenario.posterImageUrl || '/placeholder-logo.png'}
                 alt="포스터 미리보기"
                 className="mt-2 h-36 w-24 rounded border object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
+                  setIsImageError(true);
                 }}
+                width={200}
+                height={200}
               />
             </div>
           )}
