@@ -1,0 +1,59 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "prettier",
+    "import",
+    "jsx-a11y",
+    "react",
+    "react-hooks",
+    "tailwindcss"
+  ],
+  "extends": [
+    "next/core-web-vitals",
+    "airbnb-typescript",
+    "plugin:tailwindcss/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "prettier/prettier": "error",
+    // React 17+ and Next.js do not require React to be in scope
+    "react/react-in-jsx-scope": "off",
+    // Allows spreading props, which is useful for HOCs and component libraries
+    "react/jsx-props-no-spreading": "off",
+    // Disables the rule that requires default props for functional components
+    "react/require-default-props": "off",
+    // Next.js Link component does not need an anchor tag child
+    "jsx-a11y/anchor-is-valid": "off",
+    // Allows TypeScript files to have .ts or .tsx extensions
+    "@typescript-eslint/explicit-function-return-type": "off",
+    // Rule to automatically sort imports
+    "import/order": [
+      "error",
+      {
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index", "object"],
+        "pathGroups": [
+          {
+            "pattern": "react",
+            "group": "external",
+            "position": "before"
+          },
+          {
+            "pattern": "@/**",
+            "group": "internal"
+          }
+        ],
+        "pathGroupsExcludedImportTypes": ["react"],
+        "newlines-between": "always",
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
+      }
+    ],
+    "import/prefer-default-export": "off"
+  }
+}
