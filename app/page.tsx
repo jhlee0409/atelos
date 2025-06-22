@@ -10,21 +10,14 @@ import CoreStoryElementsContent from '@/pages/admin/ScenarioEditor/CoreStoryElem
 import StickySidebar from '@/pages/admin/ScenarioEditor/StickySidebar';
 import ScenarioHeader from '@/pages/admin/ScenarioEditor/ScenarioHeader';
 import { toast } from 'sonner';
-import {
-  initialScenario,
-  MAX_CORE_KEYWORDS,
-  MIN_CORE_KEYWORDS,
-  MIN_GENRE,
-  STORAGE_KEY,
-  VALIDATION_IDS,
-} from '@/constants/scenario';
+import { STORAGE_KEY } from '@/constants/scenario';
 import { validateScenario } from '@/lib/validations';
+import mockScenario from '@/mocks/ZERO_HOUR.json' with { type: 'json' };
 
 export default function AtelosScenarioEditor() {
-  const [scenario, setScenario] = useState<ScenarioData>(() => {
-    const savedScenario = localStorage.getItem(STORAGE_KEY);
-    return savedScenario ? JSON.parse(savedScenario) : initialScenario;
-  });
+  const [scenario, setScenario] = useState<ScenarioData>(
+    () => mockScenario as ScenarioData,
+  );
   const [errors, setErrors] = useState<string[]>([]);
 
   // Save functions

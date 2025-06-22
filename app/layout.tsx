@@ -18,8 +18,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <Toaster />
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <Toaster />
+
+        {children}
+      </body>
     </html>
   );
 }
