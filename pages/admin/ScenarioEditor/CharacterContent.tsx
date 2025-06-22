@@ -1,0 +1,702 @@
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Character, Relationship, ScenarioData } from '@/types';
+import { SetStateAction, useState } from 'react';
+
+type Props = {
+  scenario: ScenarioData;
+  setScenario: (value: SetStateAction<ScenarioData>) => void;
+  errors: string[];
+};
+
+export default function CharacterContent({
+  scenario,
+  setScenario,
+  errors,
+}: Props) {
+  // Character management
+  const addCharacter = () => {
+    const newCharacter: Character = {
+      roleId: '',
+      roleName: '',
+      characterName: '',
+      backstory: '',
+      imageUrl: '',
+      weightedTraitTypes: [],
+      isEditing: true,
+    };
+    setScenario((prev) => ({
+      ...prev,
+      characters: [...prev.characters, newCharacter],
+    }));
+  };
+
+  const saveCharacter = (index: number) => {
+    setScenario((prev) => ({
+      ...prev,
+      characters: prev.characters.map((char, i) =>
+        i === index ? { ...char, isEditing: false } : char,
+      ),
+    }));
+  };
+
+  const editCharacter = (index: number) => {
+    setScenario((prev) => ({
+      ...prev,
+      characters: prev.characters.map((char, i) =>
+        i === index ? { ...char, isEditing: true } : char,
+      ),
+    }));
+  };
+
+  const removeCharacter = (index: number) => {
+    setScenario((prev) => ({
+      ...prev,
+      characters: prev.characters.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateCharacter = (
+    index: number,
+    field: keyof Character,
+    value: any,
+  ) => {
+    setScenario((prev) => ({
+      ...prev,
+      characters: prev.characters.map((char, i) =>
+        i === index ? { ...char, [field]: value } : char,
+      ),
+    }));
+  };
+
+  // Relationship management
+  const addRelationship = () => {
+    const newRelationship: Relationship = {
+      id: Date.now().toString(),
+      personA: '',
+      personB: '',
+      value: 0,
+      reason: '',
+      isEditing: true,
+    };
+    setScenario((prev) => ({
+      ...prev,
+      initialRelationships: [...prev.initialRelationships, newRelationship],
+    }));
+  };
+
+  const saveRelationship = (id: string) => {
+    setScenario((prev) => ({
+      ...prev,
+      initialRelationships: prev.initialRelationships.map((rel) =>
+        rel.id === id ? { ...rel, isEditing: false } : rel,
+      ),
+    }));
+  };
+
+  const editRelationship = (id: string) => {
+    setScenario((prev) => ({
+      ...prev,
+      initialRelationships: prev.initialRelationships.map((rel) =>
+        rel.id === id ? { ...rel, isEditing: true } : rel,
+      ),
+    }));
+  };
+
+  const removeRelationship = (id: string) => {
+    setScenario((prev) => ({
+      ...prev,
+      initialRelationships: prev.initialRelationships.filter(
+        (rel) => rel.id !== id,
+      ),
+    }));
+  };
+
+  const updateRelationship = (
+    id: string,
+    field: keyof Relationship,
+    value: any,
+  ) => {
+    setScenario((prev) => ({
+      ...prev,
+      initialRelationships: prev.initialRelationships.map((rel) =>
+        rel.id === id ? { ...rel, [field]: value } : rel,
+      ),
+    }));
+  };
+
+  return (
+    <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="font-sans text-2xl text-kairos-gold">
+            등장인물 및 관계 설정
+          </CardTitle>
+          <Button
+            onClick={addCharacter}
+            variant="outline"
+            className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            인물 추가
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {scenario.characters.length === 0 ? (
+            <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 py-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                <Plus className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-gray-800">
+                등장인물이 없습니다
+              </h3>
+              <p className="mb-4 text-sm text-socratic-grey">
+                시나리오에 등장할 인물들을 추가해보세요.
+              </p>
+              <Button
+                onClick={addCharacter}
+                className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
+              >
+                <Plus className="mr-2 h-4 w-4" />첫 번째 인물 추가
+              </Button>
+            </div>
+          ) : (
+            scenario.characters.map((character, index) => (
+              <Card
+                key={index}
+                className={`${character.isEditing ? 'border-kairos-gold/50 bg-white/50' : 'border-socratic-grey/30 bg-gray-50/50'} relative`}
+              >
+                {character.isEditing ? (
+                  <div className="absolute right-3 top-3 flex gap-2">
+                    <Button
+                      onClick={() => saveCharacter(index)}
+                      size="sm"
+                      className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
+                    >
+                      저장
+                    </Button>
+                    <button
+                      onClick={() => removeCharacter(index)}
+                      className="text-socratic-grey transition-colors hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="absolute right-3 top-3 flex gap-2">
+                    <Button
+                      onClick={() => editCharacter(index)}
+                      size="sm"
+                      variant="outline"
+                      className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                    >
+                      수정
+                    </Button>
+                    <button
+                      onClick={() => removeCharacter(index)}
+                      className="text-socratic-grey transition-colors hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {!character.isEditing && (
+                  <div className="absolute left-3 top-3">
+                    <Badge className="border-green-300 bg-green-100 text-green-800">
+                      추가됨
+                    </Badge>
+                  </div>
+                )}
+
+                <CardContent className="pt-6">
+                  <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-800">
+                        배역 ID <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={character.roleId}
+                        onChange={(e) => {
+                          const value = e.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z]/g, '');
+                          updateCharacter(index, 'roleId', value);
+                        }}
+                        className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+                        placeholder="GUARDIAN"
+                        disabled={!character.isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-800">
+                        배역명 <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={character.roleName}
+                        onChange={(e) =>
+                          updateCharacter(index, 'roleName', e.target.value)
+                        }
+                        className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+                        placeholder="수호자"
+                        disabled={!character.isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-800">
+                        캐릭터 이름 <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={character.characterName}
+                        onChange={(e) =>
+                          updateCharacter(
+                            index,
+                            'characterName',
+                            e.target.value,
+                          )
+                        }
+                        className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+                        placeholder="박준경"
+                        disabled={!character.isEditing}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-800">
+                        배경 설정
+                      </label>
+                      <Textarea
+                        value={character.backstory}
+                        onChange={(e) =>
+                          updateCharacter(index, 'backstory', e.target.value)
+                        }
+                        className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+                        placeholder="캐릭터의 배경 스토리를 입력하세요"
+                        maxLength={300}
+                        rows={3}
+                        disabled={!character.isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-800">
+                        역할군 이미지
+                      </label>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={character.imageUrl}
+                            onChange={(e) =>
+                              updateCharacter(index, 'imageUrl', e.target.value)
+                            }
+                            className="flex-1 border-socratic-grey bg-white text-sm focus:border-kairos-gold focus:ring-kairos-gold/20"
+                            placeholder="이미지 URL 입력"
+                            disabled={!character.isEditing}
+                          />
+                          {character.isEditing && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement)
+                                    .files?.[0];
+                                  if (file) {
+                                    const url = URL.createObjectURL(file);
+                                    updateCharacter(index, 'imageUrl', url);
+                                  }
+                                };
+                                input.click();
+                              }}
+                            >
+                              파일
+                            </Button>
+                          )}
+                        </div>
+                        {character.imageUrl && (
+                          <img
+                            src={character.imageUrl || '/placeholder.svg'}
+                            alt="캐릭터 이미지"
+                            className="h-16 w-16 rounded border object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-800">
+                      가중치 특성 유형
+                    </label>
+                    {scenario.traitPool.buffs.length === 0 &&
+                    scenario.traitPool.debuffs.length === 0 ? (
+                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                        <p className="text-sm text-yellow-800">
+                          먼저 아래 "시나리오 시스템 규칙" 섹션에서 특성 풀을
+                          생성해주세요.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {character.isEditing && (
+                          <Select
+                            onValueChange={(value) => {
+                              const allTraits = [
+                                ...scenario.traitPool.buffs,
+                                ...scenario.traitPool.debuffs,
+                              ];
+                              const selectedTrait = allTraits.find(
+                                (trait) => trait.weightType === value,
+                              );
+                              if (
+                                selectedTrait &&
+                                !character.weightedTraitTypes.includes(
+                                  selectedTrait.weightType,
+                                )
+                              ) {
+                                updateCharacter(index, 'weightedTraitTypes', [
+                                  ...character.weightedTraitTypes,
+                                  selectedTrait.weightType,
+                                ]);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="mb-2 border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20">
+                              <SelectValue placeholder="특성 유형 선택" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <div className="bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                                긍정 특성 (BUFF)
+                              </div>
+                              {scenario.traitPool.buffs.map(
+                                (trait, traitIndex) => (
+                                  <SelectItem
+                                    key={`buff-${traitIndex}`}
+                                    value={trait.weightType}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                                      <span>{trait.traitName}</span>
+                                      <span className="text-xs text-socratic-grey">
+                                        ({trait.weightType})
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ),
+                              )}
+                              <div className="mt-1 bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
+                                부정 특성 (DEBUFF)
+                              </div>
+                              {scenario.traitPool.debuffs.map(
+                                (trait, traitIndex) => (
+                                  <SelectItem
+                                    key={`debuff-${traitIndex}`}
+                                    value={trait.weightType}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                                      <span>{trait.traitName}</span>
+                                      <span className="text-xs text-socratic-grey">
+                                        ({trait.weightType})
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                          {character.weightedTraitTypes.map(
+                            (weightType, wtIndex) => {
+                              const allTraits = [
+                                ...scenario.traitPool.buffs,
+                                ...scenario.traitPool.debuffs,
+                              ];
+                              const trait = allTraits.find(
+                                (t) => t.weightType === weightType,
+                              );
+                              const isPositive = scenario.traitPool.buffs.some(
+                                (t) => t.weightType === weightType,
+                              );
+
+                              return (
+                                <Badge
+                                  key={wtIndex}
+                                  className={`${isPositive ? 'border-green-300 bg-green-100 text-green-800' : 'border-red-300 bg-red-100 text-red-800'} hover:opacity-80`}
+                                >
+                                  <span
+                                    className={`mr-1 h-2 w-2 rounded-full ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
+                                  ></span>
+                                  {trait?.traitName || weightType}
+                                  {character.isEditing && (
+                                    <button
+                                      onClick={() => {
+                                        const newTraitTypes =
+                                          character.weightedTraitTypes.filter(
+                                            (_, i) => i !== wtIndex,
+                                          );
+                                        updateCharacter(
+                                          index,
+                                          'weightedTraitTypes',
+                                          newTraitTypes,
+                                        );
+                                      }}
+                                      className="ml-2 hover:text-red-600"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </Badge>
+                              );
+                            },
+                          )}
+                        </div>
+
+                        <p className="mt-1 text-xs text-socratic-grey">
+                          특성 풀에서 이 캐릭터에게 적용될 가중치 특성을
+                          선택하세요
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+
+          {/* 초기 관계 설정 */}
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="font-medium text-gray-800">초기 관계 설정</h4>
+              <Button
+                onClick={addRelationship}
+                variant="outline"
+                size="sm"
+                className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                disabled={scenario.characters.length < 2}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                관계 추가
+              </Button>
+            </div>
+
+            {scenario.initialRelationships.length === 0 ? (
+              <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 py-8 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                  <Plus className="h-6 w-6 text-gray-400" />
+                </div>
+                <h4 className="text-md mb-2 font-medium text-gray-800">
+                  관계 설정이 없습니다
+                </h4>
+                <p className="mb-3 text-sm text-socratic-grey">
+                  등장인물 간의 초기 관계를 설정해보세요.
+                </p>
+                {scenario.characters.length >= 2 ? (
+                  <Button
+                    onClick={addRelationship}
+                    size="sm"
+                    className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    관계 추가
+                  </Button>
+                ) : (
+                  <p className="text-xs text-socratic-grey">
+                    관계 설정을 위해서는 최소 2명의 등장인물이 필요합니다.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {scenario.initialRelationships.map((relationship) => (
+                  <Card
+                    key={relationship.id}
+                    className={`${relationship.isEditing ? 'border-kairos-gold/50 bg-white/50' : 'border-socratic-grey/30 bg-gray-50/50'} relative`}
+                  >
+                    {relationship.isEditing ? (
+                      <div className="absolute right-3 top-3 flex gap-2">
+                        <Button
+                          onClick={() => saveRelationship(relationship.id)}
+                          size="sm"
+                          className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
+                        >
+                          저장
+                        </Button>
+                        <button
+                          onClick={() => removeRelationship(relationship.id)}
+                          className="text-socratic-grey hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="absolute right-3 top-3 flex gap-2">
+                        <Badge className="mr-2 border-green-300 bg-green-100 text-green-800">
+                          추가됨
+                        </Badge>
+                        <Button
+                          onClick={() => editRelationship(relationship.id)}
+                          size="sm"
+                          variant="outline"
+                          className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                        >
+                          수정
+                        </Button>
+                        <button
+                          onClick={() => removeRelationship(relationship.id)}
+                          className="text-socratic-grey hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    <CardContent className="pt-6">
+                      <div className="mb-4 grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-800">
+                            인물 A <span className="text-red-500">*</span>
+                          </label>
+                          <Select
+                            value={relationship.personA}
+                            onValueChange={(value) =>
+                              updateRelationship(
+                                relationship.id,
+                                'personA',
+                                value,
+                              )
+                            }
+                            disabled={!relationship.isEditing}
+                          >
+                            <SelectTrigger className="border-socratic-grey bg-white">
+                              <SelectValue placeholder="인물 A 선택" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {scenario.characters.map((char, index) => (
+                                <SelectItem
+                                  key={index}
+                                  value={char.characterName}
+                                >
+                                  {char.characterName || `인물 ${index + 1}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-800">
+                            인물 B <span className="text-red-500">*</span>
+                          </label>
+                          <Select
+                            value={relationship.personB}
+                            onValueChange={(value) =>
+                              updateRelationship(
+                                relationship.id,
+                                'personB',
+                                value,
+                              )
+                            }
+                            disabled={!relationship.isEditing}
+                          >
+                            <SelectTrigger className="border-socratic-grey bg-white">
+                              <SelectValue placeholder="인물 B 선택" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {scenario.characters.map((char, index) => (
+                                <SelectItem
+                                  key={index}
+                                  value={char.characterName}
+                                >
+                                  {char.characterName || `인물 ${index + 1}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-800">
+                            초기 관계도 수치: {relationship.value}
+                          </label>
+                          <Slider
+                            value={[relationship.value]}
+                            onValueChange={(value) =>
+                              updateRelationship(
+                                relationship.id,
+                                'value',
+                                value[0],
+                              )
+                            }
+                            min={-100}
+                            max={100}
+                            step={1}
+                            className="w-full"
+                            disabled={!relationship.isEditing}
+                          />
+                          <div className="mt-1 flex justify-between text-xs text-socratic-grey">
+                            <span>-100 (적대)</span>
+                            <span>0 (중립)</span>
+                            <span>100 (우호)</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-800">
+                            관계 설정 이유
+                          </label>
+                          <Input
+                            value={relationship.reason}
+                            onChange={(e) =>
+                              updateRelationship(
+                                relationship.id,
+                                'reason',
+                                e.target.value,
+                              )
+                            }
+                            className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+                            placeholder="과거의 악연"
+                            maxLength={50}
+                            disabled={!relationship.isEditing}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
