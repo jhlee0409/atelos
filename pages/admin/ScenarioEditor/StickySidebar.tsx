@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Save, AlertCircle } from 'lucide-react';
 import { ScenarioData } from '@/types';
 import { SetStateAction } from 'react';
+import { toast } from 'sonner';
 
 type Props = {
   scenario: ScenarioData;
@@ -162,7 +163,7 @@ export default function StickySidebar({
                 navigator.clipboard.writeText(
                   JSON.stringify(scenario, null, 2),
                 );
-                alert('JSON이 클립보드에 복사되었습니다.');
+                toast.success('JSON이 클립보드에 복사되었습니다.');
               }}
               variant="outline"
               size="sm"
