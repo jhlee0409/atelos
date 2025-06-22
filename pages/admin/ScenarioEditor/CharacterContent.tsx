@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
-import { SetStateAction, useState } from 'react';
+import { SetStateAction } from 'react';
 
 type Props = {
   scenario: ScenarioData;

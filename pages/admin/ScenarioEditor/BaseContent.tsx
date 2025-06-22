@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, X } from 'lucide-react';
 import type { ScenarioData } from '@/types';
 import { SetStateAction, useState, useRef } from 'react';
+import { VALIDATION_IDS } from '@/constants/scenario';
 
 type Props = {
   scenario: ScenarioData;
@@ -64,7 +65,9 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                 setScenario((prev) => ({ ...prev, scenarioId: value }));
               }}
               className={`border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-                errors.includes('시나리오 ID') ? 'border-red-500' : ''
+                errors.includes(VALIDATION_IDS.SCENARIO_ID)
+                  ? 'border-red-500'
+                  : ''
               }`}
               placeholder="ZERO_HOUR"
             />
@@ -86,7 +89,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                 }))
               }
               className={`border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-                errors.includes('시나리오 제목') ? 'border-red-500' : ''
+                errors.includes(VALIDATION_IDS.TITLE) ? 'border-red-500' : ''
               }`}
               placeholder="제로 아워: 도시의 법칙"
               maxLength={50}
@@ -109,7 +112,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                   }))
                 }
                 className={`flex-1 border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-                  errors.includes('시나리오 포스터 이미지')
+                  errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
                     ? 'border-red-500'
                     : ''
                 }`}
@@ -172,7 +175,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
               }))
             }
             className={`min-h-[120px] border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-              errors.includes('시나리오 시놉시스') ? 'border-red-500' : ''
+              errors.includes(VALIDATION_IDS.SYNOPSIS) ? 'border-red-500' : ''
             }`}
             placeholder="시나리오의 전체적인 개요와 배경을 설명하세요"
             maxLength={1000}
@@ -195,7 +198,9 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
               }))
             }
             className={`border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-              errors.includes('플레이어 목표') ? 'border-red-500' : ''
+              errors.includes(VALIDATION_IDS.PLAYER_GOAL)
+                ? 'border-red-500'
+                : ''
             }`}
             placeholder="플레이어가 달성해야 할 목표를 설명하세요"
             maxLength={200}
@@ -217,7 +222,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                 onChange={(e) => setNewGenre(e.target.value)}
                 className="border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20"
                 placeholder="사회 드라마, 스릴러"
-                onKeyPress={(e) =>
+                onKeyDown={(e) =>
                   e.key === 'Enter' && addTag('genre', newGenre)
                 }
               />
@@ -260,7 +265,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                 onChange={(e) => setNewKeyword(e.target.value)}
                 className="border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20"
                 placeholder="리더십, 딜레마"
-                onKeyPress={(e) =>
+                onKeyDown={(e) =>
                   e.key === 'Enter' && addTag('coreKeywords', newKeyword)
                 }
               />
