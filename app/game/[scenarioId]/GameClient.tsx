@@ -18,6 +18,18 @@ import type {
 } from '@/types';
 import { buildInitialDilemmaPrompt } from '@/lib/prompt-builder';
 import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
+import {
+  Bell,
+  User,
+  Drama,
+  Sunrise,
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  MessageCircle,
+  Calendar,
+} from 'lucide-react';
 
 // --- Locally Defined Types (to fix import errors) ---
 export interface SaveState {
@@ -142,60 +154,96 @@ const checkEndingConditions = (
 
 // --- Components ---
 
-// 날짜 변경을 표시하는 컴포넌트
-const DaySeparator = ({ day }: { day: number }) => (
-  <div className="absolute left-0 top-0 z-10 flex h-10 w-full items-center bg-black">
-    <div className="flex w-full items-center">
-      <div className="flex-grow border-t border-gray-600"></div>
-      <span className="mx-4 flex-shrink-0 text-sm font-bold text-gray-400">
-        Day {day}
-      </span>
-      <div className="flex-grow border-t border-gray-600"></div>
-    </div>
-  </div>
-);
-
 const ChatMessage = ({
   message,
+  isLatest = false,
 }: {
   message: {
     type: 'system' | 'player' | 'ai';
     content: string;
     timestamp: number;
   };
+  isLatest?: boolean;
 }) => {
   const getMessageStyle = () => {
     switch (message.type) {
       case 'system':
-        return 'bg-gray-700/50 text-gray-300 border-l-4 border-gray-500';
+        // Day 변경 메시지인지 확인
+        const isDayChange =
+          message.content.includes('Day') && message.content.includes('시작');
+
+        if (isDayChange) {
+          return {
+            container: 'flex justify-center mb-6',
+            bubble:
+              'bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur-sm text-white px-6 py-3 rounded-full border border-purple-500/30 shadow-lg',
+            icon: Sunrise,
+            label: '',
+          };
+        } else {
+          return {
+            container: 'flex justify-center mb-4',
+            bubble:
+              'bg-gray-800/60 backdrop-blur-sm text-gray-300 px-4 py-2 rounded-lg text-sm border border-gray-600/30',
+            icon: Bell,
+            label: '',
+          };
+        }
       case 'player':
-        return 'bg-blue-600/20 text-blue-200 border-l-4 border-blue-500 ml-8';
+        return {
+          container: 'flex justify-end mb-4',
+          bubble:
+            'bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-3 rounded-2xl rounded-br-md max-w-md shadow-lg relative',
+          icon: User,
+          label: '나의 선택',
+        };
       case 'ai':
-        return 'bg-purple-600/20 text-purple-200 border-l-4 border-purple-500 mr-8';
+        return {
+          container: 'flex justify-start mb-4',
+          bubble:
+            'bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-md max-w-md shadow-lg relative',
+          icon: Drama,
+          label: '상황 변화',
+        };
       default:
-        return 'bg-gray-600/20 text-gray-300';
+        return {
+          container: 'flex justify-center mb-4',
+          bubble: 'bg-gray-600/50 text-gray-300 px-4 py-2 rounded-lg max-w-md',
+          icon: MessageCircle,
+          label: '',
+        };
     }
   };
 
-  const getMessagePrefix = () => {
-    switch (message.type) {
-      case 'system':
-        return '[시스템]';
-      case 'player':
-        return '[나의 선택]';
-      case 'ai':
-        return '[상황 변화]';
-      default:
-        return '';
-    }
-  };
+  const style = getMessageStyle();
+  const animationClass = isLatest ? 'animate-fade-in' : '';
+  const IconComponent = style.icon;
 
   return (
-    <div className={cn('mb-4 rounded-lg p-4', getMessageStyle())}>
-      <div className="mb-1 text-xs font-semibold opacity-70">
-        {getMessagePrefix()}
+    <div className={`${style.container} ${animationClass}`}>
+      <div
+        className={`${style.bubble} transform transition-all duration-300 hover:scale-105 active:scale-95`}
+      >
+        {message.type !== 'system' && (
+          <div className="mb-1 flex items-center text-xs font-semibold opacity-80">
+            <IconComponent className="mr-1 h-3 w-3" />
+            {style.label}
+          </div>
+        )}
+        <div className="flex items-center whitespace-pre-wrap leading-relaxed">
+          {message.type === 'system' && (
+            <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
+          )}
+          {message.content}
+        </div>
+        {/* 말풍선 꼬리 */}
+        {message.type === 'player' && (
+          <div className="absolute -bottom-1 -right-1 h-3 w-3 rotate-45 transform bg-blue-500"></div>
+        )}
+        {message.type === 'ai' && (
+          <div className="absolute -bottom-1 -left-1 h-3 w-3 rotate-45 transform bg-purple-500"></div>
+        )}
       </div>
-      <div className="whitespace-pre-wrap">{message.content}</div>
     </div>
   );
 };
@@ -205,11 +253,13 @@ const StatDisplay = ({
   value,
   min,
   max,
+  isCompact = false,
 }: {
   name: string;
   value: number;
   min: number;
   max: number;
+  isCompact?: boolean;
 }) => {
   const percentage = Math.max(
     0,
@@ -218,12 +268,48 @@ const StatDisplay = ({
 
   let stateColor = 'bg-blue-500';
   let stateKeyword = '안정';
-  if (percentage < 33) {
-    stateColor = 'bg-red-600';
+  let pulseClass = '';
+
+  if (percentage < 25) {
+    stateColor = 'bg-red-500';
     stateKeyword = '위험';
-  } else if (percentage < 66) {
+    pulseClass = 'animate-pulse';
+  } else if (percentage < 50) {
     stateColor = 'bg-yellow-500';
     stateKeyword = '불안';
+  } else if (percentage >= 75) {
+    stateColor = 'bg-green-500';
+    stateKeyword = '우수';
+  }
+
+  if (isCompact) {
+    return (
+      <div className="flex items-center space-x-2">
+        <span className="min-w-0 truncate text-xs text-gray-400">{name}</span>
+        <div className="flex items-center space-x-1">
+          <div className="h-1.5 w-8 rounded-full bg-gray-700">
+            <div
+              className={cn(
+                'h-1.5 rounded-full transition-all duration-500',
+                stateColor,
+                pulseClass,
+              )}
+              style={{ width: `${percentage}%` }}
+            ></div>
+          </div>
+          <span
+            className={cn('text-xs font-semibold', {
+              'text-red-400': percentage < 25,
+              'text-yellow-400': percentage >= 25 && percentage < 50,
+              'text-blue-400': percentage >= 50 && percentage < 75,
+              'text-green-400': percentage >= 75,
+            })}
+          >
+            {Math.round(percentage)}%
+          </span>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -232,21 +318,183 @@ const StatDisplay = ({
         <span className="text-sm text-gray-400">{name}</span>
         <span
           className={cn('text-xs font-semibold', {
-            'text-red-400': percentage < 33,
-            'text-yellow-400': percentage >= 33 && percentage < 66,
-            'text-blue-400': percentage >= 66,
+            'text-red-400': percentage < 25,
+            'text-yellow-400': percentage >= 25 && percentage < 50,
+            'text-blue-400': percentage >= 50 && percentage < 75,
+            'text-green-400': percentage >= 75,
           })}
         >
           {stateKeyword}
         </span>
       </div>
-      <div className="h-1.5 w-full rounded bg-gray-700">
+      <div className="h-2 w-full rounded-full bg-gray-700">
         <div
-          className={cn('h-1.5 rounded', stateColor)}
+          className={cn(
+            'h-2 rounded-full transition-all duration-500',
+            stateColor,
+            pulseClass,
+          )}
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
     </div>
+  );
+};
+
+// 컴팩트 스탯 바 컴포넌트
+const CompactStatsBar = ({
+  scenario,
+  saveState,
+  isExpanded,
+  onToggle,
+}: {
+  scenario: ScenarioData;
+  saveState: SaveState;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) => {
+  const getStatValue = (statId: string) => {
+    return saveState.context.scenarioStats[statId] ?? 0;
+  };
+
+  return (
+    <div className="sticky top-0 z-20 border-b border-gray-700/50 bg-gray-900/95 shadow-lg backdrop-blur-sm">
+      <div className="px-4 py-3">
+        <button
+          onClick={onToggle}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <h2 className="flex items-center text-sm font-bold text-white">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            상태
+          </h2>
+          <span className="text-xs text-gray-400">
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </span>
+        </button>
+
+        {isExpanded ? (
+          <div className="mt-3 space-y-3">
+            {scenario.scenarioStats.map((stat) => (
+              <StatDisplay
+                key={stat.id}
+                name={stat.name}
+                value={getStatValue(stat.id)}
+                min={stat.min}
+                max={stat.max}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {scenario.scenarioStats.map((stat) => (
+              <StatDisplay
+                key={stat.id}
+                name={stat.name}
+                value={getStatValue(stat.id)}
+                min={stat.min}
+                max={stat.max}
+                isCompact={true}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 위험도 감지 함수
+const detectUrgency = (choice_a: string, choice_b: string): boolean => {
+  const urgencyKeywords = [
+    '공격',
+    '싸운',
+    '위험',
+    '생명',
+    '죽음',
+    '파괴',
+    '절망',
+    '최후',
+    '마지막',
+  ];
+  const text = (choice_a + ' ' + choice_b).toLowerCase();
+  return urgencyKeywords.some((keyword) => text.includes(keyword));
+};
+
+// 선택지 버튼 컴포넌트
+const ChoiceButton = ({
+  choice,
+  onClick,
+  variant = 'primary',
+  disabled = false,
+  urgency = false,
+}: {
+  choice: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+  urgency?: boolean;
+}) => {
+  const baseClasses =
+    'flex-1 p-4 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg min-h-[48px] relative overflow-hidden';
+
+  const variantClasses =
+    variant === 'primary'
+      ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white'
+      : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white';
+
+  const urgencyClasses = urgency ? 'animate-pulse ring-2 ring-yellow-400' : '';
+  const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : '';
+
+  // 핵심 키워드 강조
+  const highlightKeywords = (text: string) => {
+    const keywords = [
+      '공격',
+      '방어',
+      '협상',
+      '도망',
+      '위험',
+      '안전',
+      '진행',
+      '후퇴',
+    ];
+    let highlightedText = text;
+
+    keywords.forEach((keyword) => {
+      if (text.includes(keyword)) {
+        highlightedText = highlightedText.replace(
+          keyword,
+          `<span class="font-extrabold text-yellow-300">${keyword}</span>`,
+        );
+      }
+    });
+
+    return highlightedText;
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        baseClasses,
+        variantClasses,
+        urgencyClasses,
+        disabledClasses,
+      )}
+    >
+      <div
+        className="relative z-10 text-center leading-tight"
+        dangerouslySetInnerHTML={{ __html: highlightKeywords(choice) }}
+      />
+      {urgency && (
+        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />
+      )}
+    </button>
   );
 };
 
@@ -415,6 +663,11 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     chatHistory: [
       {
         type: 'system',
+        content: 'Day 1 시작 - 새로운 모험이 시작됩니다.',
+        timestamp: Date.now() - 1, // 시놉시스보다 먼저 표시
+      },
+      {
+        type: 'system',
         content: synopsis,
         timestamp: Date.now(),
       },
@@ -461,8 +714,8 @@ const updateSaveState = (
     hiddenRelationships_change,
     shouldAdvanceTime,
   } = aiResponse.statChanges;
-
   for (const key in scenarioStats) {
+    console.log(scenarioStats, key, newSaveState.context.scenarioStats[key]);
     if (newSaveState.context.scenarioStats[key] !== undefined) {
       // 동적 증폭 시스템: 스탯의 현재 상태에 따라 변화량을 조절
       const currentValue = newSaveState.context.scenarioStats[key];
@@ -596,6 +849,14 @@ const updateSaveState = (
       if (newSaveState.context.currentDay !== undefined) {
         newSaveState.context.currentDay += 1;
         dayAfterUpdate = newSaveState.context.currentDay;
+
+        // 날짜가 바뀔 때 채팅 히스토리에 시스템 메시지 추가
+        newSaveState.chatHistory.push({
+          type: 'system',
+          content: `Day ${dayAfterUpdate} 시작 - 새로운 하루가 밝았습니다.`,
+          timestamp: Date.now() + 1, // AI 메시지보다 1ms 늦게 설정하여 순서 보장
+        });
+
         console.log(
           `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate}`,
         );
@@ -620,6 +881,7 @@ export default function GameClient({ scenario }: GameClientProps) {
   const [triggeredEnding, setTriggeredEnding] =
     useState<EndingArchetype | null>(null);
   const [isInitialDilemmaLoading, setIsInitialDilemmaLoading] = useState(true);
+  const [isStatsExpanded, setIsStatsExpanded] = useState(false);
   const initialDilemmaGenerated = useRef(false);
 
   // Auto-scroll to bottom when new messages are added
@@ -904,115 +1166,98 @@ export default function GameClient({ scenario }: GameClientProps) {
     );
   }
 
+  const isUrgent = detectUrgency(
+    saveState.dilemma.choice_a,
+    saveState.dilemma.choice_b,
+  );
+
   return (
-    <div className="flex h-screen w-full bg-black text-white">
-      {/* Left Panel: Stats */}
-      <aside
-        className={cn(
-          'flex-shrink-0 border-r border-gray-700 p-4',
-          isMobile ? 'w-full' : 'w-80',
-        )}
+    <div className="flex h-screen w-full flex-col bg-black text-white">
+      {/* Compact Stats Bar */}
+      <CompactStatsBar
+        scenario={scenario}
+        saveState={saveState}
+        isExpanded={isStatsExpanded}
+        onToggle={() => setIsStatsExpanded(!isStatsExpanded)}
+      />
+
+      {/* Chat History - Takes up most of the screen */}
+      <div
+        id="chat-container"
+        className="flex-1 overflow-y-auto px-4 pb-4"
+        style={{ height: 'calc(100vh - 140px)' }}
       >
-        <h2 className="mb-4 text-lg font-bold text-white">상태</h2>
-        <div className="space-y-4">
-          {scenario.scenarioStats.map((stat) => (
-            <StatDisplay
-              key={stat.id}
-              name={stat.name}
-              value={getStatValue(stat.id)}
-              min={stat.min}
-              max={stat.max}
-            />
-          ))}
+        <div className="mx-auto max-w-2xl pt-4">
+          {saveState.chatHistory.map((message, index) => {
+            const isLatest = index === saveState.chatHistory.length - 1;
+
+            return (
+              <ChatMessage
+                key={message.timestamp}
+                message={message}
+                isLatest={isLatest}
+              />
+            );
+          })}
         </div>
-      </aside>
+      </div>
 
-      {/* Main Panel: Chat History */}
-      <main className="relative flex flex-1 flex-col">
-        <div id="chat-container" className="flex-1 overflow-y-auto px-4">
-          <div className="container mx-auto mt-10 max-w-4xl">
-            {saveState.chatHistory.map((message, index) => {
-              const previousMessage = saveState.chatHistory[index - 1];
-              let showDaySeparator = false;
-
-              // 첫 메시지이거나, 이전 메시지와 날짜가 다를 경우 날짜 구분선 표시
-              if (message.type === 'ai' && previousMessage) {
-                const currentDay =
-                  message.content.match(/\[Day (\d+)\]/)?.[1] ||
-                  message.content.match(/남은 시간: (\d+)시간/)?.[1];
-                const previousDay =
-                  previousMessage.content.match(/\[Day (\d+)\]/)?.[1] ||
-                  previousMessage.content.match(/남은 시간: (\d+)시간/)?.[1];
-
-                if (currentDay && currentDay !== previousDay) {
-                  showDaySeparator = true;
-                }
-              } else if (index === 0) {
-                // 첫 시스템 메시지에 Day 1 표시
-                showDaySeparator = true;
-              }
-
-              const dayMatch = message.content.match(/\[Day (\d+)\]/);
-              const dayNumber = dayMatch
-                ? parseInt(dayMatch[1], 10)
-                : saveState.context.currentDay || 1;
-
-              return (
-                <Fragment key={message.timestamp}>
-                  {showDaySeparator && <DaySeparator day={dayNumber} />}
-                  <ChatMessage message={message} />
-                </Fragment>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Choice Window */}
-        <footer className="flex-shrink-0 border-t border-gray-700 bg-gray-900/50 p-4 shadow-inner">
-          <div className="container mx-auto max-w-4xl">
-            {isLoading ? (
-              <div className="text-center text-gray-400">
+      {/* Sticky Choice Buttons - Always visible at bottom */}
+      <div className="pb-safe-area-inset-bottom sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent px-4 pt-4">
+        <div className="mx-auto max-w-2xl">
+          {isLoading ? (
+            <div className="flex items-center justify-center space-x-2 py-6">
+              <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
+              <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
+              <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
+              <span className="ml-3 text-sm text-gray-400">
                 AI가 다음 이야기를 생성 중입니다...
-              </div>
-            ) : error ? (
-              <div className="text-center text-red-400">오류: {error}</div>
-            ) : (
-              <>
-                <p className="mb-4 text-center text-lg text-yellow-300">
+              </span>
+            </div>
+          ) : error ? (
+            <div className="rounded-lg bg-red-900/50 p-4 text-center text-red-300 backdrop-blur-sm">
+              <AlertTriangle className="mr-2 inline h-4 w-4" />
+              오류: {error}
+            </div>
+          ) : (
+            <>
+              {/* Dilemma Prompt */}
+              <div className="mb-4 rounded-2xl bg-gray-900/80 p-4 text-center backdrop-blur-sm">
+                <p className="text-sm leading-relaxed text-yellow-300">
                   {saveState.dilemma.prompt}
                 </p>
-                <div
-                  className={cn(
-                    'grid gap-4',
-                    isMobile ? 'grid-cols-1' : 'grid-cols-2',
-                  )}
-                >
-                  <button
-                    onClick={() =>
-                      handlePlayerChoice(saveState.dilemma.choice_a)
-                    }
-                    className="rounded-md bg-indigo-600 p-4 font-bold transition hover:bg-indigo-500"
-                    disabled={isInitialDilemmaLoading}
-                  >
-                    {saveState.dilemma.choice_a}
-                  </button>
-                  <button
-                    onClick={() =>
-                      handlePlayerChoice(saveState.dilemma.choice_b)
-                    }
-                    className="rounded-md bg-indigo-600 p-4 font-bold transition hover:bg-indigo-500"
-                    disabled={
-                      isInitialDilemmaLoading || !saveState.dilemma.choice_b
-                    }
-                  >
-                    {saveState.dilemma.choice_b}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </footer>
-      </main>
+                {isUrgent && (
+                  <div className="mt-2 flex items-center justify-center space-x-1 text-xs text-yellow-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>중요한 결정입니다</span>
+                    <AlertTriangle className="h-3 w-3" />
+                  </div>
+                )}
+              </div>
+
+              {/* Choice Buttons */}
+              <div className="flex space-x-3">
+                <ChoiceButton
+                  choice={saveState.dilemma.choice_a}
+                  onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
+                  variant="primary"
+                  disabled={isInitialDilemmaLoading}
+                  urgency={isUrgent}
+                />
+                <ChoiceButton
+                  choice={saveState.dilemma.choice_b}
+                  onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
+                  variant="secondary"
+                  disabled={
+                    isInitialDilemmaLoading || !saveState.dilemma.choice_b
+                  }
+                  urgency={isUrgent}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
