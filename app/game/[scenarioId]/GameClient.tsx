@@ -464,7 +464,48 @@ const updateSaveState = (
 
   for (const key in scenarioStats) {
     if (newSaveState.context.scenarioStats[key] !== undefined) {
-      newSaveState.context.scenarioStats[key] += scenarioStats[key];
+      // 동적 증폭 시스템: 스탯의 현재 상태에 따라 변화량을 조절
+      const currentValue = newSaveState.context.scenarioStats[key];
+      const statDef = scenario.scenarioStats.find((s) => s.id === key);
+
+      if (statDef) {
+        const { min, max } = statDef;
+        const range = max - min;
+        const percentage = ((currentValue - min) / range) * 100;
+
+        let amplificationFactor: number;
+
+        // 스탯이 위험하거나 최대치에 가까울 때는 부드럽게 증폭
+        if (percentage <= 25 || percentage >= 75) {
+          amplificationFactor = 1.5;
+        }
+        // 스탯이 안정적인 중간 구간일 때는 크게 증폭하여 긴장감 조성
+        else {
+          amplificationFactor = 3.0;
+        }
+
+        const originalChange = scenarioStats[key];
+        const amplifiedChange = Math.round(
+          originalChange * amplificationFactor,
+        );
+
+        // 스탯이 범위를 벗어나지 않도록 안전장치 추가
+        const newValue = currentValue + amplifiedChange;
+        const clampedChange = Math.max(
+          min - currentValue,
+          Math.min(max - currentValue, amplifiedChange),
+        );
+
+        newSaveState.context.scenarioStats[key] += clampedChange;
+
+        console.log(
+          `📊 스탯 변화: ${key} | 원본: ${originalChange} | 증폭: ${amplifiedChange} | 실제 적용: ${clampedChange} | 현재 비율: ${percentage.toFixed(1)}%`,
+        );
+      } else {
+        // 스탯 정의를 찾을 수 없는 경우 기본 증폭 적용
+        const amplifiedChange = Math.round(scenarioStats[key] * 2.0);
+        newSaveState.context.scenarioStats[key] += amplifiedChange;
+      }
     }
   }
 
