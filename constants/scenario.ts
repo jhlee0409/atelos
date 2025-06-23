@@ -13,9 +13,9 @@ export const initialScenario: ScenarioData = {
   endCondition: { type: '시간제한' },
   scenarioStats: [],
   traitPool: { buffs: [], debuffs: [] },
-  coreDilemmas: [],
   endingArchetypes: [],
   status: '작업 중',
+  flagDictionary: [],
 } as const;
 
 // validation ids

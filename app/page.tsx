@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-
 import type { ScenarioData } from '@/types';
 import BaseContent from '@/pages/admin/ScenarioEditor/BaseContent';
 import CharacterContent from '@/pages/admin/ScenarioEditor/CharacterContent';
@@ -12,12 +11,17 @@ import ScenarioHeader from '@/pages/admin/ScenarioEditor/ScenarioHeader';
 import { toast } from 'sonner';
 import { STORAGE_KEY } from '@/constants/scenario';
 import { validateScenario } from '@/lib/validations';
-import mockScenario from '@/mocks/ZERO_HOUR.json' with { type: 'json' };
+import { getScenarioData } from '@/mocks';
+import GeminiTest from '@/components/ui/gemini-test';
 
 export default function AtelosScenarioEditor() {
-  const [scenario, setScenario] = useState<ScenarioData>(
-    () => mockScenario as ScenarioData,
-  );
+  const [scenario, setScenario] = useState<ScenarioData>(() => {
+    const mockScenario = getScenarioData('ZERO_HOUR');
+    if (!mockScenario) {
+      throw new Error('ZERO_HOUR scenario not found');
+    }
+    return mockScenario;
+  });
   const [errors, setErrors] = useState<string[]>([]);
 
   // Save functions
@@ -49,6 +53,12 @@ export default function AtelosScenarioEditor() {
         {/* Main Content */}
         <div className="mx-auto max-w-5xl flex-1 px-8 py-12">
           <ScenarioHeader />
+
+          {/* Gemini API Test Section */}
+          <div className="mb-8 flex justify-center">
+            <GeminiTest />
+          </div>
+
           <div className="space-y-8">
             {/* Section 1: 시나리오 기본 정보 */}
             <BaseContent

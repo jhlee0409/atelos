@@ -140,12 +140,6 @@ export default function StickySidebar({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-socratic-grey">핵심 딜레마</span>
-                <span className="font-medium text-gray-800">
-                  {scenario.coreDilemmas.length}개
-                </span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-socratic-grey">엔딩 원형</span>
                 <span className="font-medium text-gray-800">
                   {scenario.endingArchetypes.length}개

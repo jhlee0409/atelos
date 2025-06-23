@@ -7,6 +7,7 @@ export type Character = {
   imageUrl: string;
   weightedTraitTypes: string[];
   isEditing?: boolean;
+  currentTrait: Trait | null;
 };
 
 export type Relationship = {
@@ -22,8 +23,9 @@ export type ScenarioStat = {
   id: string;
   name: string;
   description: string;
-  initialValue: number;
-  range: [number, number];
+  current: number;
+  min: number;
+  max: number;
   isEditing?: boolean;
 };
 
@@ -45,14 +47,33 @@ export type Dilemma = {
   isEditing?: boolean;
 };
 
-export type SystemCondition = {
-  type: '필수 스탯' | '필수 플래그' | '생존자 수';
-  statId?: string;
-  comparison?: '>=' | '<=' | '==';
-  value?: number;
-  flagName?: string;
+export type ScenarioFlag = {
+  flagName: string;
+  description: string;
+  type: 'boolean' | 'count';
+  initial: boolean | number;
   isEditing?: boolean;
 };
+
+export type SystemCondition =
+  | {
+      type: '필수 스탯';
+      statId: string;
+      comparison: '>=' | '<=' | '==';
+      value: number;
+      isEditing?: boolean;
+    }
+  | {
+      type: '필수 플래그';
+      flagName: string;
+      isEditing?: boolean;
+    }
+  | {
+      type: '생존자 수';
+      comparison: '>=' | '<=' | '==';
+      value: number;
+      isEditing?: boolean;
+    };
 
 export type EndingArchetype = {
   endingId: string;
@@ -69,6 +90,11 @@ export type EndCondition = {
   statId?: string;
 };
 
+export type TraitPool = {
+  buffs: Trait[];
+  debuffs: Trait[];
+};
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -81,11 +107,29 @@ export type ScenarioData = {
   initialRelationships: Relationship[];
   endCondition: EndCondition;
   scenarioStats: ScenarioStat[];
-  traitPool: {
-    buffs: Trait[];
-    debuffs: Trait[];
-  };
-  coreDilemmas: Dilemma[];
+  traitPool: TraitPool;
+  flagDictionary: ScenarioFlag[];
   endingArchetypes: EndingArchetype[];
   status: '작업 중' | '테스트 중' | '활성';
+};
+
+// --- Game-specific state types, not part of scenario definition ---
+
+export type PlayerState = {
+  stats: Record<string, number>;
+  flags: Record<string, boolean | number>;
+  traits: string[]; // array of traitIds
+  relationships: Record<string, number>;
+};
+
+export type StoryState = {
+  currentDay: number;
+  currentHour: number;
+  turn: number;
+  lastNarrative: string;
+  lastChoice: {
+    action: { actionId: string; description_for_ai: string };
+    playerFeedback: string;
+  } | null;
+  recentEvents: string[];
 };

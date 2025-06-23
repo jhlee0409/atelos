@@ -21,6 +21,215 @@ import {
 import { SetStateAction } from 'react';
 import { Badge } from '@/components/ui/badge';
 
+const EndingConditionBuilder = ({
+  conditions,
+  onConditionsChange,
+  scenarioStats,
+  scenario,
+}: {
+  conditions: SystemCondition[];
+  onConditionsChange: (newConditions: SystemCondition[]) => void;
+  scenarioStats: ScenarioData['scenarioStats'];
+  scenario: ScenarioData;
+}) => {
+  const addCondition = () => {
+    const newCondition: SystemCondition = {
+      type: '필수 스탯',
+      statId: scenarioStats[0]?.id || '',
+      comparison: '>=',
+      value: 0,
+      isEditing: true,
+    };
+    onConditionsChange([...conditions, newCondition]);
+  };
+
+  const updateCondition = (
+    index: number,
+    updatedCondition: SystemCondition,
+  ) => {
+    const newConditions = [...conditions];
+    newConditions[index] = updatedCondition;
+    onConditionsChange(newConditions);
+  };
+
+  const handleTypeChange = (index: number, type: SystemCondition['type']) => {
+    let newCondition: SystemCondition;
+    switch (type) {
+      case '필수 플래그':
+        newCondition = { type, flagName: '', isEditing: true };
+        break;
+      case '생존자 수':
+        newCondition = { type, comparison: '==', value: 1, isEditing: true };
+        break;
+      case '필수 스탯':
+      default:
+        newCondition = {
+          type: '필수 스탯',
+          statId: scenarioStats[0]?.id || '',
+          comparison: '>=',
+          value: 0,
+          isEditing: true,
+        };
+        break;
+    }
+    updateCondition(index, newCondition);
+  };
+
+  const removeCondition = (index: number) => {
+    onConditionsChange(conditions.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border border-socratic-grey/20 bg-gray-50/50 p-3">
+      <h5 className="text-sm font-semibold text-gray-700">시스템 조건</h5>
+      {conditions.map((condition, index) => (
+        <div
+          key={index}
+          className="space-y-2 rounded-md border border-socratic-grey/20 bg-white p-2 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <Select
+              value={condition.type}
+              onValueChange={(value: SystemCondition['type']) =>
+                handleTypeChange(index, value)
+              }
+            >
+              <SelectTrigger className="w-full border-socratic-grey/50 bg-white">
+                <SelectValue placeholder="조건 유형" />
+              </SelectTrigger>
+              <SelectContent className="border-socratic-grey bg-parchment-white">
+                <SelectItem value="필수 스탯">필수 스탯</SelectItem>
+                <SelectItem value="필수 플래그">필수 플래그</SelectItem>
+                <SelectItem value="생존자 수">생존자 수</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => removeCondition(index)}
+              className="shrink-0 text-gray-400 hover:bg-red-100 hover:text-red-500"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          {condition.type === '필수 스탯' && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Select
+                value={condition.statId}
+                onValueChange={(statId) =>
+                  updateCondition(index, { ...condition, statId })
+                }
+              >
+                <SelectTrigger className="border-socratic-grey/50 bg-white">
+                  <SelectValue placeholder="대상 스탯" />
+                </SelectTrigger>
+                <SelectContent className="border-socratic-grey bg-parchment-white">
+                  {scenarioStats.map((stat) => (
+                    <SelectItem key={stat.id} value={stat.id}>
+                      {stat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={condition.comparison}
+                onValueChange={(comparison) =>
+                  updateCondition(index, {
+                    ...condition,
+                    comparison: comparison as '>=' | '<=' | '==',
+                  })
+                }
+              >
+                <SelectTrigger className="border-socratic-grey/50 bg-white">
+                  <SelectValue placeholder="비교" />
+                </SelectTrigger>
+                <SelectContent className="border-socratic-grey bg-parchment-white">
+                  <SelectItem value=">=">&gt;=</SelectItem>
+                  <SelectItem value="<=">&lt;=</SelectItem>
+                  <SelectItem value="==">==</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                value={condition.value}
+                onChange={(e) =>
+                  updateCondition(index, {
+                    ...condition,
+                    value: parseInt(e.target.value, 10),
+                  })
+                }
+                className="border-socratic-grey/50"
+              />
+            </div>
+          )}
+          {condition.type === '필수 플래그' && (
+            <Select
+              value={condition.flagName}
+              onValueChange={(flagName) =>
+                updateCondition(index, { ...condition, flagName })
+              }
+            >
+              <SelectTrigger className="border-socratic-grey/50 bg-white">
+                <SelectValue placeholder="필수 플래그 선택" />
+              </SelectTrigger>
+              <SelectContent className="border-socratic-grey bg-parchment-white">
+                {scenario.flagDictionary
+                  .filter((flag) => flag.flagName)
+                  .map((flag) => (
+                    <SelectItem key={flag.flagName} value={flag.flagName}>
+                      {flag.flagName}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+          {condition.type === '생존자 수' && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Select
+                value={condition.comparison}
+                onValueChange={(comparison) =>
+                  updateCondition(index, {
+                    ...condition,
+                    comparison: comparison as '>=' | '<=' | '==',
+                  })
+                }
+              >
+                <SelectTrigger className="border-socratic-grey/50 bg-white">
+                  <SelectValue placeholder="비교" />
+                </SelectTrigger>
+                <SelectContent className="border-socratic-grey bg-parchment-white">
+                  <SelectItem value=">=">&gt;=</SelectItem>
+                  <SelectItem value="<=">&lt;=</SelectItem>
+                  <SelectItem value="==">==</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                value={condition.value}
+                onChange={(e) =>
+                  updateCondition(index, {
+                    ...condition,
+                    value: parseInt(e.target.value, 10),
+                  })
+                }
+                className="border-socratic-grey/50"
+              />
+            </div>
+          )}
+        </div>
+      ))}
+      <Button
+        onClick={addCondition}
+        variant="outline"
+        className="mt-2 w-full border-2 border-dashed border-socratic-grey/30 bg-transparent text-socratic-grey shadow-none transition-all hover:border-kairos-gold/50 hover:bg-kairos-gold/10 hover:text-kairos-gold"
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        조건 추가
+      </Button>
+    </div>
+  );
+};
+
 type Props = {
   scenario: ScenarioData;
   setScenario: (value: SetStateAction<ScenarioData>) => void;
@@ -32,58 +241,6 @@ export default function CoreStoryElementsContent({
   setScenario,
   errors,
 }: Props) {
-  // Dilemma management
-  const addDilemma = () => {
-    const newDilemma: Dilemma = {
-      dilemmaId: '',
-      title: '',
-      description: '',
-      isEditing: true,
-    };
-    setScenario((prev) => ({
-      ...prev,
-      coreDilemmas: [...prev.coreDilemmas, newDilemma],
-    }));
-  };
-
-  const saveDilemma = (index: number) => {
-    setScenario((prev) => ({
-      ...prev,
-      coreDilemmas: prev.coreDilemmas.map((dilemma, i) =>
-        i === index ? { ...dilemma, isEditing: false } : dilemma,
-      ),
-    }));
-  };
-
-  const editDilemma = (index: number) => {
-    setScenario((prev) => ({
-      ...prev,
-      coreDilemmas: prev.coreDilemmas.map((dilemma, i) =>
-        i === index ? { ...dilemma, isEditing: true } : dilemma,
-      ),
-    }));
-  };
-
-  const removeDilemma = (index: number) => {
-    setScenario((prev) => ({
-      ...prev,
-      coreDilemmas: prev.coreDilemmas.filter((_, i) => i !== index),
-    }));
-  };
-
-  const updateDilemma = (
-    index: number,
-    field: keyof Dilemma,
-    value: string,
-  ) => {
-    setScenario((prev) => ({
-      ...prev,
-      coreDilemmas: prev.coreDilemmas.map((dilemma, i) =>
-        i === index ? { ...dilemma, [field]: value } : dilemma,
-      ),
-    }));
-  };
-
   // Ending management
   const addEnding = () => {
     const newEnding: EndingArchetype = {
@@ -136,6 +293,14 @@ export default function CoreStoryElementsContent({
       ),
     }));
   };
+
+  const updateEndingConditions = (
+    endingIndex: number,
+    newConditions: SystemCondition[],
+  ) => {
+    updateEnding(endingIndex, 'systemConditions', newConditions);
+  };
+
   return (
     <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
       <CardHeader>
@@ -144,138 +309,6 @@ export default function CoreStoryElementsContent({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 핵심 딜레마 */}
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h4 className="font-medium text-gray-800">핵심 딜레마</h4>
-            <Button
-              onClick={addDilemma}
-              variant="outline"
-              size="sm"
-              className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              딜레마 추가
-            </Button>
-          </div>
-
-          {scenario.coreDilemmas.length === 0 ? (
-            <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 py-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-                <Plus className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-gray-800">
-                핵심 딜레마가 없습니다
-              </h3>
-              <p className="mb-4 text-sm text-socratic-grey">
-                시나리오의 핵심적인 딜레마를 추가해보세요.
-              </p>
-              <Button
-                onClick={addDilemma}
-                className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
-              >
-                <Plus className="mr-2 h-4 w-4" />첫 번째 딜레마 추가
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {scenario.coreDilemmas.map((dilemma, index) => (
-                <Card
-                  key={index}
-                  className={`${dilemma.isEditing ? 'border-kairos-gold/50 bg-white/50' : 'border-socratic-grey/30 bg-gray-50/50'} relative`}
-                >
-                  <div className="absolute right-3 top-3 flex items-center gap-2">
-                    {dilemma.isEditing ? (
-                      <>
-                        <Button
-                          onClick={() => saveDilemma(index)}
-                          size="sm"
-                          className="bg-kairos-gold text-telos-black hover:bg-kairos-gold/90"
-                        >
-                          저장
-                        </Button>
-                        <button
-                          onClick={() => removeDilemma(index)}
-                          className="text-socratic-grey hover:text-red-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Badge className="border-green-300 bg-green-100 text-green-800">
-                          추가됨
-                        </Badge>
-                        <Button
-                          onClick={() => editDilemma(index)}
-                          size="sm"
-                          variant="outline"
-                          className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                        >
-                          수정
-                        </Button>
-                        <button
-                          onClick={() => removeDilemma(index)}
-                          className="text-socratic-grey hover:text-red-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <CardContent className="pt-12">
-                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-800">
-                          딜레마 ID
-                        </label>
-                        <Input
-                          value={dilemma.dilemmaId}
-                          onChange={(e) =>
-                            updateDilemma(index, 'dilemmaId', e.target.value)
-                          }
-                          className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
-                          placeholder="HOSPITAL_SCREAM"
-                          disabled={!dilemma.isEditing}
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-800">
-                          제목
-                        </label>
-                        <Input
-                          value={dilemma.title}
-                          onChange={(e) =>
-                            updateDilemma(index, 'title', e.target.value)
-                          }
-                          className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
-                          placeholder="병원의 비명"
-                          disabled={!dilemma.isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-800">
-                        설명
-                      </label>
-                      <Textarea
-                        value={dilemma.description}
-                        onChange={(e) =>
-                          updateDilemma(index, 'description', e.target.value)
-                        }
-                        className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
-                        placeholder="딜레마 상황을 자세히 설명하세요"
-                        rows={3}
-                        disabled={!dilemma.isEditing}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* 엔딩 원형 */}
         <div>
           <div className="mb-4 flex items-center justify-between">
@@ -386,7 +419,7 @@ export default function CoreStoryElementsContent({
                         />
                       </div>
                     </div>
-                    <div className="mb-4">
+                    <div>
                       <label className="mb-2 block text-sm font-medium text-gray-800">
                         설명
                       </label>
@@ -396,264 +429,19 @@ export default function CoreStoryElementsContent({
                           updateEnding(index, 'description', e.target.value)
                         }
                         className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
-                        placeholder="엔딩 시나리오를 설명하세요"
-                        rows={3}
+                        placeholder="군대가 도착하기 직전, 혼란의 도시를 성공적으로 탈출한다."
                         disabled={!ending.isEditing}
                       />
                     </div>
-
-                    <div>
-                      <div className="mb-3 flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-800">
-                          시스템 조건
-                        </label>
-                        <Button
-                          onClick={() => {
-                            const newCondition: SystemCondition = {
-                              type: '필수 스탯',
-                            };
-                            updateEnding(index, 'systemConditions', [
-                              ...ending.systemConditions,
-                              newCondition,
-                            ]);
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                          disabled={!ending.isEditing}
-                        >
-                          <Plus className="mr-1 h-3 w-3" />
-                          조건 추가
-                        </Button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {ending.systemConditions.map((condition, condIndex) => (
-                          <div
-                            key={condIndex}
-                            className="flex items-center gap-2 rounded bg-gray-50 p-3"
-                          >
-                            <Select
-                              value={condition.type}
-                              onValueChange={(
-                                value:
-                                  | '필수 스탯'
-                                  | '필수 플래그'
-                                  | '생존자 수',
-                              ) => {
-                                const newConditions = [
-                                  ...ending.systemConditions,
-                                ];
-                                newConditions[condIndex] = {
-                                  type: value,
-                                };
-                                updateEnding(
-                                  index,
-                                  'systemConditions',
-                                  newConditions,
-                                );
-                              }}
-                              disabled={!ending.isEditing}
-                            >
-                              <SelectTrigger className="w-32 border-socratic-grey bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="필수 스탯">
-                                  필수 스탯
-                                </SelectItem>
-                                <SelectItem value="필수 플래그">
-                                  필수 플래그
-                                </SelectItem>
-                                <SelectItem value="생존자 수">
-                                  생존자 수
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-
-                            {condition.type === '필수 스탯' && (
-                              <>
-                                <Select
-                                  value={condition.statId || ''}
-                                  onValueChange={(value) => {
-                                    const newConditions = [
-                                      ...ending.systemConditions,
-                                    ];
-                                    newConditions[condIndex] = {
-                                      ...condition,
-                                      statId: value,
-                                    };
-                                    updateEnding(
-                                      index,
-                                      'systemConditions',
-                                      newConditions,
-                                    );
-                                  }}
-                                  disabled={!ending.isEditing}
-                                >
-                                  <SelectTrigger className="w-32 border-socratic-grey bg-white">
-                                    <SelectValue placeholder="스탯 선택" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {scenario.scenarioStats.map((stat) => (
-                                      <SelectItem key={stat.id} value={stat.id}>
-                                        {stat.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Select
-                                  value={condition.comparison || '>='}
-                                  onValueChange={(
-                                    value: '>=' | '<=' | '==',
-                                  ) => {
-                                    const newConditions = [
-                                      ...ending.systemConditions,
-                                    ];
-                                    newConditions[condIndex] = {
-                                      ...condition,
-                                      comparison: value,
-                                    };
-                                    updateEnding(
-                                      index,
-                                      'systemConditions',
-                                      newConditions,
-                                    );
-                                  }}
-                                  disabled={!ending.isEditing}
-                                >
-                                  <SelectTrigger className="w-20 border-socratic-grey bg-white">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value=">=">{'>='}</SelectItem>
-                                    <SelectItem value="<=">{`<=`}</SelectItem>
-                                    <SelectItem value="==">==</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  value={condition.value || ''}
-                                  onChange={(e) => {
-                                    const newConditions = [
-                                      ...ending.systemConditions,
-                                    ];
-                                    newConditions[condIndex] = {
-                                      ...condition,
-                                      value: Number.parseInt(e.target.value),
-                                    };
-                                    updateEnding(
-                                      index,
-                                      'systemConditions',
-                                      newConditions,
-                                    );
-                                  }}
-                                  className="w-20 border-socratic-grey bg-white"
-                                  placeholder="값"
-                                  disabled={!ending.isEditing}
-                                />
-                              </>
-                            )}
-
-                            {condition.type === '필수 플래그' && (
-                              <Input
-                                value={condition.flagName || ''}
-                                onChange={(e) => {
-                                  const newConditions = [
-                                    ...ending.systemConditions,
-                                  ];
-                                  newConditions[condIndex] = {
-                                    ...condition,
-                                    flagName: e.target.value,
-                                  };
-                                  updateEnding(
-                                    index,
-                                    'systemConditions',
-                                    newConditions,
-                                  );
-                                }}
-                                className="flex-1 border-socratic-grey bg-white"
-                                placeholder="플래그 이름"
-                                disabled={!ending.isEditing}
-                              />
-                            )}
-
-                            {condition.type === '생존자 수' && (
-                              <>
-                                <Select
-                                  value={condition.comparison || '>='}
-                                  onValueChange={(
-                                    value: '>=' | '<=' | '==',
-                                  ) => {
-                                    const newConditions = [
-                                      ...ending.systemConditions,
-                                    ];
-                                    newConditions[condIndex] = {
-                                      ...condition,
-                                      comparison: value,
-                                    };
-                                    updateEnding(
-                                      index,
-                                      'systemConditions',
-                                      newConditions,
-                                    );
-                                  }}
-                                  disabled={!ending.isEditing}
-                                >
-                                  <SelectTrigger className="w-20 border-socratic-grey bg-white">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value=">=">{'>='}</SelectItem>
-                                    <SelectItem value="<=">{`<=`}</SelectItem>
-                                    <SelectItem value="==">==</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  value={condition.value || ''}
-                                  onChange={(e) => {
-                                    const newConditions = [
-                                      ...ending.systemConditions,
-                                    ];
-                                    newConditions[condIndex] = {
-                                      ...condition,
-                                      value: Number.parseInt(e.target.value),
-                                    };
-                                    updateEnding(
-                                      index,
-                                      'systemConditions',
-                                      newConditions,
-                                    );
-                                  }}
-                                  className="w-20 border-socratic-grey bg-white"
-                                  placeholder="수"
-                                  disabled={!ending.isEditing}
-                                />
-                              </>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                const newConditions =
-                                  ending.systemConditions.filter(
-                                    (_, i) => i !== condIndex,
-                                  );
-                                updateEnding(
-                                  index,
-                                  'systemConditions',
-                                  newConditions,
-                                );
-                              }}
-                              className="text-socratic-grey hover:text-red-500"
-                              disabled={!ending.isEditing}
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    {/* System Conditions Builder */}
+                    <EndingConditionBuilder
+                      conditions={ending.systemConditions}
+                      onConditionsChange={(newConditions) =>
+                        updateEndingConditions(index, newConditions)
+                      }
+                      scenarioStats={scenario.scenarioStats}
+                      scenario={scenario}
+                    />
                   </CardContent>
                 </Card>
               ))}

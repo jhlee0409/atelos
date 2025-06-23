@@ -33,7 +33,12 @@ export default function ScenarioDetailClient({
       const randomTrait =
         possibleTraits[Math.floor(Math.random() * possibleTraits.length)] ||
         allTraits[Math.floor(Math.random() * allTraits.length)];
-      return { ...char, assignedTrait: randomTrait };
+
+      return {
+        ...char,
+        assignedTrait: randomTrait,
+        currentTrait: randomTrait, // assignedTrait 값을 currentTrait에도 할당
+      };
     });
 
     setCastedCharacters(newCastedCharacters);
