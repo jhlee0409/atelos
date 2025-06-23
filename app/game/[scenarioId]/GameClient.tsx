@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -144,12 +144,14 @@ const checkEndingConditions = (
 
 // 날짜 변경을 표시하는 컴포넌트
 const DaySeparator = ({ day }: { day: number }) => (
-  <div className="my-4 flex items-center">
-    <div className="flex-grow border-t border-gray-600"></div>
-    <span className="mx-4 flex-shrink-0 text-sm font-bold text-gray-400">
-      Day {day}
-    </span>
-    <div className="flex-grow border-t border-gray-600"></div>
+  <div className="absolute left-0 top-0 z-10 flex h-10 w-full items-center bg-black">
+    <div className="flex w-full items-center">
+      <div className="flex-grow border-t border-gray-600"></div>
+      <span className="mx-4 flex-shrink-0 text-sm font-bold text-gray-400">
+        Day {day}
+      </span>
+      <div className="flex-grow border-t border-gray-600"></div>
+    </div>
   </div>
 );
 
@@ -848,8 +850,6 @@ export default function GameClient({ scenario }: GameClientProps) {
     return saveState.context.scenarioStats[statId] ?? 0;
   };
 
-  console.log(saveState);
-
   if (triggeredEnding) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-black text-white">
@@ -887,9 +887,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       </aside>
 
       {/* Main Panel: Chat History */}
-      <main className="flex flex-1 flex-col">
-        <div id="chat-container" className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto max-w-4xl">
+      <main className="relative flex flex-1 flex-col">
+        <div id="chat-container" className="flex-1 overflow-y-auto px-4">
+          <div className="container mx-auto mt-10 max-w-4xl">
             {saveState.chatHistory.map((message, index) => {
               const previousMessage = saveState.chatHistory[index - 1];
               let showDaySeparator = false;
@@ -917,10 +917,10 @@ export default function GameClient({ scenario }: GameClientProps) {
                 : saveState.context.currentDay || 1;
 
               return (
-                <div key={message.timestamp}>
+                <Fragment key={message.timestamp}>
                   {showDaySeparator && <DaySeparator day={dayNumber} />}
                   <ChatMessage message={message} />
-                </div>
+                </Fragment>
               );
             })}
           </div>
