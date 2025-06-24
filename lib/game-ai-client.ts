@@ -83,7 +83,7 @@ export const generateGameResponse = async (
     const geminiResponse = await callGeminiAPI({
       systemPrompt: promptData.systemPrompt,
       userPrompt: promptData.userPrompt,
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       temperature: 0.8, // 창의적 스토리텔링을 위해 약간 높게 설정
       maxTokens: useLiteVersion ? 2000 : 4000,
     });
@@ -190,7 +190,7 @@ export const getOptimalAISettings = (currentTokenUsage: number = 0) => {
     useLiteVersion: shouldUseLite,
     maxTokens: shouldUseLite ? 2000 : 4000,
     temperature: shouldUseLite ? 0.7 : 0.8,
-    model: 'gemini-2.0-flash-exp', // 현재는 고정, 향후 다른 모델 지원 시 변경 가능
+    model: 'gemini-2.0-flash', // 현재는 고정, 향후 다른 모델 지원 시 변경 가능
   };
 };
 
