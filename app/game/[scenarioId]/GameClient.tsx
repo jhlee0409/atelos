@@ -5,6 +5,8 @@ import {
   generateGameResponse,
   validateGameResponse,
   getOptimalAISettings,
+  generateInitialDilemma,
+  cleanAndValidateAIResponse,
 } from '@/lib/game-ai-client';
 import type {
   ScenarioData,
@@ -24,6 +26,14 @@ import {
   generateFallbackInitialChoices,
   detectUrgency,
 } from '@/lib/game-builder';
+import {
+  getStatIdByKorean,
+  getKoreanStatName,
+  getKoreanFlagName,
+  getKoreanRoleName,
+  getKoreanTraitName,
+  getKoreanStatusName,
+} from '@/constants/korean-english-mapping';
 
 // --- Game Logic v2.0 ---
 
@@ -32,88 +42,76 @@ interface GameClientProps {
 }
 
 const createInitialSaveState = (scenario: ScenarioData): SaveState => {
-  const {
-    endCondition,
-    synopsis,
-    scenarioId,
-    scenarioStats,
-    characters,
-    initialRelationships,
-    flagDictionary,
-    traitPool,
-  } = scenario;
+  const scenarioStats = scenario.scenarioStats.reduce(
+    (acc, stat) => {
+      acc[stat.id] = stat.initialValue ?? stat.current;
+      return acc;
+    },
+    {} as { [key: string]: number },
+  );
 
-  // AI가 생성하기 전, 로딩 상태의 딜레마를 설정
-  const initialDilemma = {
-    prompt: '동료들의 의견을 종합하여, 첫 번째 결정을 내리는 중입니다...',
-    choice_a: '상황 분석 중...',
-    choice_b: '잠시만 기다려주세요...',
-  };
+  const flags = scenario.flagDictionary.reduce(
+    (acc, flag) => {
+      acc[flag.flagName] = flag.initial;
+      return acc;
+    },
+    {} as { [key: string]: boolean | number },
+  );
 
-  // 관계 데이터를 올바른 형태로 초기화 (키 정렬 추가)
-  const hiddenRelationships: { [key: string]: number } = {};
-  initialRelationships.forEach((rel) => {
-    // 키는 항상 알파벳 순으로 정렬하여 일관성 유지
-    const key = [rel.personA, rel.personB].sort().join('-');
-    hiddenRelationships[key] = rel.value;
+  const hiddenRelationships = scenario.initialRelationships.reduce(
+    (acc, rel) => {
+      const key = `${rel.personA}-${rel.personB}`;
+      acc[key] = rel.value;
+      return acc;
+    },
+    {} as { [key: string]: number },
+  );
+
+  // 초기 캐릭터 특성 할당
+  const charactersWithTraits = scenario.characters.map((char) => {
+    if (!char.currentTrait) {
+      const allTraits = [
+        ...scenario.traitPool.buffs,
+        ...scenario.traitPool.debuffs,
+      ];
+      const possibleTraits = allTraits.filter((trait) =>
+        char.weightedTraitTypes.includes(trait.weightType),
+      );
+      const randomTrait =
+        possibleTraits[Math.floor(Math.random() * possibleTraits.length)] ||
+        allTraits[Math.floor(Math.random() * allTraits.length)];
+      return { ...char, currentTrait: randomTrait };
+    }
+    return char;
   });
 
-  const initialState: SaveState = {
+  return {
     context: {
-      scenarioId,
-      scenarioStats: scenarioStats.reduce(
-        (acc, stat) => {
-          acc[stat.id] = stat.current; // Use current value
-          return acc;
-        },
-        {} as { [key: string]: number },
-      ),
-      flags: flagDictionary.reduce(
-        (acc, flag) => {
-          acc[flag.flagName] = flag.initial; // Use initial value
-          return acc;
-        },
-        {} as { [key: string]: boolean | number },
-      ),
-      currentDay: 1, // 명시적으로 초기값 설정
+      scenarioId: scenario.scenarioId,
+      scenarioStats,
+      flags,
+      currentDay: 1,
+      remainingHours: (scenario.endCondition.value || 7) * 24,
     },
     community: {
-      survivors: characters.map((char: Character) => ({
-        name: char.characterName,
-        role: char.roleName,
-        traits: char.currentTrait
-          ? [char.currentTrait.traitName]
-          : char.weightedTraitTypes,
-        status: '정상',
+      survivors: charactersWithTraits.map((c) => ({
+        name: c.characterName,
+        role: c.roleName,
+        traits: c.currentTrait ? [c.currentTrait.traitName] : [],
+        status: 'normal',
       })),
-      hiddenRelationships, // 수정된 관계 데이터
+      hiddenRelationships,
     },
-    log: synopsis, // Base log is the synopsis
-    chatHistory: [
-      {
-        type: 'system',
-        content: 'Day 1 시작 - 새로운 모험이 시작됩니다.',
-        timestamp: Date.now() - 1, // 시놉시스보다 먼저 표시
-      },
-      {
-        type: 'system',
-        content: synopsis,
-        timestamp: Date.now(),
-      },
-    ],
-    dilemma: initialDilemma,
+    log:
+      `[Day 1] ${scenario.synopsis}` ||
+      '게임이 시작되었습니다. 첫 번째 선택을 내려주세요.',
+    chatHistory: [], // 새 게임 시 채팅 기록 초기화
+    dilemma: {
+      prompt: '... 로딩 중 ...',
+      choice_a: '... 로딩 중 ...',
+      choice_b: '... 로딩 중 ...',
+    },
   };
-
-  // Set time-based context based on EndCondition
-  if (endCondition.type === '시간제한' && endCondition.unit === '시간') {
-    initialState.context.remainingHours = endCondition.value;
-    initialState.log = `남은 시간: ${endCondition.value}시간. ${synopsis}`;
-  } else {
-    // Default to day-based tracking for all other scenarios
-    initialState.log = `[Day 1] ${synopsis}`;
-  }
-
-  return initialState;
 };
 
 // Mock AI API function removed - now using real Gemini API
@@ -143,12 +141,59 @@ const updateSaveState = (
     hiddenRelationships_change,
     shouldAdvanceTime,
   } = aiResponse.statChanges;
-  for (const key in scenarioStats) {
-    console.log(scenarioStats, key, newSaveState.context.scenarioStats[key]);
-    if (newSaveState.context.scenarioStats[key] !== undefined) {
+  // 한국어 스탯 이름을 영어 ID로 매핑하는 함수 (개선된 버전)
+  const mapStatNameToId = (
+    statName: string,
+    scenario: ScenarioData,
+  ): string => {
+    // 먼저 정확한 ID 매치 시도
+    if (scenario.scenarioStats.find((s) => s.id === statName)) {
+      return statName;
+    }
+
+    // 매핑 상수를 사용한 한국어 -> 영어 변환
+    const mappedId = getStatIdByKorean(statName);
+    if (mappedId && scenario.scenarioStats.find((s) => s.id === mappedId)) {
+      console.log(`📝 스탯 매핑 (상수): "${statName}" -> "${mappedId}"`);
+      return mappedId;
+    }
+
+    // 한국어 이름으로 매칭 시도 (기존 로직)
+    const statByName = scenario.scenarioStats.find((s) => s.name === statName);
+    if (statByName) {
+      console.log(`📝 스탯 이름 매핑: "${statName}" -> "${statByName.id}"`);
+      return statByName.id;
+    }
+
+    // 부분 매칭 시도 (한국어 이름이 포함된 경우)
+    const statByPartialName = scenario.scenarioStats.find(
+      (s) => s.name.includes(statName) || statName.includes(s.name),
+    );
+    if (statByPartialName) {
+      console.log(
+        `📝 스탯 부분 매핑: "${statName}" -> "${statByPartialName.id}"`,
+      );
+      return statByPartialName.id;
+    }
+
+    console.warn(
+      `⚠️ 스탯 매핑 실패: "${statName}" - 사용 가능한 스탯:`,
+      scenario.scenarioStats.map((s) => `${s.name}(${s.id})`),
+    );
+    return statName; // 매핑 실패 시 원래 이름 반환
+  };
+
+  for (const originalKey in scenarioStats) {
+    const mappedKey = mapStatNameToId(originalKey, scenario);
+    console.log(
+      `🔄 스탯 처리: "${originalKey}" -> "${mappedKey}"`,
+      scenarioStats[originalKey],
+    );
+
+    if (newSaveState.context.scenarioStats[mappedKey] !== undefined) {
       // 동적 증폭 시스템: 스탯의 현재 상태에 따라 변화량을 조절
-      const currentValue = newSaveState.context.scenarioStats[key];
-      const statDef = scenario.scenarioStats.find((s) => s.id === key);
+      const currentValue = newSaveState.context.scenarioStats[mappedKey];
+      const statDef = scenario.scenarioStats.find((s) => s.id === mappedKey);
 
       if (statDef) {
         const { min, max } = statDef;
@@ -166,7 +211,7 @@ const updateSaveState = (
           amplificationFactor = 3.0;
         }
 
-        const originalChange = scenarioStats[key];
+        const originalChange = scenarioStats[originalKey];
         const amplifiedChange = Math.round(
           originalChange * amplificationFactor,
         );
@@ -178,15 +223,15 @@ const updateSaveState = (
           Math.min(max - currentValue, amplifiedChange),
         );
 
-        newSaveState.context.scenarioStats[key] += clampedChange;
+        newSaveState.context.scenarioStats[mappedKey] += clampedChange;
 
         console.log(
-          `📊 스탯 변화: ${key} | 원본: ${originalChange} | 증폭: ${amplifiedChange} | 실제 적용: ${clampedChange} | 현재 비율: ${percentage.toFixed(1)}%`,
+          `📊 스탯 변화: ${mappedKey} | 원본: ${originalChange} | 증폭: ${amplifiedChange} | 실제 적용: ${clampedChange} | 현재 비율: ${percentage.toFixed(1)}%`,
         );
       } else {
         // 스탯 정의를 찾을 수 없는 경우 기본 증폭 적용
-        const amplifiedChange = Math.round(scenarioStats[key] * 2.0);
-        newSaveState.context.scenarioStats[key] += amplifiedChange;
+        const amplifiedChange = Math.round(scenarioStats[originalKey] * 2.0);
+        newSaveState.context.scenarioStats[mappedKey] += amplifiedChange;
       }
     }
   }
@@ -203,20 +248,47 @@ const updateSaveState = (
   // 관계도 업데이트 로직 강화
   if (hiddenRelationships_change && Array.isArray(hiddenRelationships_change)) {
     hiddenRelationships_change.forEach((change) => {
-      // 역할명 '리더'를 플레이어 이름으로 교체하는 함수
-      const normalizeName = (name: string) =>
-        name === '리더' ? '(플레이어)' : name;
+      // 다양한 플레이어 참조를 정규화하는 함수
+      const normalizeName = (name: string) => {
+        const lowerName = name.toLowerCase();
+        if (
+          lowerName.includes('플레이어') ||
+          lowerName.includes('리더') ||
+          lowerName.includes('player') ||
+          name === '나' ||
+          name === '당신'
+        ) {
+          return '(플레이어)';
+        }
+        return name;
+      };
 
-      let { personA, personB, change: value } = change;
-      personA = normalizeName(personA);
-      personB = normalizeName(personB);
+      // pair 형식과 개별 필드 형식 모두 지원
+      let personA: string, personB: string, value: number;
+
+      if ('pair' in change && change.pair) {
+        // "A-B" 형식 처리
+        const [nameA, nameB] = change.pair.split('-');
+        personA = normalizeName(nameA?.trim() || '');
+        personB = normalizeName(nameB?.trim() || '');
+        value = change.change || 0;
+      } else if ('personA' in change && 'personB' in change) {
+        // 개별 필드 형식 처리
+        personA = normalizeName(change.personA || '');
+        personB = normalizeName(change.personB || '');
+        value = change.change || 0;
+      } else {
+        console.warn('⚠️ 비정상적인 관계도 데이터 형식 (무시됨):', change);
+        return;
+      }
 
       // personA와 personB가 유효한 이름인지, value가 숫자인지 확인
       if (
         personA &&
         personB &&
         personA !== personB &&
-        typeof value === 'number'
+        typeof value === 'number' &&
+        !isNaN(value)
       ) {
         // 키는 항상 알파벳 순으로 정렬하여 일관성 유지
         const key = [personA, personB].sort().join('-');
@@ -260,8 +332,8 @@ const updateSaveState = (
 
   // 시간 진행 로직 개선
   if (
-    scenario.endCondition.type === '시간제한' &&
-    scenario.endCondition.unit === '시간'
+    scenario.endCondition.type === 'time_limit' &&
+    scenario.endCondition.unit === 'hours'
   ) {
     // 시간 기반 시나리오 (기존 로직 유지)
     if (newSaveState.context.remainingHours !== undefined) {
@@ -305,12 +377,14 @@ export default function GameClient({ scenario }: GameClientProps) {
     createInitialSaveState(scenario),
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialDilemmaLoading, setIsInitialDilemmaLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [triggeredEnding, setTriggeredEnding] =
     useState<EndingArchetype | null>(null);
-  const [isInitialDilemmaLoading, setIsInitialDilemmaLoading] = useState(true);
   const [isStatsExpanded, setIsStatsExpanded] = useState(false);
+  const [languageWarning, setLanguageWarning] = useState<string | null>(null);
   const initialDilemmaGenerated = useRef(false);
+  const dilemmaGenerationInProgress = useRef(false); // 딜레마 생성 중복 방지
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -320,104 +394,130 @@ export default function GameClient({ scenario }: GameClientProps) {
     }
   }, [saveState.chatHistory]);
 
-  // Effect to check for endings on initial state (e.g. immediate failure/success)
-  useEffect(() => {
-    const initialPlayerState: PlayerState = {
-      stats: saveState.context.scenarioStats,
-      flags: saveState.context.flags,
-      // These are not used in ending checks yet, but are part of the type
-      traits: [],
-      relationships: saveState.community.hiddenRelationships,
-    };
-    const ending = checkEndingConditions(
-      initialPlayerState,
-      scenario.endingArchetypes,
-    );
-    if (ending) {
-      setTriggeredEnding(ending);
-    }
-  }, []); // Run only once on mount
+  // 초기 상태에서는 엔딩 체크를 하지 않음 - 게임이 시작된 후에만 엔딩 체크
 
-  // AI를 통해 초기 딜레마를 동적으로 생성하는 useEffect
+  // 최초 딜레마 생성 로직
   useEffect(() => {
+    // 이미 생성되었거나 생성 중이라면 중복 실행 방지
+    if (initialDilemmaGenerated.current || dilemmaGenerationInProgress.current)
+      return;
+
+    // 엔딩이 이미 트리거된 상태라면 딜레마 생성하지 않음
+    if (triggeredEnding) return;
+
     const generateAndSetDilemma = async () => {
-      // 초기 캐릭터 특성 할당 로직은 createInitialSaveState에서 가져와 여기서 처리
-      const charactersWithTraits = scenario.characters.map((char) => {
-        if (!char.currentTrait) {
-          const allTraits = [
-            ...scenario.traitPool.buffs,
-            ...scenario.traitPool.debuffs,
-          ];
-          const possibleTraits = allTraits.filter((trait) =>
-            char.weightedTraitTypes.includes(trait.weightType),
-          );
-          const randomTrait =
-            possibleTraits[Math.floor(Math.random() * possibleTraits.length)] ||
-            allTraits[Math.floor(Math.random() * allTraits.length)];
-          return { ...char, currentTrait: randomTrait };
-        }
-        return char;
-      });
-
+      dilemmaGenerationInProgress.current = true; // 생성 시작 플래그 설정
+      console.log('🤖 AI 초기 딜레마 생성을 시작합니다...');
+      setIsInitialDilemmaLoading(true);
+      setError(null);
       try {
-        console.log('🤖 AI 초기 딜레마 생성을 시작합니다...');
-        const systemPrompt = buildInitialDilemmaPrompt(
+        const initialState = createInitialSaveState(scenario);
+        const aiSettings = getOptimalAISettings(1, 'medium', 0);
+        const aiResponse = await generateInitialDilemma(
+          initialState,
           scenario,
-          charactersWithTraits,
+          aiSettings.useLiteVersion,
         );
-        const response = await callGeminiAPI({
-          systemPrompt: systemPrompt,
-          userPrompt:
-            '제공된 컨텍스트를 바탕으로, 지침에 따라 플레이어의 첫 번째 딜레마를 JSON 형식으로 생성해주세요.',
-        });
-        const newDilemma = parseGeminiJsonResponse<{
-          prompt: string;
-          choice_a: string;
-          choice_b: string;
-        }>(response);
 
-        setSaveState((prevState) => ({
-          ...prevState,
-          dilemma: newDilemma,
-          // AI가 생성하는 동안 변경될 수 있는 다른 초기 상태도 여기서 최종 확정
-          community: {
-            ...prevState.community,
-            survivors: charactersWithTraits.map((c) => ({
-              name: c.characterName,
-              role: c.roleName,
-              traits: [c.currentTrait!.traitName],
-              status: '정상',
-            })),
-          },
-        }));
+        // 초기 딜레마도 언어 검증 및 정리
+        const { cleanedResponse, hasLanguageIssues, languageIssues } =
+          cleanAndValidateAIResponse(aiResponse);
+
+        if (hasLanguageIssues) {
+          console.warn('🌐 초기 딜레마 언어 문제 감지:', languageIssues);
+          setLanguageWarning(
+            `초기 설정에서 언어 문제가 감지되어 정리했습니다: ${languageIssues.join(', ')}`,
+          );
+          setTimeout(() => setLanguageWarning(null), 3000);
+        }
+
+        if (
+          !validateGameResponse(
+            cleanedResponse,
+            scenario,
+            aiSettings.useLiteVersion,
+          )
+        ) {
+          // Fallback if AI response is invalid
+          console.warn('AI 응답이 유효하지 않아, 폴백 딜레마를 생성합니다.');
+          const fallbackCharacters = initialState.community.survivors.map(
+            (c) => {
+              const originalChar = scenario.characters.find(
+                (char) => char.characterName === c.name,
+              );
+              return {
+                roleId: c.role,
+                roleName: c.role,
+                characterName: c.name,
+                backstory: originalChar?.backstory || '',
+                imageUrl: originalChar?.imageUrl || '',
+                weightedTraitTypes: originalChar?.weightedTraitTypes || [],
+                currentTrait: null,
+              };
+            },
+          );
+          const fallbackDilemma = generateFallbackInitialChoices(
+            scenario,
+            fallbackCharacters,
+          );
+          setSaveState({
+            ...initialState,
+            dilemma: fallbackDilemma,
+          });
+        } else {
+          // Valid AI response
+          const updatedState = updateSaveState(
+            initialState,
+            cleanedResponse,
+            scenario,
+          );
+          setSaveState(updatedState);
+        }
+
+        initialDilemmaGenerated.current = true; // 생성 완료 플래그 설정
         console.log('✅ AI 초기 딜레마 생성 성공!');
-      } catch (error) {
-        console.error(
-          '❌ AI 초기 딜레마 생성 실패, 폴백 로직을 사용합니다:',
-          error,
+      } catch (err) {
+        console.error('초기 딜레마 생성 오류:', err);
+        setError(
+          '초기 딜레마를 생성하는 데 실패했습니다. 폴백 선택지를 사용합니다.',
         );
+        // Fallback on error
+        const initialState = createInitialSaveState(scenario);
+        const fallbackCharacters = initialState.community.survivors.map((c) => {
+          const originalChar = scenario.characters.find(
+            (char) => char.characterName === c.name,
+          );
+          return {
+            roleId: c.role,
+            roleName: c.role,
+            characterName: c.name,
+            backstory: originalChar?.backstory || '',
+            imageUrl: originalChar?.imageUrl || '',
+            weightedTraitTypes: originalChar?.weightedTraitTypes || [],
+            currentTrait: null,
+          };
+        });
         const fallbackDilemma = generateFallbackInitialChoices(
           scenario,
-          charactersWithTraits,
+          fallbackCharacters,
         );
-        setSaveState((prevState) => ({
-          ...prevState,
-          dilemma: fallbackDilemma,
-        }));
+        setSaveState({ ...initialState, dilemma: fallbackDilemma });
+        initialDilemmaGenerated.current = true; // 오류 발생 시에도 플래그 설정하여 무한 루프 방지
       } finally {
+        dilemmaGenerationInProgress.current = false; // 생성 완료 플래그 해제
+        console.log('🔄 setIsInitialDilemmaLoading(false) 호출');
         setIsInitialDilemmaLoading(false);
       }
     };
 
-    if (scenario && !initialDilemmaGenerated.current) {
-      initialDilemmaGenerated.current = true;
-      generateAndSetDilemma();
-    }
+    generateAndSetDilemma();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario]);
+  }, [scenario.scenarioId, triggeredEnding]); // 시나리오 ID 변경 시 또는 엔딩 상태 변경 시 실행
 
   const handlePlayerChoice = async (choiceDetails: string) => {
-    if (isInitialDilemmaLoading) return; // 로딩 중 선택 방지
+    // 초기 딜레마 생성 전에는 선택 불가
+    if (!initialDilemmaGenerated.current || isLoading) return;
+
     setIsLoading(true);
     setError(null);
 
@@ -482,7 +582,11 @@ export default function GameClient({ scenario }: GameClientProps) {
 
     try {
       // 비용 효율적인 AI 설정 가져오기
-      const aiSettings = getOptimalAISettings();
+      const aiSettings = getOptimalAISettings(
+        newSaveState.context.currentDay || 1,
+        'medium',
+        0, // 초기 토큰 사용량
+      );
 
       // 제미나이 API를 통한 게임 응답 생성
       const aiResponse = await generateGameResponse(
@@ -492,14 +596,35 @@ export default function GameClient({ scenario }: GameClientProps) {
         aiSettings.useLiteVersion,
       );
 
-      // 응답 검증
-      if (!validateGameResponse(aiResponse)) {
+      // 언어 품질 추가 검증 (generateGameResponse에서 이미 처리되지만 추가 확인)
+      const { cleanedResponse, hasLanguageIssues, languageIssues } =
+        cleanAndValidateAIResponse(aiResponse);
+
+      if (hasLanguageIssues) {
+        console.warn('🌐 언어 문제 감지:', languageIssues);
+        setLanguageWarning(
+          `언어 혼용 문제가 감지되어 자동으로 정리했습니다: ${languageIssues.join(', ')}`,
+        );
+        // 3초 후 경고 메시지 자동 제거
+        setTimeout(() => setLanguageWarning(null), 3000);
+      } else {
+        setLanguageWarning(null);
+      }
+
+      // 응답 검증 (정리된 응답 사용)
+      if (
+        !validateGameResponse(
+          cleanedResponse,
+          scenario,
+          aiSettings.useLiteVersion,
+        )
+      ) {
         throw new Error('AI 응답이 유효하지 않습니다.');
       }
 
       const updatedSaveState = updateSaveState(
         newSaveState,
-        aiResponse,
+        cleanedResponse,
         scenario,
       );
       setSaveState(updatedSaveState);
@@ -514,31 +639,69 @@ export default function GameClient({ scenario }: GameClientProps) {
         relationships: updatedSaveState.community.hiddenRelationships,
       };
 
-      let ending = checkEndingConditions(
-        currentPlayerState,
-        scenario.endingArchetypes,
-      );
+      let ending: EndingArchetype | null = null;
+      const currentDay = updatedSaveState.context.currentDay || 1;
 
-      // 시간제한 엔딩 조건 확인
-      if (!ending && scenario.endCondition.type === '시간제한') {
+      // Day 5 이후에만 엔딩 조건 체크
+      if (currentDay >= 5) {
+        ending = checkEndingConditions(
+          currentPlayerState,
+          scenario.endingArchetypes,
+        );
+
+        if (ending) {
+          console.log(
+            `🎯 Day ${currentDay}에서 엔딩 조건 만족: ${ending.title}`,
+          );
+        }
+      } else {
+        console.log(
+          `⏸️ Day ${currentDay} - 엔딩 체크 대기 중 (Day 5 이후 체크)`,
+        );
+      }
+
+      // 시간제한 엔딩 조건 확인 (Day 7 완료 후 강제 엔딩)
+      if (!ending && scenario.endCondition.type === 'time_limit') {
         const timeLimit = scenario.endCondition.value || 0;
+        const currentDay = updatedSaveState.context.currentDay || 0;
+        const currentHours =
+          updatedSaveState.context.remainingHours || Infinity;
+
         const isTimeUp =
-          scenario.endCondition.unit === '일'
-            ? (updatedSaveState.context.currentDay || 0) > timeLimit
-            : (updatedSaveState.context.remainingHours || Infinity) <= 0;
+          scenario.endCondition.unit === 'days'
+            ? currentDay > timeLimit // > 로 변경하여 Day 7 이후(Day 8)에서 엔딩 체크
+            : currentHours <= 0;
 
         if (isTimeUp) {
-          console.log('⏰ 시간 초과! 시간제한 엔딩을 확인합니다.');
-          // "시간 초과"와 관련된 엔딩을 찾거나, 없으면 기본 엔딩을 생성
-          ending = scenario.endingArchetypes.find((e) =>
-            e.title.includes('시간'),
-          ) || {
-            endingId: 'TIME_UP',
-            title: '시간 초과',
-            description:
-              '정해진 시간 안에 목표를 달성하지 못했습니다. 모든 것이 불확실한 상황 속에서, 당신의 공동체는 미래를 기약할 수 없게 되었습니다.',
-            systemConditions: [],
-          };
+          console.log(
+            `⏰ 시간 제한 도달! Day ${currentDay}/${timeLimit} - 시간 제한 엔딩을 확인합니다.`,
+          );
+
+          // 먼저 일반적인 엔딩 조건 체크를 다시 시도 (더 관대한 조건으로)
+          ending = checkEndingConditions(
+            currentPlayerState,
+            scenario.endingArchetypes,
+          );
+
+          // 여전히 엔딩이 없으면 시간 관련 엔딩 찾기
+          if (!ending) {
+            ending =
+              scenario.endingArchetypes.find(
+                (e) => e.endingId === 'ENDING_TIME_UP',
+              ) || null;
+          }
+
+          // 마지막 수단: 기본 시간 초과 엔딩 생성
+          if (!ending) {
+            ending = {
+              endingId: 'DEFAULT_TIME_UP',
+              title: '결단의 시간',
+              description:
+                '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다. 당신과 당신의 공동체는 이제 운명의 심판을 기다린다.',
+              systemConditions: [],
+              isGoalSuccess: false,
+            };
+          }
         }
       }
 
@@ -597,6 +760,13 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   return (
     <div className="flex h-screen w-full flex-col bg-black text-white">
+      {/* Language Warning Banner */}
+      {languageWarning && (
+        <div className="bg-yellow-600 px-4 py-2 text-center text-sm text-white">
+          🌐 {languageWarning}
+        </div>
+      )}
+
       {/* Stats Bar */}
       <StatsBar
         scenario={scenario}
@@ -610,11 +780,12 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       {/* Sticky Choice Buttons - Always visible at bottom */}
       <ChoiceButtons
-        isLoading={isLoading}
+        isLoading={isLoading || isInitialDilemmaLoading}
         error={error}
         saveState={saveState}
         isUrgent={isUrgent}
         handlePlayerChoice={handlePlayerChoice}
+        isInitialLoading={isInitialDilemmaLoading}
       />
     </div>
   );
