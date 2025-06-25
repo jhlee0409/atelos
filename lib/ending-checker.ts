@@ -36,7 +36,9 @@ export const checkEndingConditions = (
 
   // "결단의 날"과 같은 시간 제한 엔딩은 제외 (별도 처리)
   const checkableEndings = endingArchetypes.filter(
-    ending => ending.systemConditions.length > 0 && ending.endingId !== 'ENDING_TIME_UP'
+    (ending) =>
+      ending.systemConditions.length > 0 &&
+      ending.endingId !== 'ENDING_TIME_UP',
   );
 
   for (const ending of checkableEndings) {

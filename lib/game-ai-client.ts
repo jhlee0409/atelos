@@ -1,6 +1,9 @@
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { buildOptimizedGamePrompt, PromptComplexity } from './prompt-builder';
-import { buildOptimizedGamePromptV2, getDynamicComplexity } from './prompt-builder-optimized';
+import {
+  buildOptimizedGamePromptV2,
+  getDynamicComplexity,
+} from './prompt-builder-optimized';
 import { ChatHistoryManager } from './chat-history-manager';
 import type { ScenarioData, PlayerState } from '@/types';
 
@@ -273,7 +276,7 @@ export const generateGameResponse = async (
     const startTime = Date.now();
     console.log('🎮 게임 AI 응답 생성 시작...');
     console.log('🎯 액션:', playerAction.actionId);
-    
+
     // 현재 플레이어 상태 구성
     const currentPlayerState: PlayerState = {
       stats: saveState.context.scenarioStats,
@@ -294,7 +297,7 @@ export const generateGameResponse = async (
 
     // 토큰 예산 계산 (남은 토큰 기준)
     const remainingTokenBudget = 20000 - sessionStats.totalTokensUsed;
-    
+
     // 동적 복잡도 조절
     const dynamicSettings = getDynamicComplexity(
       saveState.context.currentDay || 1,
@@ -303,16 +306,17 @@ export const generateGameResponse = async (
     );
 
     // 최적화 v2 사용 여부 결정
-    const useV2 = remainingTokenBudget < 10000 || sessionStats.totalApiCalls > 15;
+    const useV2 =
+      remainingTokenBudget < 10000 || sessionStats.totalApiCalls > 15;
 
     let promptData;
-    
+
     if (useV2) {
       console.log('🚀 최적화 v2 프롬프트 사용');
-      
+
       // 압축된 히스토리 가져오기
       const compressedHistory = chatHistoryManager.getCompressedHistory(500);
-      
+
       promptData = buildOptimizedGamePromptV2(
         scenario,
         currentPlayerState,
@@ -351,7 +355,9 @@ export const generateGameResponse = async (
       );
     }
 
-    console.log(`📊 예상 토큰: ${promptData.estimatedTokens}, 남은 예산: ${remainingTokenBudget}`);
+    console.log(
+      `📊 예상 토큰: ${promptData.estimatedTokens}, 남은 예산: ${remainingTokenBudget}`,
+    );
 
     // 제미나이 API 호출
     const geminiResponse = await callGeminiAPI({
