@@ -10,11 +10,12 @@ export const initialScenario: ScenarioData = {
   playerGoal: '',
   characters: [],
   initialRelationships: [],
-  endCondition: { type: '시간제한' },
+  endCondition: { type: 'time_limit' },
   scenarioStats: [],
   traitPool: { buffs: [], debuffs: [] },
+  goalCluster: undefined,
   endingArchetypes: [],
-  status: '작업 중',
+  status: 'in_progress',
   flagDictionary: [],
 } as const;
 

@@ -2,6 +2,7 @@ import { ScenarioData } from '@/types';
 import { SaveState } from '@/types';
 import { BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { StatDisplay } from './StatDisplay';
+import { getKoreanStatName } from '@/constants/korean-english-mapping';
 
 export const StatsBar = ({
   scenario,
@@ -43,10 +44,11 @@ export const StatsBar = ({
             {scenario.scenarioStats.map((stat) => (
               <StatDisplay
                 key={stat.id}
-                name={stat.name}
+                name={getKoreanStatName(stat.id)}
                 value={getStatValue(stat.id)}
                 min={stat.min}
                 max={stat.max}
+                statId={stat.id}
               />
             ))}
           </div>
@@ -55,10 +57,11 @@ export const StatsBar = ({
             {scenario.scenarioStats.map((stat) => (
               <StatDisplay
                 key={stat.id}
-                name={stat.name}
+                name={getKoreanStatName(stat.id)}
                 value={getStatValue(stat.id)}
                 min={stat.min}
                 max={stat.max}
+                statId={stat.id}
                 isCompact={true}
               />
             ))}

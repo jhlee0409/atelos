@@ -38,6 +38,7 @@ export default function CharacterContent({
       backstory: '',
       imageUrl: '',
       weightedTraitTypes: [],
+      currentTrait: null,
       isEditing: true,
     };
     setScenario((prev) => ({

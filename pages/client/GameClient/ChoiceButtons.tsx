@@ -8,31 +8,66 @@ export const ChoiceButtons = ({
   saveState,
   isUrgent,
   handlePlayerChoice,
+  isInitialLoading = false,
 }: {
   isLoading: boolean;
   error: string | null;
   saveState: SaveState;
   isUrgent: boolean;
   handlePlayerChoice: (choice: string) => void;
+  isInitialLoading?: boolean;
 }) => {
   if (isLoading) {
+    const loadingMessage = isInitialLoading
+      ? '첫 번째 딜레마를 생성하고 있습니다...'
+      : 'AI가 다음 이야기를 생성 중입니다...';
+
     return (
-      <div className="flex items-center justify-center space-x-2 py-6">
-        <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
-        <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
-        <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
-        <span className="ml-3 text-sm text-gray-400">
-          AI가 다음 이야기를 생성 중입니다...
-        </span>
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+        <div className="mx-auto max-w-2xl">
+          <div className="flex items-center justify-center space-x-2 py-6">
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
+            <span className="ml-3 text-sm text-gray-400">{loadingMessage}</span>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-900/50 p-4 text-center text-red-300 backdrop-blur-sm">
-        <AlertTriangle className="mr-2 inline h-4 w-4" />
-        오류: {error}
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-lg bg-red-900/50 p-4 text-center text-red-300 backdrop-blur-sm">
+            <AlertTriangle className="mr-2 inline h-4 w-4" />
+            오류: {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 딜레마가 유효하지 않은 경우 로딩 표시
+  if (
+    !saveState.dilemma ||
+    !saveState.dilemma.prompt ||
+    !saveState.dilemma.choice_a
+  ) {
+    console.log('⚠️ 딜레마가 아직 준비되지 않음:', saveState.dilemma);
+    return (
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+        <div className="mx-auto max-w-2xl">
+          <div className="flex items-center justify-center space-x-2 py-6">
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
+            <span className="ml-3 text-sm text-gray-400">
+              첫 번째 딜레마를 준비하고 있습니다...
+            </span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -72,7 +107,7 @@ const ChoiceButton = ({
   disabled = false,
   urgency = false,
 }: {
-  choice: string;
+  choice: string | undefined;
   onClick: () => void;
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
@@ -91,6 +126,11 @@ const ChoiceButton = ({
 
   // 핵심 키워드 강조
   const highlightKeywords = (text: string) => {
+    // text가 undefined나 null인 경우 빈 문자열로 처리
+    if (!text || typeof text !== 'string') {
+      return '';
+    }
+
     const keywords = [
       '공격',
       '방어',
@@ -128,7 +168,7 @@ const ChoiceButton = ({
     >
       <div
         className="relative z-10 text-center leading-tight"
-        dangerouslySetInnerHTML={{ __html: highlightKeywords(choice) }}
+        dangerouslySetInnerHTML={{ __html: highlightKeywords(choice || '') }}
       />
       {urgency && (
         <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />

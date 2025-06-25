@@ -4,6 +4,10 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ScenarioData, Character, Trait } from '@/types';
+import {
+  getKoreanRoleName,
+  getKoreanTraitName,
+} from '@/constants/korean-english-mapping';
 
 interface CastedCharacter extends Character {
   assignedTrait: Trait;
@@ -113,7 +117,7 @@ export default function ScenarioDetailClient({
 function CharacterCard({ character }: { character: CastedCharacter }) {
   const [imgSrc, setImgSrc] = useState(character.imageUrl);
   const traitColor =
-    character.assignedTrait.type === '긍정'
+    character.assignedTrait.type === 'positive'
       ? 'border-blue-500'
       : 'border-red-500';
 
@@ -132,15 +136,16 @@ function CharacterCard({ character }: { character: CastedCharacter }) {
         />
       </div>
       <h2 className="mt-4 text-2xl font-bold">{character.characterName}</h2>
+      <p className="text-sm text-gray-400">{character.backstory}</p>
       <div className="mt-4 w-full rounded-lg bg-gray-900 p-3 text-left">
         <h4
           className={`text-lg font-bold ${
-            character.assignedTrait.type === '긍정'
+            character.assignedTrait.type === 'positive'
               ? 'text-blue-400'
               : 'text-red-400'
           }`}
         >
-          {character.assignedTrait.traitName}
+          {getKoreanTraitName(character.assignedTrait.traitName)}
         </h4>
         <p className="mt-1 text-sm text-gray-300">
           {character.assignedTrait.displayText}

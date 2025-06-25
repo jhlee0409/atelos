@@ -194,26 +194,32 @@ export class SimulationUtils {
   }
 
   private static checkStatCondition(
-    condition: Extract<SystemCondition, { type: '필수 스탯' }>,
+    condition: Extract<SystemCondition, { type: 'required_stat' }>,
     stats: PlayerState['stats'],
   ): boolean {
     const statValue = stats[condition.statId];
     if (statValue === undefined) return false;
 
     switch (condition.comparison) {
-      case '>=':
+      case 'greater_equal':
         return statValue >= condition.value;
-      case '<=':
+      case 'less_equal':
         return statValue <= condition.value;
-      case '==':
+      case 'equal':
         return statValue === condition.value;
+      case 'greater_than':
+        return statValue > condition.value;
+      case 'less_than':
+        return statValue < condition.value;
+      case 'not_equal':
+        return statValue !== condition.value;
       default:
         return false;
     }
   }
 
   private static checkFlagCondition(
-    condition: Extract<SystemCondition, { type: '필수 플래그' }>,
+    condition: Extract<SystemCondition, { type: 'required_flag' }>,
     flags: PlayerState['flags'],
   ): boolean {
     const flagValue = flags[condition.flagName];
@@ -233,11 +239,11 @@ export class SimulationUtils {
     for (const ending of endingArchetypes) {
       const conditionsMet = ending.systemConditions.every((condition) => {
         switch (condition.type) {
-          case '필수 스탯':
+          case 'required_stat':
             return this.checkStatCondition(condition, playerState.stats);
-          case '필수 플래그':
+          case 'required_flag':
             return this.checkFlagCondition(condition, playerState.flags);
-          case '생존자 수':
+          case 'survivor_count':
             // For now, assume we have the survivor count in playerState
             // This would need to be implemented based on actual game logic
             return true;

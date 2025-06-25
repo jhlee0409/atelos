@@ -2,12 +2,13 @@ import { notFound } from 'next/navigation';
 import { getScenarioData } from '@/mocks/index';
 import GameClient from './GameClient';
 
-export default function GamePage({
+export default async function GamePage({
   params,
 }: {
-  params: { scenarioId: string };
+  params: Promise<{ scenarioId: string }>;
 }) {
-  const scenario = getScenarioData(params.scenarioId);
+  const { scenarioId } = await params;
+  const scenario = getScenarioData(scenarioId);
 
   if (!scenario) {
     notFound();

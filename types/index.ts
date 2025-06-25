@@ -26,13 +26,15 @@ export type ScenarioStat = {
   current: number;
   min: number;
   max: number;
+  initialValue?: number;
+  range?: [number, number];
   isEditing?: boolean;
 };
 
 export type Trait = {
   traitId: string;
   traitName: string;
-  type: '긍정' | '부정';
+  type: 'positive' | 'negative';
   weightType: string;
   displayText: string;
   systemInstruction: string;
@@ -57,36 +59,56 @@ export type ScenarioFlag = {
 
 export type SystemCondition =
   | {
-      type: '필수 스탯';
+      type: 'required_stat';
       statId: string;
-      comparison: '>=' | '<=' | '==';
+      comparison:
+        | 'greater_equal'
+        | 'less_equal'
+        | 'equal'
+        | 'greater_than'
+        | 'less_than'
+        | 'not_equal';
       value: number;
       isEditing?: boolean;
     }
   | {
-      type: '필수 플래그';
+      type: 'required_flag';
       flagName: string;
       isEditing?: boolean;
     }
   | {
-      type: '생존자 수';
-      comparison: '>=' | '<=' | '==';
+      type: 'survivor_count';
+      comparison:
+        | 'greater_equal'
+        | 'less_equal'
+        | 'equal'
+        | 'greater_than'
+        | 'less_than'
+        | 'not_equal';
       value: number;
       isEditing?: boolean;
     };
+
+export type GoalCluster = {
+  id: string;
+  title: string;
+  description: string;
+  connectedEndings: string[];
+};
 
 export type EndingArchetype = {
   endingId: string;
   title: string;
   description: string;
   systemConditions: SystemCondition[];
+  isGoalSuccess?: boolean;
   isEditing?: boolean;
 };
 
 export type EndCondition = {
-  type: '시간제한' | '목표 달성' | '조건 충족';
+  type: 'time_limit' | 'goal_achievement' | 'condition_met';
   value?: number;
-  unit?: '일' | '시간';
+  unit?: 'days' | 'hours';
   statId?: string;
 };
 
@@ -109,8 +131,9 @@ export type ScenarioData = {
   scenarioStats: ScenarioStat[];
   traitPool: TraitPool;
   flagDictionary: ScenarioFlag[];
+  goalCluster?: GoalCluster;
   endingArchetypes: EndingArchetype[];
-  status: '작업 중' | '테스트 중' | '활성';
+  status: 'in_progress' | 'testing' | 'active';
 };
 
 // --- Game-specific state types, not part of scenario definition ---
