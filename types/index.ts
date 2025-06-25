@@ -133,3 +133,60 @@ export type StoryState = {
   } | null;
   recentEvents: string[];
 };
+
+export interface SaveState {
+  context: {
+    scenarioId: string;
+    scenarioStats: { [key: string]: number };
+    flags: { [key: string]: boolean | number };
+    currentDay?: number;
+    remainingHours?: number;
+  };
+  community: {
+    survivors: {
+      name: string;
+      role: string;
+      traits: string[];
+      status: string;
+    }[];
+    hiddenRelationships: { [key: string]: number };
+  };
+  log: string;
+  chatHistory: {
+    type: 'system' | 'player' | 'ai';
+    content: string;
+    timestamp: number;
+  }[];
+  dilemma: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+  };
+}
+
+export interface AIResponse {
+  log: string;
+  dilemma: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+  };
+  statChanges: {
+    scenarioStats: { [key: string]: number };
+    survivorStatus: { name: string; newStatus: string }[];
+    hiddenRelationships_change: any[]; // Type can be refined if needed
+    flags_acquired: string[];
+    shouldAdvanceTime?: boolean; // AI가 시간 진행 여부를 결정
+  };
+}
+
+export interface PlayerAction {
+  actionId: string;
+  actionDescription: string;
+  playerFeedback: string;
+}
+
+export interface AvailableAction {
+  actionId: string;
+  description_for_ai: string;
+}
