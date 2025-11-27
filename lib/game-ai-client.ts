@@ -1229,3 +1229,206 @@ export const formatImpactsForUI = (impacts: PredictedImpact[]): string[] => {
       return `${arrow}${impact.statName}${intensity}`;
     });
 };
+
+// ============================================================
+// P3-4: 스탯 증폭 로직 투명화
+// ============================================================
+
+/**
+ * 스탯 증폭 계산 결과
+ */
+export interface AmplificationResult {
+  statId: string;
+  statName: string;
+  originalChange: number;
+  amplificationFactor: number;
+  amplifiedChange: number;
+  finalChange: number;  // 클램핑 후 실제 적용된 변화량
+  currentValue: number;
+  newValue: number;
+  percentage: number;   // 변경 전 스탯 위치 (0-100%)
+  zone: 'extreme_low' | 'mid_range' | 'extreme_high';  // 스탯 구간
+  explanation: string;  // 사용자 친화적 설명
+}
+
+/**
+ * 스탯 변화 요약 (턴 종료 시 표시용)
+ */
+export interface StatChangeSummary {
+  timestamp: number;
+  changes: AmplificationResult[];
+  totalAmplification: string;  // 전체 증폭 설명
+}
+
+/**
+ * 스탯의 현재 구간 결정
+ * @param percentage 스탯의 현재 퍼센티지 (0-100)
+ * @returns 스탯 구간
+ */
+export const getStatZone = (
+  percentage: number
+): 'extreme_low' | 'mid_range' | 'extreme_high' => {
+  if (percentage <= 25) return 'extreme_low';
+  if (percentage >= 75) return 'extreme_high';
+  return 'mid_range';
+};
+
+/**
+ * 구간별 증폭 배수 반환
+ * @param zone 스탯 구간
+ * @returns 증폭 배수
+ */
+export const getAmplificationFactor = (
+  zone: 'extreme_low' | 'mid_range' | 'extreme_high'
+): number => {
+  if (zone === 'mid_range') {
+    return 3.0;  // 중간 구간: 긴장감을 위해 큰 증폭
+  }
+  return 1.5;  // 극단 구간: 부드러운 증폭
+};
+
+/**
+ * 구간별 한글 설명
+ */
+const ZONE_DESCRIPTIONS: Record<'extreme_low' | 'mid_range' | 'extreme_high', string> = {
+  extreme_low: '위험 구간 (0-25%)',
+  mid_range: '안정 구간 (25-75%)',
+  extreme_high: '과열 구간 (75-100%)',
+};
+
+/**
+ * 증폭 배수별 설명
+ */
+const AMPLIFICATION_DESCRIPTIONS: Record<number, string> = {
+  1.5: '완만한 변화 (1.5배)',
+  3.0: '급격한 변화 (3배)',
+  2.0: '기본 증폭 (2배)',
+};
+
+/**
+ * 스탯 변화량의 증폭을 계산하고 상세 결과 반환
+ * @param statId 스탯 영문 ID
+ * @param statName 스탯 한글 이름
+ * @param originalChange 원본 변화량
+ * @param currentValue 현재 스탯 값
+ * @param min 스탯 최소값
+ * @param max 스탯 최대값
+ * @returns 증폭 계산 결과
+ */
+export const calculateAmplification = (
+  statId: string,
+  statName: string,
+  originalChange: number,
+  currentValue: number,
+  min: number,
+  max: number
+): AmplificationResult => {
+  const range = max - min;
+  const percentage = ((currentValue - min) / range) * 100;
+  const zone = getStatZone(percentage);
+  const amplificationFactor = getAmplificationFactor(zone);
+
+  const amplifiedChange = Math.round(originalChange * amplificationFactor);
+
+  // 클램핑: 스탯이 범위를 벗어나지 않도록
+  const finalChange = Math.max(
+    min - currentValue,
+    Math.min(max - currentValue, amplifiedChange)
+  );
+
+  const newValue = currentValue + finalChange;
+
+  // 사용자 친화적 설명 생성
+  const direction = originalChange > 0 ? '증가' : originalChange < 0 ? '감소' : '유지';
+  const zoneDesc = ZONE_DESCRIPTIONS[zone];
+  const ampDesc = AMPLIFICATION_DESCRIPTIONS[amplificationFactor] || `${amplificationFactor}배`;
+
+  let explanation: string;
+  if (finalChange === amplifiedChange) {
+    explanation = `${statName} ${Math.abs(originalChange)} → ${Math.abs(finalChange)} (${zoneDesc}에서 ${ampDesc})`;
+  } else {
+    explanation = `${statName} ${Math.abs(originalChange)} → ${Math.abs(finalChange)} (${zoneDesc}, 범위 제한 적용)`;
+  }
+
+  return {
+    statId,
+    statName,
+    originalChange,
+    amplificationFactor,
+    amplifiedChange,
+    finalChange,
+    currentValue,
+    newValue,
+    percentage,
+    zone,
+    explanation,
+  };
+};
+
+/**
+ * 여러 스탯 변화의 요약 생성
+ * @param changes 증폭 결과 배열
+ * @returns 사용자 친화적 요약
+ */
+export const formatStatChangeSummary = (
+  changes: AmplificationResult[]
+): string[] => {
+  if (changes.length === 0) return ['스탯 변화 없음'];
+
+  return changes.map((change) => {
+    const arrow = change.finalChange > 0 ? '↑' : change.finalChange < 0 ? '↓' : '→';
+    const absChange = Math.abs(change.finalChange);
+    const factorText = change.amplificationFactor === 3.0 ? '⚡' : '';  // 급격한 변화 표시
+
+    return `${arrow} ${change.statName} ${change.finalChange > 0 ? '+' : ''}${change.finalChange} ${factorText}`;
+  });
+};
+
+/**
+ * 증폭 로직 시각화용 데이터 생성
+ * @param percentage 현재 스탯 퍼센티지
+ * @returns 시각화용 데이터
+ */
+export interface AmplificationVisualData {
+  zoneStart: number;
+  zoneEnd: number;
+  zoneName: string;
+  zoneColor: string;
+  factor: number;
+  factorLabel: string;
+}
+
+export const getAmplificationVisualData = (
+  percentage: number
+): AmplificationVisualData => {
+  const zone = getStatZone(percentage);
+
+  const zoneConfig = {
+    extreme_low: {
+      zoneStart: 0,
+      zoneEnd: 25,
+      zoneName: '위험',
+      zoneColor: 'text-red-400',
+      factor: 1.5,
+      factorLabel: '×1.5',
+    },
+    mid_range: {
+      zoneStart: 25,
+      zoneEnd: 75,
+      zoneName: '안정',
+      zoneColor: 'text-yellow-400',
+      factor: 3.0,
+      factorLabel: '×3.0',
+    },
+    extreme_high: {
+      zoneStart: 75,
+      zoneEnd: 100,
+      zoneName: '과열',
+      zoneColor: 'text-orange-400',
+      factor: 1.5,
+      factorLabel: '×1.5',
+    },
+  };
+
+  return zoneConfig[zone];
+};

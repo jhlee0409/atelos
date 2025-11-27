@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.8.0",
-  "lastUpdated": "2025-11-27T08:00:00Z",
+  "version": "1.9.0",
+  "lastUpdated": "2025-11-27T09:00:00Z",
   "currentPhase": "P3",
-  "currentTask": "P3-4",
+  "currentTask": "completed",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -91,7 +91,8 @@
     },
     "P3": {
       "name": "Game Client Stabilization",
-      "status": "in_progress",
+      "status": "completed",
+      "completedAt": "2025-11-27T09:00:00Z",
       "tasks": [
         {
           "id": "P3-1",
@@ -131,7 +132,20 @@
             "Shows predicted stat impacts (↑/↓) and risk level for each choice"
           ]
         },
-        {"id": "P3-4", "name": "Transparentize stat amplification", "status": "pending"}
+{
+          "id": "P3-4",
+          "name": "Transparentize stat amplification",
+          "status": "completed",
+          "changes": [
+            "Added AmplificationResult, StatChangeSummary, AmplificationVisualData types",
+            "Added getStatZone(), getAmplificationFactor() utility functions",
+            "Added calculateAmplification() with detailed result breakdown",
+            "Added formatStatChangeSummary() for UI display",
+            "Added getAmplificationVisualData() for zone visualization",
+            "Updated StatDisplay.tsx with amplification info button and panel",
+            "Shows current zone (위험/안정/과열), multiplier (×1.5/×3.0), and zone indicator bar"
+          ]
+        }
       ]
     }
   },
@@ -153,7 +167,10 @@
         "P3-1: Added action classification system with regex patterns",
         "P3-3: Added StatImpactDirection, PredictedImpact, ChoiceHint types",
         "P3-3: Added CATEGORY_STAT_IMPACTS, CATEGORY_RISK_LEVELS, CATEGORY_SHORT_HINTS",
-        "P3-3: Added getChoiceHint() and formatImpactsForUI() functions"
+        "P3-3: Added getChoiceHint() and formatImpactsForUI() functions",
+        "P3-4: Added AmplificationResult, StatChangeSummary, AmplificationVisualData types",
+        "P3-4: Added getStatZone(), getAmplificationFactor(), calculateAmplification()",
+        "P3-4: Added formatStatChangeSummary(), getAmplificationVisualData()"
       ]
     },
     "app/game/[scenarioId]/GameClient.tsx": {
@@ -196,6 +213,15 @@
       "status": "modified",
       "phase": "P3",
       "changes": ["P3-2: Added sanitizeMessageContent() for defensive XSS prevention"]
+    },
+    "pages/client/GameClient/StatDisplay.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P3-4: Added amplification zone visualization (×1.5/×3.0)",
+        "P3-4: Added info button with expandable amplification panel",
+        "P3-4: Shows current zone, multiplier, and zone indicator bar"
+      ]
     },
     "pages/admin/ScenarioEditor/BaseContent.tsx": {
       "status": "modified",
@@ -247,9 +273,11 @@
   "notes": [
     "Phase 1 completed - LLM control significantly improved",
     "Phase 2 completed - Admin page fully enhanced",
-    "P3-1 completed - Action classification with 11 regex categories",
-    "P3-2 completed - XSS prevention with escapeHtml/sanitizeHtml utilities",
-    "P3-3 completed - Choice hints UI with predicted impacts and risk levels",
-    "Next: P3-4 Transparentize stat amplification"
+    "Phase 3 completed - Game client stabilization",
+    "P3-1: Action classification with 11 regex categories",
+    "P3-2: XSS prevention with escapeHtml/sanitizeHtml utilities",
+    "P3-3: Choice hints UI with predicted impacts and risk levels",
+    "P3-4: Stat amplification transparency with zone visualization",
+    "All phases completed successfully!"
   ]
 }
