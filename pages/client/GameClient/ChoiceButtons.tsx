@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, escapeHtml, sanitizeHtml } from '@/lib/utils';
 import { SaveState } from '@/types';
 import { AlertTriangle } from 'lucide-react';
 
@@ -124,12 +124,15 @@ const ChoiceButton = ({
   const urgencyClasses = urgency ? 'animate-pulse ring-2 ring-yellow-400' : '';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : '';
 
-  // 핵심 키워드 강조
+  // 핵심 키워드 강조 (XSS 방지 적용)
   const highlightKeywords = (text: string) => {
     // text가 undefined나 null인 경우 빈 문자열로 처리
     if (!text || typeof text !== 'string') {
       return '';
     }
+
+    // 1. 먼저 HTML 이스케이프하여 XSS 방지
+    const escapedText = escapeHtml(text);
 
     const keywords = [
       '공격',
@@ -141,18 +144,22 @@ const ChoiceButton = ({
       '진행',
       '후퇴',
     ];
-    let highlightedText = text;
 
+    // 2. 이스케이프된 텍스트에서 안전하게 키워드 강조
+    let highlightedText = escapedText;
     keywords.forEach((keyword) => {
-      if (text.includes(keyword)) {
+      // 키워드도 이스케이프하여 일치 확인 (특수문자가 없는 한국어라 동일)
+      const escapedKeyword = escapeHtml(keyword);
+      if (highlightedText.includes(escapedKeyword)) {
         highlightedText = highlightedText.replace(
-          keyword,
-          `<span class="font-extrabold text-yellow-300">${keyword}</span>`,
+          escapedKeyword,
+          `<span class="font-extrabold text-yellow-300">${escapedKeyword}</span>`,
         );
       }
     });
 
-    return highlightedText;
+    // 3. 최종적으로 sanitizeHtml로 한 번 더 검증
+    return sanitizeHtml(highlightedText);
   };
 
   return (
@@ -177,6 +184,22 @@ const ChoiceButton = ({
   );
 };
 
+/**
+ * AI 생성 프롬프트를 안전하게 정제 (XSS 방지)
+ * @param prompt AI가 생성한 프롬프트
+ * @returns 정제된 안전한 프롬프트
+ */
+const sanitizePrompt = (prompt: string): string => {
+  if (!prompt || typeof prompt !== 'string') {
+    return '';
+  }
+  // HTML 태그 및 위험한 패턴 제거
+  return prompt
+    .replace(/<[^>]*>/g, '') // HTML 태그 제거
+    .replace(/javascript:/gi, '') // javascript: 프로토콜 제거
+    .replace(/on\w+=/gi, ''); // 이벤트 핸들러 제거
+};
+
 export const DilemmaPrompt = ({
   prompt,
   isUrgent,
@@ -186,7 +209,9 @@ export const DilemmaPrompt = ({
 }) => {
   return (
     <div className="mb-4 rounded-2xl bg-gray-900/80 p-4 text-center backdrop-blur-sm">
-      <p className="text-sm leading-relaxed text-yellow-300">{prompt}</p>
+      <p className="text-sm leading-relaxed text-yellow-300">
+        {sanitizePrompt(prompt)}
+      </p>
       {isUrgent && (
         <div className="mt-2 flex items-center justify-center space-x-1 text-xs text-yellow-400">
           <AlertTriangle className="h-3 w-3" />

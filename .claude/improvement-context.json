@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.6.0",
-  "lastUpdated": "2025-11-27T06:00:00Z",
+  "version": "1.7.0",
+  "lastUpdated": "2025-11-27T07:00:00Z",
   "currentPhase": "P3",
-  "currentTask": "P3-2",
+  "currentTask": "P3-3",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -106,7 +106,18 @@
             "Updated GameClient.tsx to use new classification system"
           ]
         },
-        {"id": "P3-2", "name": "Apply HTML escaping (XSS prevention)", "status": "pending"},
+{
+          "id": "P3-2",
+          "name": "Apply HTML escaping (XSS prevention)",
+          "status": "completed",
+          "changes": [
+            "Added escapeHtml(), unescapeHtml(), sanitizeHtml() to lib/utils.ts",
+            "Fixed XSS vulnerability in ChoiceButtons.tsx highlightKeywords()",
+            "Added sanitizeMessageContent() to ChatMessage.tsx",
+            "Added sanitizePrompt() to DilemmaPrompt component",
+            "All AI-generated content now sanitized before rendering"
+          ]
+        },
         {"id": "P3-3", "name": "Add expected result hints to choices", "status": "pending"},
         {"id": "P3-4", "name": "Transparentize stat amplification", "status": "pending"}
       ]
@@ -150,8 +161,24 @@
     },
     "lib/utils.ts": {
       "status": "modified",
-      "phase": "P2",
-      "changes": ["Added fileToBase64(), isBase64DataUrl(), isBlobUrl() functions"]
+      "phase": "P3",
+      "changes": [
+        "P2: Added fileToBase64(), isBase64DataUrl(), isBlobUrl() functions",
+        "P3-2: Added escapeHtml(), unescapeHtml(), sanitizeHtml() for XSS prevention"
+      ]
+    },
+    "pages/client/GameClient/ChoiceButtons.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P3-2: Fixed XSS vulnerability in highlightKeywords() using escapeHtml()",
+        "P3-2: Added sanitizePrompt() for DilemmaPrompt component"
+      ]
+    },
+    "pages/client/GameClient/ChatMessage.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": ["P3-2: Added sanitizeMessageContent() for defensive XSS prevention"]
     },
     "pages/admin/ScenarioEditor/BaseContent.tsx": {
       "status": "modified",
@@ -204,6 +231,7 @@
     "Phase 1 completed - LLM control significantly improved",
     "Phase 2 completed - Admin page fully enhanced",
     "P3-1 completed - Action classification with 11 regex categories",
-    "Next: P3-2 HTML escaping (XSS prevention)"
+    "P3-2 completed - XSS prevention with escapeHtml/sanitizeHtml utilities",
+    "Next: P3-3 Add expected result hints to choices"
   ]
 }
