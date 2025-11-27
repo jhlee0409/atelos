@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.4.0",
-  "lastUpdated": "2025-11-27T04:00:00Z",
-  "currentPhase": "P2",
-  "currentTask": "P2-5",
+  "version": "1.5.0",
+  "lastUpdated": "2025-11-27T05:00:00Z",
+  "currentPhase": "P3",
+  "currentTask": "P3-1",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -26,7 +26,8 @@
     },
     "P2": {
       "name": "Admin Page Enhancement",
-      "status": "in_progress",
+      "status": "completed",
+      "completedAt": "2025-11-27T05:00:00Z",
       "tasks": [
         {
           "id": "P2-1",
@@ -76,14 +77,21 @@
         {
           "id": "P2-5",
           "name": "Strengthen scenario validation",
-          "status": "pending",
-          "file": "lib/validations.ts"
+          "status": "completed",
+          "changes": [
+            "Added VALIDATION_IDS for characters, stats, endings, relationships, flags",
+            "Added validateCharacters(), validateStats(), validateEndings() functions",
+            "Added validateRelationships(), validateFlags() functions",
+            "Added validateScenarioFull() for comprehensive validation with warnings",
+            "Added ValidationResult type with errors, warnings, details",
+            "Added getValidationMessage() utility function"
+          ]
         }
       ]
     },
     "P3": {
       "name": "Game Client Stabilization",
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
         {"id": "P3-1", "name": "Improve action classification logic", "status": "pending"},
         {"id": "P3-2", "name": "Apply HTML escaping (XSS prevention)", "status": "pending"},
@@ -141,6 +149,19 @@
         "Added type/comparison mapping system",
         "Unified SystemCondition values to English for type safety"
       ]
+    },
+    "lib/validations.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": [
+        "Added comprehensive validation functions for all scenario components",
+        "Added validateScenarioFull() with warnings support"
+      ]
+    },
+    "constants/scenario.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Added new VALIDATION_IDS and MIN_* constants"]
     }
   },
 
@@ -160,10 +181,12 @@
 
   "notes": [
     "Phase 1 completed - LLM control significantly improved",
-    "P2-1 completed - Stats can now be managed from admin UI",
-    "P2-2 completed - Flags now have triggerCondition field for AI guidance",
-    "P2-3 completed - Images now stored as base64, persist across sessions",
-    "P2-4 completed - SystemCondition types unified (Korean UI ↔ English storage)",
-    "Next: P2-5 Strengthen scenario validation"
+    "Phase 2 completed - Admin page fully enhanced",
+    "P2-1: Stats management UI added",
+    "P2-2: Flags now have triggerCondition field",
+    "P2-3: Images stored as base64 (persistent)",
+    "P2-4: SystemCondition types unified",
+    "P2-5: Comprehensive validation with errors/warnings",
+    "Next: P3 Game Client Stabilization starting with P3-1"
   ]
 }
