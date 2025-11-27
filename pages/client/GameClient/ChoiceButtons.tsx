@@ -1,6 +1,8 @@
 import { cn, escapeHtml, sanitizeHtml } from '@/lib/utils';
+import { getChoiceHint, formatImpactsForUI } from '@/lib/game-ai-client';
 import { SaveState } from '@/types';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
+import { useState } from 'react';
 
 export const ChoiceButtons = ({
   isLoading,
@@ -99,20 +101,24 @@ export const ChoiceButtons = ({
   );
 };
 
-// 선택지 버튼 컴포넌트
+// 선택지 버튼 컴포넌트 (예상 결과 힌트 포함)
 const ChoiceButton = ({
   choice,
   onClick,
   variant = 'primary',
   disabled = false,
   urgency = false,
+  showHints = true,
 }: {
   choice: string | undefined;
   onClick: () => void;
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
   urgency?: boolean;
+  showHints?: boolean;
 }) => {
+  const [isHintVisible, setIsHintVisible] = useState(false);
+
   const baseClasses =
     'flex-1 p-4 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg min-h-[48px] relative overflow-hidden';
 
@@ -162,25 +168,91 @@ const ChoiceButton = ({
     return sanitizeHtml(highlightedText);
   };
 
+  // 예상 결과 힌트 계산
+  const hint = choice ? getChoiceHint(choice) : null;
+  const impactTexts = hint ? formatImpactsForUI(hint.predictedImpacts) : [];
+
+  // 위험도별 색상
+  const getRiskColor = (riskLevel: 'low' | 'medium' | 'high') => {
+    switch (riskLevel) {
+      case 'high':
+        return 'text-red-300';
+      case 'medium':
+        return 'text-yellow-300';
+      case 'low':
+        return 'text-green-300';
+    }
+  };
+
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        baseClasses,
-        variantClasses,
-        urgencyClasses,
-        disabledClasses,
+    <div className="flex-1">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          baseClasses,
+          variantClasses,
+          urgencyClasses,
+          disabledClasses,
+          'w-full',
+        )}
+      >
+        <div
+          className="relative z-10 text-center leading-tight"
+          dangerouslySetInnerHTML={{ __html: highlightKeywords(choice || '') }}
+        />
+        {urgency && (
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />
+        )}
+        {/* 힌트 토글 버튼 */}
+        {showHints && hint && hint.category !== 'general' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsHintVisible(!isHintVisible);
+            }}
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/30 p-1 transition-colors hover:bg-black/50"
+            aria-label="힌트 보기"
+          >
+            <Info className="h-3 w-3 text-white/70" />
+          </button>
+        )}
+      </button>
+
+      {/* 예상 결과 힌트 표시 */}
+      {showHints && hint && isHintVisible && hint.category !== 'general' && (
+        <div className="mt-1 rounded-lg bg-black/60 px-3 py-2 text-xs backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">{hint.shortHint}</span>
+            <span className={cn('text-[10px]', getRiskColor(hint.riskLevel))}>
+              {hint.riskLevel === 'high'
+                ? '위험'
+                : hint.riskLevel === 'medium'
+                  ? '보통'
+                  : '안전'}
+            </span>
+          </div>
+          {impactTexts.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {impactTexts.map((text, idx) => (
+                <span
+                  key={idx}
+                  className={cn(
+                    'rounded px-1.5 py-0.5 text-[10px]',
+                    text.startsWith('↑')
+                      ? 'bg-green-900/50 text-green-300'
+                      : 'bg-red-900/50 text-red-300',
+                  )}
+                >
+                  {text}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-    >
-      <div
-        className="relative z-10 text-center leading-tight"
-        dangerouslySetInnerHTML={{ __html: highlightKeywords(choice || '') }}
-      />
-      {urgency && (
-        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />
-      )}
-    </button>
+    </div>
   );
 };
 

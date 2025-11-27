@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.7.0",
-  "lastUpdated": "2025-11-27T07:00:00Z",
+  "version": "1.8.0",
+  "lastUpdated": "2025-11-27T08:00:00Z",
   "currentPhase": "P3",
-  "currentTask": "P3-3",
+  "currentTask": "P3-4",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -118,7 +118,19 @@
             "All AI-generated content now sanitized before rendering"
           ]
         },
-        {"id": "P3-3", "name": "Add expected result hints to choices", "status": "pending"},
+{
+          "id": "P3-3",
+          "name": "Add expected result hints to choices",
+          "status": "completed",
+          "changes": [
+            "Added StatImpactDirection, PredictedImpact, ChoiceHint types to game-ai-client.ts",
+            "Added CATEGORY_STAT_IMPACTS mapping for 11 action categories",
+            "Added CATEGORY_RISK_LEVELS and CATEGORY_SHORT_HINTS mappings",
+            "Added getChoiceHint() and formatImpactsForUI() functions",
+            "Updated ChoiceButton component with hint toggle and display UI",
+            "Shows predicted stat impacts (↑/↓) and risk level for each choice"
+          ]
+        },
         {"id": "P3-4", "name": "Transparentize stat amplification", "status": "pending"}
       ]
     }
@@ -138,7 +150,10 @@
       "phase": "P3",
       "changes": [
         "P1: Added choice/stat validation functions",
-        "P3-1: Added action classification system with regex patterns"
+        "P3-1: Added action classification system with regex patterns",
+        "P3-3: Added StatImpactDirection, PredictedImpact, ChoiceHint types",
+        "P3-3: Added CATEGORY_STAT_IMPACTS, CATEGORY_RISK_LEVELS, CATEGORY_SHORT_HINTS",
+        "P3-3: Added getChoiceHint() and formatImpactsForUI() functions"
       ]
     },
     "app/game/[scenarioId]/GameClient.tsx": {
@@ -172,7 +187,9 @@
       "phase": "P3",
       "changes": [
         "P3-2: Fixed XSS vulnerability in highlightKeywords() using escapeHtml()",
-        "P3-2: Added sanitizePrompt() for DilemmaPrompt component"
+        "P3-2: Added sanitizePrompt() for DilemmaPrompt component",
+        "P3-3: Added choice hint toggle button and display UI",
+        "P3-3: Shows predicted impacts and risk level for each choice"
       ]
     },
     "pages/client/GameClient/ChatMessage.tsx": {
@@ -232,6 +249,7 @@
     "Phase 2 completed - Admin page fully enhanced",
     "P3-1 completed - Action classification with 11 regex categories",
     "P3-2 completed - XSS prevention with escapeHtml/sanitizeHtml utilities",
-    "Next: P3-3 Add expected result hints to choices"
+    "P3-3 completed - Choice hints UI with predicted impacts and risk levels",
+    "Next: P3-4 Transparentize stat amplification"
   ]
 }

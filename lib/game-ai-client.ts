@@ -1087,3 +1087,145 @@ export const compareActionTypes = (
     suggestion,
   };
 };
+
+/**
+ * 카테고리별 예상 스탯 영향 매핑
+ * 각 행동 유형이 게임 스탯에 미칠 수 있는 예상 영향을 정의
+ */
+export type StatImpactDirection = 'up' | 'down' | 'neutral';
+
+export interface PredictedImpact {
+  statName: string;        // 한글 스탯 이름
+  statId: string;          // 영문 스탯 ID
+  direction: StatImpactDirection;
+  intensity: 'low' | 'medium' | 'high';  // 영향 강도
+}
+
+export interface ChoiceHint {
+  category: ActionCategory;
+  categoryDescription: string;
+  predictedImpacts: PredictedImpact[];
+  riskLevel: 'low' | 'medium' | 'high';
+  shortHint: string;  // 짧은 힌트 텍스트
+}
+
+// 카테고리별 예상 스탯 영향
+const CATEGORY_STAT_IMPACTS: Record<ActionCategory, PredictedImpact[]> = {
+  combat: [
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'up', intensity: 'high' },
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'down', intensity: 'medium' },
+    { statName: '안전 수준', statId: 'safetyLevel', direction: 'neutral', intensity: 'medium' },
+  ],
+  diplomacy: [
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'down', intensity: 'medium' },
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'up', intensity: 'medium' },
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'up', intensity: 'low' },
+  ],
+  medical: [
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'up', intensity: 'high' },
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'up', intensity: 'medium' },
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'down', intensity: 'low' },
+  ],
+  exploration: [
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'up', intensity: 'medium' },
+    { statName: '안전 수준', statId: 'safetyLevel', direction: 'down', intensity: 'low' },
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'neutral', intensity: 'low' },
+  ],
+  construction: [
+    { statName: '방어 능력', statId: 'defenseCapability', direction: 'up', intensity: 'high' },
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'down', intensity: 'medium' },
+    { statName: '안전 수준', statId: 'safetyLevel', direction: 'up', intensity: 'medium' },
+  ],
+  resource: [
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'up', intensity: 'high' },
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'up', intensity: 'low' },
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'up', intensity: 'low' },
+  ],
+  social: [
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'up', intensity: 'high' },
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'up', intensity: 'medium' },
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'down', intensity: 'low' },
+  ],
+  leadership: [
+    { statName: '시민 신뢰도', statId: 'citizenTrust', direction: 'up', intensity: 'medium' },
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'up', intensity: 'medium' },
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'neutral', intensity: 'low' },
+  ],
+  stealth: [
+    { statName: '안전 수준', statId: 'safetyLevel', direction: 'up', intensity: 'medium' },
+    { statName: '도시 혼란도', statId: 'cityChaos', direction: 'neutral', intensity: 'low' },
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'neutral', intensity: 'low' },
+  ],
+  survival: [
+    { statName: '안전 수준', statId: 'safetyLevel', direction: 'up', intensity: 'low' },
+    { statName: '커뮤니티 사기', statId: 'communityMorale', direction: 'neutral', intensity: 'low' },
+    { statName: '자원 수준', statId: 'resourceLevel', direction: 'down', intensity: 'low' },
+  ],
+  general: [
+    { statName: '스탯 변화', statId: 'general', direction: 'neutral', intensity: 'low' },
+  ],
+};
+
+// 카테고리별 위험도
+const CATEGORY_RISK_LEVELS: Record<ActionCategory, 'low' | 'medium' | 'high'> = {
+  combat: 'high',
+  diplomacy: 'low',
+  medical: 'low',
+  exploration: 'medium',
+  construction: 'low',
+  resource: 'medium',
+  social: 'low',
+  leadership: 'medium',
+  stealth: 'medium',
+  survival: 'low',
+  general: 'low',
+};
+
+// 카테고리별 짧은 힌트
+const CATEGORY_SHORT_HINTS: Record<ActionCategory, string> = {
+  combat: '⚔️ 위험하지만 즉각적인 해결',
+  diplomacy: '🤝 평화적 해결 시도',
+  medical: '💊 생명 보호 우선',
+  exploration: '🔍 위험과 기회 공존',
+  construction: '🏗️ 장기적 안정 확보',
+  resource: '📦 자원 확보 중심',
+  social: '💬 커뮤니티 결속 강화',
+  leadership: '👑 결단력 있는 지도',
+  stealth: '🌙 신중한 접근',
+  survival: '⏳ 안전한 대기',
+  general: '📋 일반적 행동',
+};
+
+/**
+ * 선택지의 예상 결과 힌트 생성
+ * @param choiceText 선택지 텍스트
+ * @returns 선택지 힌트 정보
+ */
+export const getChoiceHint = (choiceText: string): ChoiceHint => {
+  const classification = classifyAction(choiceText);
+  const category = classification.category;
+
+  return {
+    category,
+    categoryDescription: classification.description,
+    predictedImpacts: CATEGORY_STAT_IMPACTS[category],
+    riskLevel: CATEGORY_RISK_LEVELS[category],
+    shortHint: CATEGORY_SHORT_HINTS[category],
+  };
+};
+
+/**
+ * 예상 영향을 UI용 텍스트로 변환
+ * @param impacts 예상 영향 배열
+ * @returns UI 표시용 문자열 배열
+ */
+export const formatImpactsForUI = (impacts: PredictedImpact[]): string[] => {
+  return impacts
+    .filter((impact) => impact.direction !== 'neutral')
+    .slice(0, 2)  // 최대 2개만 표시
+    .map((impact) => {
+      const arrow = impact.direction === 'up' ? '↑' : '↓';
+      const intensity = impact.intensity === 'high' ? '!' : '';
+      return `${arrow}${impact.statName}${intensity}`;
+    });
+};
