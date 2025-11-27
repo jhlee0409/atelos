@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.3.0",
-  "lastUpdated": "2025-11-27T03:00:00Z",
+  "version": "1.4.0",
+  "lastUpdated": "2025-11-27T04:00:00Z",
   "currentPhase": "P2",
-  "currentTask": "P2-4",
+  "currentTask": "P2-5",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -64,8 +64,14 @@
         {
           "id": "P2-4",
           "name": "Unify SystemCondition types",
-          "status": "pending",
-          "file": "pages/admin/ScenarioEditor/CoreStoryElementsContent.tsx"
+          "status": "completed",
+          "changes": [
+            "Added CONDITION_TYPE_MAP for Korean↔English type conversion",
+            "Added COMPARISON_MAP for symbol↔English operator conversion",
+            "Updated EndingConditionBuilder to store English values (required_stat, greater_equal)",
+            "UI displays Korean/symbols but stores English values for type safety",
+            "Added all comparison operators (>, <, !=) to UI"
+          ]
         },
         {
           "id": "P2-5",
@@ -127,6 +133,14 @@
       "status": "modified",
       "phase": "P2",
       "changes": ["Changed character image upload from blob URL to base64"]
+    },
+    "pages/admin/ScenarioEditor/CoreStoryElementsContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": [
+        "Added type/comparison mapping system",
+        "Unified SystemCondition values to English for type safety"
+      ]
     }
   },
 
@@ -149,6 +163,7 @@
     "P2-1 completed - Stats can now be managed from admin UI",
     "P2-2 completed - Flags now have triggerCondition field for AI guidance",
     "P2-3 completed - Images now stored as base64, persist across sessions",
-    "Next: P2-4 SystemCondition type unification"
+    "P2-4 completed - SystemCondition types unified (Korean UI ↔ English storage)",
+    "Next: P2-5 Strengthen scenario validation"
   ]
 }

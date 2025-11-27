@@ -21,6 +21,43 @@ import {
 import { SetStateAction } from 'react';
 import { Badge } from '@/components/ui/badge';
 
+// SystemCondition 타입 매핑 (영문 ↔ 한글)
+const CONDITION_TYPE_MAP = {
+  toKorean: {
+    required_stat: '필수 스탯',
+    required_flag: '필수 플래그',
+    survivor_count: '생존자 수',
+  } as const,
+  toEnglish: {
+    '필수 스탯': 'required_stat',
+    '필수 플래그': 'required_flag',
+    '생존자 수': 'survivor_count',
+  } as const,
+};
+
+// 비교 연산자 매핑 (영문 ↔ 기호)
+const COMPARISON_MAP = {
+  toSymbol: {
+    greater_equal: '>=',
+    less_equal: '<=',
+    equal: '==',
+    greater_than: '>',
+    less_than: '<',
+    not_equal: '!=',
+  } as const,
+  toEnglish: {
+    '>=': 'greater_equal',
+    '<=': 'less_equal',
+    '==': 'equal',
+    '>': 'greater_than',
+    '<': 'less_than',
+    '!=': 'not_equal',
+  } as const,
+};
+
+type ComparisonOperator = 'greater_equal' | 'less_equal' | 'equal' | 'greater_than' | 'less_than' | 'not_equal';
+type ConditionTypeEnglish = 'required_stat' | 'required_flag' | 'survivor_count';
+
 const EndingConditionBuilder = ({
   conditions,
   onConditionsChange,
@@ -32,11 +69,21 @@ const EndingConditionBuilder = ({
   scenarioStats: ScenarioData['scenarioStats'];
   scenario: ScenarioData;
 }) => {
+  // 조건 타입을 한글로 변환 (UI 표시용)
+  const getConditionTypeKorean = (type: string): string => {
+    return CONDITION_TYPE_MAP.toKorean[type as ConditionTypeEnglish] || type;
+  };
+
+  // 비교 연산자를 기호로 변환 (UI 표시용)
+  const getComparisonSymbol = (comparison: string): string => {
+    return COMPARISON_MAP.toSymbol[comparison as ComparisonOperator] || comparison;
+  };
+
   const addCondition = () => {
     const newCondition: SystemCondition = {
-      type: '필수 스탯',
+      type: 'required_stat',
       statId: scenarioStats[0]?.id || '',
-      comparison: '>=',
+      comparison: 'greater_equal',
       value: 0,
       isEditing: true,
     };
@@ -52,27 +99,36 @@ const EndingConditionBuilder = ({
     onConditionsChange(newConditions);
   };
 
-  const handleTypeChange = (index: number, type: SystemCondition['type']) => {
+  const handleTypeChange = (index: number, koreanType: string) => {
+    const englishType = CONDITION_TYPE_MAP.toEnglish[koreanType as keyof typeof CONDITION_TYPE_MAP.toEnglish] || koreanType;
     let newCondition: SystemCondition;
-    switch (type) {
-      case '필수 플래그':
-        newCondition = { type, flagName: '', isEditing: true };
+    switch (englishType) {
+      case 'required_flag':
+        newCondition = { type: 'required_flag', flagName: '', isEditing: true };
         break;
-      case '생존자 수':
-        newCondition = { type, comparison: '==', value: 1, isEditing: true };
+      case 'survivor_count':
+        newCondition = { type: 'survivor_count', comparison: 'equal', value: 1, isEditing: true };
         break;
-      case '필수 스탯':
+      case 'required_stat':
       default:
         newCondition = {
-          type: '필수 스탯',
+          type: 'required_stat',
           statId: scenarioStats[0]?.id || '',
-          comparison: '>=',
+          comparison: 'greater_equal',
           value: 0,
           isEditing: true,
         };
         break;
     }
     updateCondition(index, newCondition);
+  };
+
+  const handleComparisonChange = (index: number, symbol: string, condition: SystemCondition) => {
+    const englishComparison = COMPARISON_MAP.toEnglish[symbol as keyof typeof COMPARISON_MAP.toEnglish] || symbol;
+    updateCondition(index, {
+      ...condition,
+      comparison: englishComparison as ComparisonOperator,
+    } as SystemCondition);
   };
 
   const removeCondition = (index: number) => {
@@ -89,10 +145,8 @@ const EndingConditionBuilder = ({
         >
           <div className="flex items-center gap-2">
             <Select
-              value={condition.type}
-              onValueChange={(value: SystemCondition['type']) =>
-                handleTypeChange(index, value)
-              }
+              value={getConditionTypeKorean(condition.type)}
+              onValueChange={(value: string) => handleTypeChange(index, value)}
             >
               <SelectTrigger className="w-full border-socratic-grey/50 bg-white">
                 <SelectValue placeholder="조건 유형" />
@@ -112,7 +166,7 @@ const EndingConditionBuilder = ({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          {condition.type === '필수 스탯' && (
+          {condition.type === 'required_stat' && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <Select
                 value={condition.statId}
@@ -132,21 +186,19 @@ const EndingConditionBuilder = ({
                 </SelectContent>
               </Select>
               <Select
-                value={condition.comparison}
-                onValueChange={(comparison) =>
-                  updateCondition(index, {
-                    ...condition,
-                    comparison: comparison as '>=' | '<=' | '==',
-                  })
-                }
+                value={getComparisonSymbol(condition.comparison)}
+                onValueChange={(symbol) => handleComparisonChange(index, symbol, condition)}
               >
                 <SelectTrigger className="border-socratic-grey/50 bg-white">
                   <SelectValue placeholder="비교" />
                 </SelectTrigger>
                 <SelectContent className="border-socratic-grey bg-parchment-white">
-                  <SelectItem value=">=">&gt;=</SelectItem>
-                  <SelectItem value="<=">&lt;=</SelectItem>
-                  <SelectItem value="==">==</SelectItem>
+                  <SelectItem value=">=">&gt;= (이상)</SelectItem>
+                  <SelectItem value="<=">&lt;= (이하)</SelectItem>
+                  <SelectItem value="==">== (같음)</SelectItem>
+                  <SelectItem value=">">&gt; (초과)</SelectItem>
+                  <SelectItem value="<">&lt; (미만)</SelectItem>
+                  <SelectItem value="!=">!= (다름)</SelectItem>
                 </SelectContent>
               </Select>
               <Input
@@ -155,14 +207,14 @@ const EndingConditionBuilder = ({
                 onChange={(e) =>
                   updateCondition(index, {
                     ...condition,
-                    value: parseInt(e.target.value, 10),
+                    value: parseInt(e.target.value, 10) || 0,
                   })
                 }
                 className="border-socratic-grey/50"
               />
             </div>
           )}
-          {condition.type === '필수 플래그' && (
+          {condition.type === 'required_flag' && (
             <Select
               value={condition.flagName}
               onValueChange={(flagName) =>
@@ -183,24 +235,22 @@ const EndingConditionBuilder = ({
               </SelectContent>
             </Select>
           )}
-          {condition.type === '생존자 수' && (
+          {condition.type === 'survivor_count' && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Select
-                value={condition.comparison}
-                onValueChange={(comparison) =>
-                  updateCondition(index, {
-                    ...condition,
-                    comparison: comparison as '>=' | '<=' | '==',
-                  })
-                }
+                value={getComparisonSymbol(condition.comparison)}
+                onValueChange={(symbol) => handleComparisonChange(index, symbol, condition)}
               >
                 <SelectTrigger className="border-socratic-grey/50 bg-white">
                   <SelectValue placeholder="비교" />
                 </SelectTrigger>
                 <SelectContent className="border-socratic-grey bg-parchment-white">
-                  <SelectItem value=">=">&gt;=</SelectItem>
-                  <SelectItem value="<=">&lt;=</SelectItem>
-                  <SelectItem value="==">==</SelectItem>
+                  <SelectItem value=">=">&gt;= (이상)</SelectItem>
+                  <SelectItem value="<=">&lt;= (이하)</SelectItem>
+                  <SelectItem value="==">== (같음)</SelectItem>
+                  <SelectItem value=">">&gt; (초과)</SelectItem>
+                  <SelectItem value="<">&lt; (미만)</SelectItem>
+                  <SelectItem value="!=">!= (다름)</SelectItem>
                 </SelectContent>
               </Select>
               <Input
@@ -209,7 +259,7 @@ const EndingConditionBuilder = ({
                 onChange={(e) =>
                   updateCondition(index, {
                     ...condition,
-                    value: parseInt(e.target.value, 10),
+                    value: parseInt(e.target.value, 10) || 0,
                   })
                 }
                 className="border-socratic-grey/50"
