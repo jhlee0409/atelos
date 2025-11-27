@@ -85,7 +85,7 @@ export const detectAndCleanLanguageMixing = (
   };
 };
 
-// 한국어 품질 검증 함수
+// 한국어 품질 검증 함수 (gemini-2.5-flash-lite 최적화 - 더 엄격한 기준)
 export const validateKoreanContent = (
   text: string,
 ): {
@@ -105,13 +105,13 @@ export const validateKoreanContent = (
   const koreanRatio = koreanMatches.length / text.length;
   const allowedRatio = allowedMatches.length / text.length;
 
-  // 한국어 비율이 너무 낮으면 문제
-  if (koreanRatio < 0.3) {
-    issues.push(`한국어 비율 낮음: ${Math.round(koreanRatio * 100)}%`);
+  // 한국어 비율이 너무 낮으면 문제 (80% 이상 요구 - 강화됨)
+  if (koreanRatio < 0.8) {
+    issues.push(`한국어 비율 낮음: ${Math.round(koreanRatio * 100)}% (80% 이상 필요)`);
   }
 
   // 허용되지 않는 문자가 너무 많으면 문제
-  if (allowedRatio < 0.8) {
+  if (allowedRatio < 0.9) {
     issues.push(
       `허용되지 않는 문자 과다: ${Math.round((1 - allowedRatio) * 100)}%`,
     );
@@ -131,16 +131,101 @@ export const validateKoreanContent = (
   };
 };
 
-// AI 응답 언어 정리 및 검증
+// 선택지 품질 검증 함수 (신규)
+export const validateChoiceFormat = (
+  choice: string,
+): {
+  isValid: boolean;
+  issues: string[];
+} => {
+  const issues: string[] = [];
+
+  // 1. 길이 검증 (15-80자)
+  if (choice.length < 15) {
+    issues.push(`선택지 너무 짧음: ${choice.length}자 (최소 15자)`);
+  }
+  if (choice.length > 80) {
+    issues.push(`선택지 너무 김: ${choice.length}자 (최대 80자)`);
+  }
+
+  // 2. 종결형 검증 (~한다, ~이다, ~는다, ~ㄴ다)
+  const validEndings = /[한이된른]다\.?$|다\.?$/;
+  if (!validEndings.test(choice)) {
+    issues.push(`선택지 종결형 오류: "~한다/~이다"로 끝나야 함`);
+  }
+
+  // 3. 시스템 ID 노출 검증
+  const systemIdPattern = /\[([A-Z_]+)\]/;
+  if (systemIdPattern.test(choice)) {
+    issues.push(`시스템 ID 노출됨: ${choice.match(systemIdPattern)?.[0]}`);
+  }
+
+  // 4. 한국어 콘텐츠 검증
+  const koreanPattern = /[가-힣]/g;
+  const koreanMatches = choice.match(koreanPattern) || [];
+  if (koreanMatches.length < 5) {
+    issues.push(`한국어 콘텐츠 부족: 한글 ${koreanMatches.length}자`);
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues,
+  };
+};
+
+// 스탯 변화량 검증 함수 (신규)
+export const validateStatChanges = (
+  statChanges: { [key: string]: number },
+): {
+  isValid: boolean;
+  issues: string[];
+  correctedChanges: { [key: string]: number };
+} => {
+  const issues: string[] = [];
+  const correctedChanges: { [key: string]: number } = {};
+  const MAX_STAT_CHANGE = 40;
+
+  for (const [statId, change] of Object.entries(statChanges)) {
+    if (typeof change !== 'number') {
+      issues.push(`${statId}: 숫자가 아님`);
+      correctedChanges[statId] = 0;
+      continue;
+    }
+
+    // ±40 범위 제한
+    if (Math.abs(change) > MAX_STAT_CHANGE) {
+      issues.push(`${statId}: 변화량 초과 (${change} → ${change > 0 ? MAX_STAT_CHANGE : -MAX_STAT_CHANGE})`);
+      correctedChanges[statId] = change > 0 ? MAX_STAT_CHANGE : -MAX_STAT_CHANGE;
+    } else {
+      correctedChanges[statId] = change;
+    }
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues,
+    correctedChanges,
+  };
+};
+
+// AI 응답 언어 정리 및 검증 (gemini-2.5-flash-lite 최적화 - 강화된 검증)
 export const cleanAndValidateAIResponse = (
   response: AIResponse,
 ): {
   cleanedResponse: AIResponse;
   hasLanguageIssues: boolean;
   languageIssues: string[];
+  hasChoiceIssues: boolean;
+  choiceIssues: string[];
+  hasStatIssues: boolean;
+  statIssues: string[];
 } => {
   const languageIssues: string[] = [];
+  const choiceIssues: string[] = [];
+  const statIssues: string[] = [];
   let hasLanguageIssues = false;
+  let hasChoiceIssues = false;
+  let hasStatIssues = false;
 
   // log 필드 정리
   const logCleaning = detectAndCleanLanguageMixing(response.log);
@@ -177,7 +262,27 @@ export const cleanAndValidateAIResponse = (
     );
   }
 
-  // 정리된 응답 생성
+  // 선택지 포맷 검증 (신규)
+  const choiceAValidation = validateChoiceFormat(choiceACleaning.cleanedText);
+  const choiceBValidation = validateChoiceFormat(choiceBCleaning.cleanedText);
+
+  if (!choiceAValidation.isValid) {
+    hasChoiceIssues = true;
+    choiceIssues.push(...choiceAValidation.issues.map((issue) => `choice_a: ${issue}`));
+  }
+  if (!choiceBValidation.isValid) {
+    hasChoiceIssues = true;
+    choiceIssues.push(...choiceBValidation.issues.map((issue) => `choice_b: ${issue}`));
+  }
+
+  // 스탯 변화량 검증 및 보정 (신규)
+  const statValidation = validateStatChanges(response.statChanges?.scenarioStats || {});
+  if (!statValidation.isValid) {
+    hasStatIssues = true;
+    statIssues.push(...statValidation.issues);
+  }
+
+  // 정리된 응답 생성 (스탯 변화 보정 포함)
   const cleanedResponse: AIResponse = {
     ...response,
     log: logCleaning.cleanedText,
@@ -186,35 +291,44 @@ export const cleanAndValidateAIResponse = (
       choice_a: choiceACleaning.cleanedText,
       choice_b: choiceBCleaning.cleanedText,
     },
+    statChanges: {
+      ...response.statChanges,
+      scenarioStats: statValidation.correctedChanges,
+    },
   };
 
-  // 정리 후 한국어 품질 재검증
+  // 정리 후 한국어 품질 재검증 (더 관대한 기준 - 경고만)
   const logValidation = validateKoreanContent(cleanedResponse.log);
   const promptValidation = validateKoreanContent(
     cleanedResponse.dilemma.prompt,
   );
 
   if (!logValidation.isValid) {
-    hasLanguageIssues = true;
-    languageIssues.push(
-      ...logValidation.issues.map((issue) => `log 품질: ${issue}`),
-    );
+    // 경고만 기록 (80% 미만이어도 게임 진행 가능)
+    console.warn('⚠️ log 한국어 품질 경고:', logValidation.issues);
   }
   if (!promptValidation.isValid) {
-    hasLanguageIssues = true;
-    languageIssues.push(
-      ...promptValidation.issues.map((issue) => `prompt 품질: ${issue}`),
-    );
+    console.warn('⚠️ prompt 한국어 품질 경고:', promptValidation.issues);
   }
 
   if (hasLanguageIssues) {
     console.warn('🌐 언어 혼용 문제 감지 및 정리:', languageIssues);
+  }
+  if (hasChoiceIssues) {
+    console.warn('📋 선택지 포맷 문제:', choiceIssues);
+  }
+  if (hasStatIssues) {
+    console.warn('📊 스탯 변화 보정:', statIssues);
   }
 
   return {
     cleanedResponse,
     hasLanguageIssues,
     languageIssues,
+    hasChoiceIssues,
+    choiceIssues,
+    hasStatIssues,
+    statIssues,
   };
 };
 
@@ -359,14 +473,16 @@ export const generateGameResponse = async (
       `📊 예상 토큰: ${promptData.estimatedTokens}, 남은 예산: ${remainingTokenBudget}`,
     );
 
-    // 제미나이 API 호출
+    // 제미나이 API 호출 (gemini-2.5-flash-lite 최적화)
+    // - temperature 0.5: 일관된 응답을 위해 낮춤 (모델이 instruction following에 강함)
+    // - maxTokens: 모델이 간결한 응답 생성에 최적화됨
     const geminiResponse = await callGeminiAPI({
       systemPrompt: promptData.systemPrompt,
       userPrompt: promptData.userPrompt,
-      model: 'gemini-2.0-flash',
-      temperature: 0.8,
+      model: 'gemini-2.5-flash-lite-preview-09-2025',
+      temperature: 0.5,
       maxTokens: Math.min(
-        dynamicSettings.useUltraLite ? 1500 : 3000,
+        dynamicSettings.useUltraLite ? 1200 : 2000,
         remainingTokenBudget,
       ),
     });
@@ -374,12 +490,25 @@ export const generateGameResponse = async (
     // JSON 응답 파싱
     const parsedResponse = parseGeminiJsonResponse<AIResponse>(geminiResponse);
 
-    // 언어 혼용 감지 및 정리
-    const { cleanedResponse, hasLanguageIssues, languageIssues } =
-      cleanAndValidateAIResponse(parsedResponse);
+    // 언어 혼용 감지 및 정리 + 선택지/스탯 검증 (gemini-2.5-flash-lite 강화 검증)
+    const {
+      cleanedResponse,
+      hasLanguageIssues,
+      languageIssues,
+      hasChoiceIssues,
+      choiceIssues,
+      hasStatIssues,
+      statIssues,
+    } = cleanAndValidateAIResponse(parsedResponse);
 
     if (hasLanguageIssues) {
       console.warn('🌐 언어 혼용 문제 감지 및 정리 완료:', languageIssues);
+    }
+    if (hasChoiceIssues) {
+      console.warn('📋 선택지 포맷 문제 감지:', choiceIssues);
+    }
+    if (hasStatIssues) {
+      console.warn('📊 스탯 변화 보정 완료:', statIssues);
     }
 
     // 응답을 히스토리에 추가
@@ -664,11 +793,13 @@ export const getOptimalAISettings = (
   // 세션 토큰 사용량에 따른 자동 최적화
   const shouldUseLite = sessionTokenUsage > 12000; // 12K로 낮춰서 더 빨리 라이트 모드 활성화
 
-  // 게임 단계별 기본 설정 (품질 우선)
+  // 게임 단계별 기본 설정 (gemini-2.5-flash-lite 최적화)
+  // - temperature 0.5: 모델이 instruction following에 강해 낮은 temperature로도 충분
+  // - maxTokens 2000: 모델이 간결한 응답 생성에 최적화됨
   let settings = {
     useLiteVersion: false,
-    maxTokens: 4000,
-    temperature: 0.8,
+    maxTokens: 2000,
+    temperature: 0.5,
     promptComplexity: 'full' as 'minimal' | 'lite' | 'full' | 'detailed',
     includeCharacterDetails: true,
     includeRelationshipTracking: true,
@@ -698,12 +829,13 @@ export const getOptimalAISettings = (
   }
 
   // 엔드게임: 최대 품질 (중요한 결말)
+  // gemini-2.5-flash-lite는 낮은 temperature에서도 창의적 - 0.6으로 설정
   if (isEndGame) {
     settings = {
       ...settings,
       promptComplexity: 'detailed',
-      maxTokens: 5000,
-      temperature: 0.9, // 더 창의적인 엔딩
+      maxTokens: 2500,
+      temperature: 0.6, // 약간 높여 창의적 엔딩 유도
       useLiteVersion: false, // 엔딩은 항상 풀 버전
     };
   }
