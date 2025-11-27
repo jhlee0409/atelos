@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.2.0",
-  "lastUpdated": "2025-11-27T02:00:00Z",
+  "version": "1.3.0",
+  "lastUpdated": "2025-11-27T03:00:00Z",
   "currentPhase": "P2",
-  "currentTask": "P2-3",
+  "currentTask": "P2-4",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -52,8 +52,14 @@
         {
           "id": "P2-3",
           "name": "Improve image upload (blob URL → base64)",
-          "status": "pending",
-          "file": "pages/admin/ScenarioEditor/BaseContent.tsx, CharacterContent.tsx"
+          "status": "completed",
+          "changes": [
+            "Added fileToBase64() utility function to lib/utils.ts",
+            "Updated BaseContent.tsx to use base64 encoding for poster images",
+            "Updated CharacterContent.tsx to use base64 encoding for character images",
+            "Added upload progress state and error handling",
+            "File size limits: 2MB for poster, 1MB for characters"
+          ]
         },
         {
           "id": "P2-4",
@@ -106,6 +112,21 @@
         "Added complete stat management UI",
         "Enhanced flag management UI with triggerCondition field"
       ]
+    },
+    "lib/utils.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Added fileToBase64(), isBase64DataUrl(), isBlobUrl() functions"]
+    },
+    "pages/admin/ScenarioEditor/BaseContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Changed poster image upload from blob URL to base64"]
+    },
+    "pages/admin/ScenarioEditor/CharacterContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Changed character image upload from blob URL to base64"]
     }
   },
 
@@ -127,6 +148,7 @@
     "Phase 1 completed - LLM control significantly improved",
     "P2-1 completed - Stats can now be managed from admin UI",
     "P2-2 completed - Flags now have triggerCondition field for AI guidance",
-    "Next: P2-3 Image upload improvement (blob → base64)"
+    "P2-3 completed - Images now stored as base64, persist across sessions",
+    "Next: P2-4 SystemCondition type unification"
   ]
 }

@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import Image from 'next/image';
+import { fileToBase64 } from '@/lib/utils';
 
 type Props = {
   scenario: ScenarioData;
@@ -428,6 +429,8 @@ const CharacterCard = ({
   updateCharacter,
 }: CharacterCardProps) => {
   const [isImageError, setIsImageError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   return (
     <Card
       key={index}
@@ -560,21 +563,35 @@ const CharacterCard = ({
                     variant="outline"
                     size="sm"
                     className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
+                    disabled={isUploading}
                     onClick={() => {
                       const input = document.createElement('input');
                       input.type = 'file';
-                      input.accept = 'image/*';
-                      input.onchange = (e) => {
+                      input.accept = 'image/jpeg,image/png';
+                      input.onchange = async (e) => {
                         const file = (e.target as HTMLInputElement).files?.[0];
                         if (file) {
-                          const url = URL.createObjectURL(file);
-                          updateCharacter(index, 'imageUrl', url);
+                          setIsUploading(true);
+                          setUploadError(null);
+                          setIsImageError(false);
+                          try {
+                            const base64Url = await fileToBase64(file, 1024);
+                            updateCharacter(index, 'imageUrl', base64Url);
+                          } catch (error) {
+                            setUploadError(
+                              error instanceof Error
+                                ? error.message
+                                : '이미지 업로드에 실패했습니다.',
+                            );
+                          } finally {
+                            setIsUploading(false);
+                          }
                         }
                       };
                       input.click();
                     }}
                   >
-                    파일
+                    {isUploading ? '...' : '파일'}
                   </Button>
                 )}
               </div>
@@ -596,6 +613,12 @@ const CharacterCard = ({
                   이미지를 찾을 수 없습니다
                 </p>
               )}
+              {uploadError && (
+                <p className="text-sm text-red-500">{uploadError}</p>
+              )}
+              <p className="mt-1 text-xs text-socratic-grey">
+                최대 1MB, JPG/PNG 형식
+              </p>
             </div>
           </div>
         </div>
