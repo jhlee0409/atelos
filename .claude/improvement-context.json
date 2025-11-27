@@ -1,9 +1,9 @@
 {
   "projectName": "ATELOS LLM Control Improvement",
-  "version": "1.5.0",
-  "lastUpdated": "2025-11-27T05:00:00Z",
+  "version": "1.6.0",
+  "lastUpdated": "2025-11-27T06:00:00Z",
   "currentPhase": "P3",
-  "currentTask": "P3-1",
+  "currentTask": "P3-2",
 
   "modelConfig": {
     "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
@@ -93,7 +93,19 @@
       "name": "Game Client Stabilization",
       "status": "in_progress",
       "tasks": [
-        {"id": "P3-1", "name": "Improve action classification logic", "status": "pending"},
+        {
+          "id": "P3-1",
+          "name": "Improve action classification logic",
+          "status": "completed",
+          "changes": [
+            "Added ActionCategory type with 11 categories (combat, diplomacy, etc.)",
+            "Added regex patterns for each action category",
+            "Added classifyAction() function with confidence scoring",
+            "Added createPlayerAction() helper function",
+            "Added compareActionTypes() for choice contrast validation",
+            "Updated GameClient.tsx to use new classification system"
+          ]
+        },
         {"id": "P3-2", "name": "Apply HTML escaping (XSS prevention)", "status": "pending"},
         {"id": "P3-3", "name": "Add expected result hints to choices", "status": "pending"},
         {"id": "P3-4", "name": "Transparentize stat amplification", "status": "pending"}
@@ -112,7 +124,16 @@
     },
     "lib/game-ai-client.ts": {
       "status": "modified",
-      "phase": "P1"
+      "phase": "P3",
+      "changes": [
+        "P1: Added choice/stat validation functions",
+        "P3-1: Added action classification system with regex patterns"
+      ]
+    },
+    "app/game/[scenarioId]/GameClient.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": ["P3-1: Updated to use createPlayerAction() for action classification"]
     },
     "types/index.ts": {
       "status": "modified",
@@ -182,11 +203,7 @@
   "notes": [
     "Phase 1 completed - LLM control significantly improved",
     "Phase 2 completed - Admin page fully enhanced",
-    "P2-1: Stats management UI added",
-    "P2-2: Flags now have triggerCondition field",
-    "P2-3: Images stored as base64 (persistent)",
-    "P2-4: SystemCondition types unified",
-    "P2-5: Comprehensive validation with errors/warnings",
-    "Next: P3 Game Client Stabilization starting with P3-1"
+    "P3-1 completed - Action classification with 11 regex categories",
+    "Next: P3-2 HTML escaping (XSS prevention)"
   ]
 }

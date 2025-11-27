@@ -920,3 +920,170 @@ export const getChatHistoryStats = () => chatHistoryManager.getStats();
 
 // 여정 요약 가져오기 (엔딩용)
 export const getJourneySummary = () => chatHistoryManager.getJourneySummary();
+
+// ========== 행동 분류 시스템 (P3-1) ==========
+
+// 행동 카테고리 정의
+export type ActionCategory =
+  | 'combat'       // 전투/공격
+  | 'diplomacy'    // 외교/협상
+  | 'medical'      // 의료/치료
+  | 'exploration'  // 탐험/수색
+  | 'construction' // 건설/방어
+  | 'resource'     // 자원/수집
+  | 'social'       // 사회/관계
+  | 'leadership'   // 리더십/결정
+  | 'stealth'      // 은신/잠입
+  | 'survival'     // 생존/휴식
+  | 'general';     // 일반
+
+// 각 카테고리별 정규표현식 패턴
+const ACTION_PATTERNS: Record<ActionCategory, RegExp> = {
+  combat: /(?:공격|싸[우운]|진압|무력|전투|격퇴|제압|물리[치친]|막[아는]|방어[하한]|대[치응]|저항)/,
+  diplomacy: /(?:협상|대화|설득|타협|합의|중재|화해|동맹|교섭|약속|제안|논의)/,
+  medical: /(?:치료|의료|부상|상처|간호|응급|수술|약|건강|회복|돌[보봄]|보살)/,
+  exploration: /(?:탐[험색색사]|수색|찾[아는]|조사|정찰|발견|확인|살[펴피]|관찰|파악)/,
+  construction: /(?:건설|방어|구축|설치|강화|수리|보강|개조|증축|바리케이드)/,
+  resource: /(?:자원|물자|수집|확보|저장|배급|분배|비축|공급|식량|식수|연료)/,
+  social: /(?:위로|격려|단결|화합|소통|이해|공감|신뢰|연대|모임|회의)/,
+  leadership: /(?:결정|지시|명령|통솔|이끌|책임|판단|선택|지휘|조직)/,
+  stealth: /(?:숨[어는기]|잠입|몰래|조용|피[하해]|회피|은폐|은신|도피|도망)/,
+  survival: /(?:휴식|대기|기다|지켜[봄본]|버[티텨]|견[디뎌]|인내|안정|유지|보존)/,
+  general: /.*/,  // 어떤 것이든 매칭 (폴백)
+};
+
+// 카테고리 우선순위 (먼저 매칭되는 것이 선택됨)
+const CATEGORY_PRIORITY: ActionCategory[] = [
+  'combat',
+  'diplomacy',
+  'medical',
+  'exploration',
+  'construction',
+  'resource',
+  'social',
+  'leadership',
+  'stealth',
+  'survival',
+  'general',
+];
+
+// 카테고리별 한글 설명 (AI 피드백용)
+const CATEGORY_DESCRIPTIONS: Record<ActionCategory, string> = {
+  combat: '전투적 행동',
+  diplomacy: '외교적 접근',
+  medical: '의료/치료 행동',
+  exploration: '탐색/조사 행동',
+  construction: '건설/방어 행동',
+  resource: '자원 관리 행동',
+  social: '사회적 상호작용',
+  leadership: '리더십 발휘',
+  stealth: '은밀한 행동',
+  survival: '생존/대기 행동',
+  general: '일반 행동',
+};
+
+/**
+ * 선택지 텍스트를 분석하여 행동 카테고리를 분류
+ * @param choiceText 선택지 텍스트
+ * @returns 분류된 행동 정보
+ */
+export const classifyAction = (
+  choiceText: string,
+): {
+  category: ActionCategory;
+  description: string;
+  confidence: 'high' | 'medium' | 'low';
+  matchedKeywords: string[];
+} => {
+  const matchedKeywords: string[] = [];
+  let matchedCategory: ActionCategory = 'general';
+  let highestMatchCount = 0;
+
+  // 모든 카테고리에 대해 매칭 시도 (general 제외)
+  for (const category of CATEGORY_PRIORITY.slice(0, -1)) {
+    const pattern = ACTION_PATTERNS[category];
+    const matches = choiceText.match(pattern);
+
+    if (matches) {
+      // 매칭된 키워드 수로 신뢰도 결정
+      const matchCount = matches.length;
+      if (matchCount > highestMatchCount) {
+        highestMatchCount = matchCount;
+        matchedCategory = category;
+        matchedKeywords.push(...matches);
+      }
+    }
+  }
+
+  // 신뢰도 결정
+  let confidence: 'high' | 'medium' | 'low';
+  if (highestMatchCount >= 2) {
+    confidence = 'high';
+  } else if (highestMatchCount === 1) {
+    confidence = 'medium';
+  } else {
+    confidence = 'low';
+  }
+
+  console.log(
+    `🎯 행동 분류: "${choiceText.substring(0, 30)}..." → ${matchedCategory} (${confidence})`,
+  );
+
+  return {
+    category: matchedCategory,
+    description: CATEGORY_DESCRIPTIONS[matchedCategory],
+    confidence,
+    matchedKeywords: [...new Set(matchedKeywords)], // 중복 제거
+  };
+};
+
+/**
+ * PlayerAction 객체 생성을 위한 헬퍼 함수
+ * @param choiceText 선택지 텍스트
+ * @param choiceId 선택지 ID ('choice_a' | 'choice_b')
+ * @returns PlayerAction 객체
+ */
+export const createPlayerAction = (
+  choiceText: string,
+  choiceId: 'choice_a' | 'choice_b',
+): PlayerAction => {
+  const classification = classifyAction(choiceText);
+
+  return {
+    actionId: `${classification.category}_${choiceId}`,
+    actionDescription: choiceText,
+    playerFeedback: `플레이어가 ${classification.description}을(를) 선택했습니다. (신뢰도: ${classification.confidence})`,
+  };
+};
+
+/**
+ * 두 선택지의 행동 유형을 비교하여 대조 여부 확인
+ * 프롬프트에서 요구한 "대비되는 선택지" 검증에 사용
+ */
+export const compareActionTypes = (
+  choiceA: string,
+  choiceB: string,
+): {
+  areContrasting: boolean;
+  categoryA: ActionCategory;
+  categoryB: ActionCategory;
+  suggestion?: string;
+} => {
+  const classificationA = classifyAction(choiceA);
+  const classificationB = classifyAction(choiceB);
+
+  // 다른 카테고리면 대조적
+  const areContrasting = classificationA.category !== classificationB.category;
+
+  let suggestion: string | undefined;
+  if (!areContrasting && classificationA.category !== 'general') {
+    suggestion = `두 선택지가 모두 "${CATEGORY_DESCRIPTIONS[classificationA.category]}" 유형입니다. 대비되는 선택지를 제안하세요.`;
+  }
+
+  return {
+    areContrasting,
+    categoryA: classificationA.category,
+    categoryB: classificationB.category,
+    suggestion,
+  };
+};
