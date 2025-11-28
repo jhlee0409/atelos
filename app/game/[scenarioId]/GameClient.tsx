@@ -18,9 +18,9 @@ import type {
 } from '@/types';
 import { buildInitialDilemmaPrompt } from '@/lib/prompt-builder';
 import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
-import { StatsBar } from '@/pages/client/GameClient/StatsBar';
-import { ChatHistory } from '@/pages/client/GameClient/ChatHistory';
-import { ChoiceButtons } from '@/pages/client/GameClient/ChoiceButtons';
+import { StatsBar } from '@/components/client/GameClient/StatsBar';
+import { ChatHistory } from '@/components/client/GameClient/ChatHistory';
+import { ChoiceButtons } from '@/components/client/GameClient/ChoiceButtons';
 import { SaveState, AIResponse, PlayerAction } from '@/types';
 import { checkEndingConditions } from '@/lib/ending-checker';
 import {
