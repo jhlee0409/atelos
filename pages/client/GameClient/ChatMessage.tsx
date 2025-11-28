@@ -1,5 +1,23 @@
-import { cn } from '@/lib/utils';
+import { cn, escapeHtml } from '@/lib/utils';
 import { Bell, User, Drama, Sunrise, MessageCircle } from 'lucide-react';
+
+/**
+ * 메시지 내용을 안전하게 정제
+ * React JSX는 기본적으로 이스케이프하지만, 방어적 계층으로 추가
+ * @param content 원본 메시지 내용
+ * @returns 정제된 메시지 내용
+ */
+const sanitizeMessageContent = (content: string): string => {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
+  // HTML 태그 제거 (React의 기본 이스케이프 전에 추가 보안)
+  // 이 함수는 의도적으로 HTML을 제거 (AI가 가끔 <b>, <i> 등을 생성할 수 있음)
+  return content
+    .replace(/<[^>]*>/g, '') // 모든 HTML 태그 제거
+    .replace(/javascript:/gi, '') // javascript: 프로토콜 제거
+    .replace(/on\w+=/gi, ''); // 이벤트 핸들러 제거
+};
 
 export const ChatMessage = ({
   message,
@@ -79,7 +97,7 @@ export const ChatMessage = ({
           {message.type === 'system' && (
             <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
           )}
-          {message.content}
+          {sanitizeMessageContent(message.content)}
         </div>
       </div>
     </div>

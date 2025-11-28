@@ -7,6 +7,7 @@ import {
   getOptimalAISettings,
   generateInitialDilemma,
   cleanAndValidateAIResponse,
+  createPlayerAction,
 } from '@/lib/game-ai-client';
 import type {
   ScenarioData,
@@ -530,55 +531,13 @@ export default function GameClient({ scenario }: GameClientProps) {
     });
     setSaveState(newSaveState);
 
-    // Generate a more descriptive action ID based on the choice content
-    const actionId =
+    // 정규표현식 기반 행동 분류 시스템 사용 (P3-1 개선)
+    const choiceId =
       choiceDetails === saveState.dilemma.choice_a ? 'choice_a' : 'choice_b';
-
-    // Extract action type from choice for better AI understanding
-    let actionType = 'general';
-    if (
-      choiceDetails.includes('공격') ||
-      choiceDetails.includes('싸운') ||
-      choiceDetails.includes('진압')
-    ) {
-      actionType = 'combat';
-    } else if (
-      choiceDetails.includes('치료') ||
-      choiceDetails.includes('의료') ||
-      choiceDetails.includes('부상')
-    ) {
-      actionType = 'medical';
-    } else if (
-      choiceDetails.includes('협상') ||
-      choiceDetails.includes('대화') ||
-      choiceDetails.includes('설득')
-    ) {
-      actionType = 'diplomacy';
-    } else if (
-      choiceDetails.includes('탐험') ||
-      choiceDetails.includes('수색') ||
-      choiceDetails.includes('찾아')
-    ) {
-      actionType = 'exploration';
-    } else if (
-      choiceDetails.includes('건설') ||
-      choiceDetails.includes('방어') ||
-      choiceDetails.includes('구축')
-    ) {
-      actionType = 'construction';
-    } else if (
-      choiceDetails.includes('자원') ||
-      choiceDetails.includes('물자') ||
-      choiceDetails.includes('수집')
-    ) {
-      actionType = 'resource';
-    }
-
-    const playerAction: PlayerAction = {
-      actionId: `${actionType}_${actionId}`,
-      actionDescription: choiceDetails,
-      playerFeedback: `플레이어가 ${actionType} 타입의 행동을 선택했습니다.`,
-    };
+    const playerAction = createPlayerAction(
+      choiceDetails,
+      choiceId as 'choice_a' | 'choice_b',
+    );
 
     try {
       // 비용 효율적인 AI 설정 가져오기

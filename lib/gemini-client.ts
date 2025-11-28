@@ -47,9 +47,9 @@ export interface GeminiResponse {
 export const callGeminiAPI = async ({
   systemPrompt,
   userPrompt,
-  model = 'gemini-2.0-flash',
-  temperature = 0.7,
-  maxTokens = 4800,
+  model = 'gemini-2.5-flash-lite-preview-09-2025',
+  temperature = 0.5,
+  maxTokens = 2000,
 }: GeminiRequest): Promise<GeminiResponse> => {
   try {
     const client = getGeminiClient();

@@ -155,23 +155,59 @@ STORY RULES:
 8. Create meaningful choices with consequences
 9. Reference character relationships and traits
 
+CHOICE FORMAT RULES (CRITICAL - MUST FOLLOW):
+10. **LENGTH**: Each choice MUST be 15-50 Korean characters (not words)
+11. **ENDING**: Each choice MUST end with "~한다" or "~이다" (e.g., "협상을 시도한다", "방어를 강화한다")
+12. **CONTRAST**: Two choices MUST represent DIFFERENT strategies (e.g., aggressive vs defensive, solo vs cooperative)
+13. **CHARACTER**: Include character name when the choice involves specific person
+14. **NO SYSTEM IDS**: Never expose internal IDs like [ACTION_ID] in choices
+
+CHOICE EXAMPLES (follow this format exactly):
+- GOOD: "박준경과 함께 외부 그룹과의 협상을 시도한다" (32자, 협력적)
+- GOOD: "내부 방어 시설을 보강하며 경계를 강화한다" (22자, 방어적)
+- BAD: "예" (too short, no context)
+- BAD: "[NEGOTIATE] 협상한다" (exposes system ID)
+- BAD: "동의함" (no verb ending, too vague)
+
 Output JSON:
 {
-  "log": "Korean narrative (150-200 words) with character interactions",
+  "log": "Korean narrative (100-150 characters) with character interactions",
   "dilemma": {
-    "prompt": "Emotional Korean dilemma with character involvement",
-    "choice_a": "Meaningful choice A with character perspective",
-    "choice_b": "Meaningful choice B with character perspective"
+    "prompt": "Emotional Korean dilemma with character involvement (50-100 characters)",
+    "choice_a": "First strategic choice in Korean (15-50 characters, ends with ~한다/~이다)",
+    "choice_b": "Contrasting strategic choice in Korean (15-50 characters, ends with ~한다/~이다)"
   },
   "statChanges": {
-    "scenarioStats": {"statId": number},
+    "scenarioStats": {"statId": change_amount},
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"]
+    "flags_acquired": ["FLAG_NAME"],
+    "shouldAdvanceTime": true
   }
 }
 
-Focus: Character-driven narrative, emotional engagement, Korean immersion.`;
+STAT CHANGE GUIDELINES (CRITICAL):
+- **NORMAL actions** (dialogue, minor exploration): ±5 to ±10
+- **IMPORTANT actions** (key decisions, negotiations): ±10 to ±20
+- **EXTREME actions** (sacrifices, major confrontations): ±20 to ±30
+- **NEVER exceed ±40** for any single stat change
+- Stats: cityChaos (↓ is good), communityCohesion (↑ is good), survivalFoundation (↑ is good)
+- Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
+- Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
+
+FLAG ACQUISITION RULES (grant flag when condition is met):
+- **FLAG_ESCAPE_VEHICLE_SECURED**: Player secures transportation (truck, bus, etc.) for escape
+- **FLAG_ALLY_NETWORK_FORMED**: Successfully forms alliance with another survivor group
+- **FLAG_GOVERNMENT_CONTACT**: Establishes communication with military or government
+- **FLAG_UNDERGROUND_HIDEOUT**: Discovers or builds underground shelter
+- **FLAG_DEFENSES_COMPLETE**: Completes defensive fortifications
+- **FLAG_LEADER_SACRIFICE**: Leader chooses self-sacrifice for others
+- **FLAG_RESOURCE_MONOPOLY**: Secures control of critical resources
+- **FLAG_IDEOLOGY_ESTABLISHED**: Community's ideology inspires other survivors
+- **FLAG_MARTYR_LEGEND**: A hero's sacrifice becomes legendary
+- Only grant 1-2 flags per response when truly earned through player actions
+
+Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.`;
 
   const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
 Player chose: ${playerAction.actionDescription}

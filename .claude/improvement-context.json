@@ -1,0 +1,283 @@
+{
+  "projectName": "ATELOS LLM Control Improvement",
+  "version": "1.9.0",
+  "lastUpdated": "2025-11-27T09:00:00Z",
+  "currentPhase": "P3",
+  "currentTask": "completed",
+
+  "modelConfig": {
+    "targetModel": "gemini-2.5-flash-lite-preview-09-2025",
+    "previousModel": "gemini-2.0-flash",
+    "appliedSettings": {
+      "temperature": 0.5,
+      "temperatureEndGame": 0.6,
+      "maxTokens": 2000,
+      "maxTokensEndGame": 2500,
+      "maxTokensUltraLite": 1200
+    }
+  },
+
+  "phases": {
+    "P1": {
+      "name": "LLM Control Enhancement",
+      "status": "completed",
+      "completedAt": "2025-11-27T01:00:00Z",
+      "summary": "Model changed to gemini-2.5-flash-lite, prompts enhanced with choice/stat/flag rules, validation strengthened"
+    },
+    "P2": {
+      "name": "Admin Page Enhancement",
+      "status": "completed",
+      "completedAt": "2025-11-27T05:00:00Z",
+      "tasks": [
+        {
+          "id": "P2-1",
+          "name": "Add scenarioStats management UI",
+          "status": "completed",
+          "changes": [
+            "Added stat CRUD functions (addStat, updateStat, removeStat, saveStat, editStat)",
+            "Added stat management UI with edit/view modes",
+            "Added validation for stat ID uniqueness and min/max range"
+          ]
+        },
+        {
+          "id": "P2-2",
+          "name": "Add triggerCondition field to flags",
+          "status": "completed",
+          "changes": [
+            "Added triggerCondition field to ScenarioFlag type in types/index.ts",
+            "Enhanced flag UI with edit/view modes",
+            "Added triggerCondition input field with placeholder examples",
+            "Added flag type selector (boolean/count)"
+          ]
+        },
+        {
+          "id": "P2-3",
+          "name": "Improve image upload (blob URL → base64)",
+          "status": "completed",
+          "changes": [
+            "Added fileToBase64() utility function to lib/utils.ts",
+            "Updated BaseContent.tsx to use base64 encoding for poster images",
+            "Updated CharacterContent.tsx to use base64 encoding for character images",
+            "Added upload progress state and error handling",
+            "File size limits: 2MB for poster, 1MB for characters"
+          ]
+        },
+        {
+          "id": "P2-4",
+          "name": "Unify SystemCondition types",
+          "status": "completed",
+          "changes": [
+            "Added CONDITION_TYPE_MAP for Korean↔English type conversion",
+            "Added COMPARISON_MAP for symbol↔English operator conversion",
+            "Updated EndingConditionBuilder to store English values (required_stat, greater_equal)",
+            "UI displays Korean/symbols but stores English values for type safety",
+            "Added all comparison operators (>, <, !=) to UI"
+          ]
+        },
+        {
+          "id": "P2-5",
+          "name": "Strengthen scenario validation",
+          "status": "completed",
+          "changes": [
+            "Added VALIDATION_IDS for characters, stats, endings, relationships, flags",
+            "Added validateCharacters(), validateStats(), validateEndings() functions",
+            "Added validateRelationships(), validateFlags() functions",
+            "Added validateScenarioFull() for comprehensive validation with warnings",
+            "Added ValidationResult type with errors, warnings, details",
+            "Added getValidationMessage() utility function"
+          ]
+        }
+      ]
+    },
+    "P3": {
+      "name": "Game Client Stabilization",
+      "status": "completed",
+      "completedAt": "2025-11-27T09:00:00Z",
+      "tasks": [
+        {
+          "id": "P3-1",
+          "name": "Improve action classification logic",
+          "status": "completed",
+          "changes": [
+            "Added ActionCategory type with 11 categories (combat, diplomacy, etc.)",
+            "Added regex patterns for each action category",
+            "Added classifyAction() function with confidence scoring",
+            "Added createPlayerAction() helper function",
+            "Added compareActionTypes() for choice contrast validation",
+            "Updated GameClient.tsx to use new classification system"
+          ]
+        },
+{
+          "id": "P3-2",
+          "name": "Apply HTML escaping (XSS prevention)",
+          "status": "completed",
+          "changes": [
+            "Added escapeHtml(), unescapeHtml(), sanitizeHtml() to lib/utils.ts",
+            "Fixed XSS vulnerability in ChoiceButtons.tsx highlightKeywords()",
+            "Added sanitizeMessageContent() to ChatMessage.tsx",
+            "Added sanitizePrompt() to DilemmaPrompt component",
+            "All AI-generated content now sanitized before rendering"
+          ]
+        },
+{
+          "id": "P3-3",
+          "name": "Add expected result hints to choices",
+          "status": "completed",
+          "changes": [
+            "Added StatImpactDirection, PredictedImpact, ChoiceHint types to game-ai-client.ts",
+            "Added CATEGORY_STAT_IMPACTS mapping for 11 action categories",
+            "Added CATEGORY_RISK_LEVELS and CATEGORY_SHORT_HINTS mappings",
+            "Added getChoiceHint() and formatImpactsForUI() functions",
+            "Updated ChoiceButton component with hint toggle and display UI",
+            "Shows predicted stat impacts (↑/↓) and risk level for each choice"
+          ]
+        },
+{
+          "id": "P3-4",
+          "name": "Transparentize stat amplification",
+          "status": "completed",
+          "changes": [
+            "Added AmplificationResult, StatChangeSummary, AmplificationVisualData types",
+            "Added getStatZone(), getAmplificationFactor() utility functions",
+            "Added calculateAmplification() with detailed result breakdown",
+            "Added formatStatChangeSummary() for UI display",
+            "Added getAmplificationVisualData() for zone visualization",
+            "Updated StatDisplay.tsx with amplification info button and panel",
+            "Shows current zone (위험/안정/과열), multiplier (×1.5/×3.0), and zone indicator bar"
+          ]
+        }
+      ]
+    }
+  },
+
+  "fileChanges": {
+    "lib/gemini-client.ts": {
+      "status": "modified",
+      "phase": "P1"
+    },
+    "lib/prompt-builder.ts": {
+      "status": "modified",
+      "phase": "P1"
+    },
+    "lib/game-ai-client.ts": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P1: Added choice/stat validation functions",
+        "P3-1: Added action classification system with regex patterns",
+        "P3-3: Added StatImpactDirection, PredictedImpact, ChoiceHint types",
+        "P3-3: Added CATEGORY_STAT_IMPACTS, CATEGORY_RISK_LEVELS, CATEGORY_SHORT_HINTS",
+        "P3-3: Added getChoiceHint() and formatImpactsForUI() functions",
+        "P3-4: Added AmplificationResult, StatChangeSummary, AmplificationVisualData types",
+        "P3-4: Added getStatZone(), getAmplificationFactor(), calculateAmplification()",
+        "P3-4: Added formatStatChangeSummary(), getAmplificationVisualData()"
+      ]
+    },
+    "app/game/[scenarioId]/GameClient.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": ["P3-1: Updated to use createPlayerAction() for action classification"]
+    },
+    "types/index.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Added triggerCondition field to ScenarioFlag type"]
+    },
+    "pages/admin/ScenarioEditor/SystemRulesContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": [
+        "Added complete stat management UI",
+        "Enhanced flag management UI with triggerCondition field"
+      ]
+    },
+    "lib/utils.ts": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P2: Added fileToBase64(), isBase64DataUrl(), isBlobUrl() functions",
+        "P3-2: Added escapeHtml(), unescapeHtml(), sanitizeHtml() for XSS prevention"
+      ]
+    },
+    "pages/client/GameClient/ChoiceButtons.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P3-2: Fixed XSS vulnerability in highlightKeywords() using escapeHtml()",
+        "P3-2: Added sanitizePrompt() for DilemmaPrompt component",
+        "P3-3: Added choice hint toggle button and display UI",
+        "P3-3: Shows predicted impacts and risk level for each choice"
+      ]
+    },
+    "pages/client/GameClient/ChatMessage.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": ["P3-2: Added sanitizeMessageContent() for defensive XSS prevention"]
+    },
+    "pages/client/GameClient/StatDisplay.tsx": {
+      "status": "modified",
+      "phase": "P3",
+      "changes": [
+        "P3-4: Added amplification zone visualization (×1.5/×3.0)",
+        "P3-4: Added info button with expandable amplification panel",
+        "P3-4: Shows current zone, multiplier, and zone indicator bar"
+      ]
+    },
+    "pages/admin/ScenarioEditor/BaseContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Changed poster image upload from blob URL to base64"]
+    },
+    "pages/admin/ScenarioEditor/CharacterContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Changed character image upload from blob URL to base64"]
+    },
+    "pages/admin/ScenarioEditor/CoreStoryElementsContent.tsx": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": [
+        "Added type/comparison mapping system",
+        "Unified SystemCondition values to English for type safety"
+      ]
+    },
+    "lib/validations.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": [
+        "Added comprehensive validation functions for all scenario components",
+        "Added validateScenarioFull() with warnings support"
+      ]
+    },
+    "constants/scenario.ts": {
+      "status": "modified",
+      "phase": "P2",
+      "changes": ["Added new VALIDATION_IDS and MIN_* constants"]
+    }
+  },
+
+  "validationRules": {
+    "choiceMinLength": 15,
+    "choiceMaxLength": 80,
+    "koreanRatio": 0.8,
+    "maxSingleStatChange": 40,
+    "validEndings": ["한다", "이다", "된다", "른다", "ㄴ다"]
+  },
+
+  "promptEnhancements": {
+    "choiceRules": "Length 15-50 chars, ~한다/~이다 ending, contrast required",
+    "statRules": "±5-10 normal, ±10-20 important, ±20-30 extreme, max ±40",
+    "flagRules": "9 flags with specific trigger conditions defined"
+  },
+
+  "notes": [
+    "Phase 1 completed - LLM control significantly improved",
+    "Phase 2 completed - Admin page fully enhanced",
+    "Phase 3 completed - Game client stabilization",
+    "P3-1: Action classification with 11 regex categories",
+    "P3-2: XSS prevention with escapeHtml/sanitizeHtml utilities",
+    "P3-3: Choice hints UI with predicted impacts and risk levels",
+    "P3-4: Stat amplification transparency with zone visualization",
+    "All phases completed successfully!"
+  ]
+}

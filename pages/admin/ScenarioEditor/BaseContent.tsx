@@ -10,7 +10,7 @@ import type { ScenarioData } from '@/types';
 import { SetStateAction, useState, useRef } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { cn, fileToBase64 } from '@/lib/utils';
 
 type Props = {
   scenario: ScenarioData;
@@ -24,6 +24,8 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImageError, setIsImageError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Tag management
   const addTag = (type: 'genre' | 'coreKeywords', value: string) => {
@@ -126,8 +128,9 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                 variant="outline"
                 className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
               >
-                파일 선택
+                {isUploading ? '업로드 중...' : '파일 선택'}
               </Button>
             </div>
             <input
@@ -135,20 +138,38 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
               type="file"
               accept="image/jpeg,image/png"
               className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const url = URL.createObjectURL(file);
-                  setScenario((prev) => ({
-                    ...prev,
-                    posterImageUrl: url,
-                  }));
+                  setIsUploading(true);
+                  setUploadError(null);
+                  setIsImageError(false);
+                  try {
+                    const base64Url = await fileToBase64(file, 2048);
+                    setScenario((prev) => ({
+                      ...prev,
+                      posterImageUrl: base64Url,
+                    }));
+                  } catch (error) {
+                    setUploadError(
+                      error instanceof Error
+                        ? error.message
+                        : '이미지 업로드에 실패했습니다.',
+                    );
+                  } finally {
+                    setIsUploading(false);
+                    // 같은 파일 재선택 가능하도록 초기화
+                    e.target.value = '';
+                  }
                 }
               }}
             />
             <p className="text-xs text-socratic-grey">
               권장 비율 2:3, 최대 2MB, JPG/PNG 형식
             </p>
+            {uploadError && (
+              <p className="mt-1 text-xs text-red-500">{uploadError}</p>
+            )}
           </div>
           {scenario.posterImageUrl && (
             <div className="mt-3 rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">

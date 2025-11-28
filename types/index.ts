@@ -54,6 +54,7 @@ export type ScenarioFlag = {
   description: string;
   type: 'boolean' | 'count';
   initial: boolean | number;
+  triggerCondition?: string; // AI에게 알려줄 플래그 부여 조건 (예: "탈출 차량 확보 선택 시")
   isEditing?: boolean;
 };
 
