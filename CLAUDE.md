@@ -250,8 +250,10 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 
 Required environment variable:
 ```
-GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
+GOOGLE_GEMINI_API_KEY=your-gemini-api-key
 ```
+
+**Note**: The API key is only used server-side via `/api/gemini` route and is never exposed to the client.
 
 ## Build Configuration
 

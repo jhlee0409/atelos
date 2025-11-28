@@ -76,10 +76,11 @@ export default function GeminiTest() {
             <li>다음 내용 추가:</li>
           </ol>
           <pre className="mt-2 rounded bg-muted p-2 text-xs">
-            {`GOOGLE_GEMINI_API_KEY=your_api_key_here
-            or
-            NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY=your_api_key_here`}
+            {`GOOGLE_GEMINI_API_KEY=your_api_key_here`}
           </pre>
+          <p className="mt-2 text-xs text-green-600">
+            ✓ API 키는 서버에서만 사용되며 클라이언트에 노출되지 않습니다.
+          </p>
           <p className="mt-2 text-xs">
             API 키는{' '}
             <a
