@@ -1,30 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// 환경 변수에서 API 키 가져오기
-const getApiKey = (): string => {
-  const apiKey =
-    process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY ||
-    process.env.GOOGLE_GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      '제미나이 API 키가 설정되지 않았습니다. .env.local 파일에 NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY를 설정해주세요.',
-    );
-  }
-
-  return apiKey;
-};
-
-// 제미나이 클라이언트 인스턴스 생성
-let genAI: GoogleGenerativeAI | null = null;
-
-const getGeminiClient = (): GoogleGenerativeAI => {
-  if (!genAI) {
-    genAI = new GoogleGenerativeAI(getApiKey());
-  }
-  return genAI;
-};
-
 // 제미나이 API 호출 인터페이스
 export interface GeminiRequest {
   systemPrompt: string;
@@ -43,7 +16,7 @@ export interface GeminiResponse {
   };
 }
 
-// 제미나이 API 호출 함수
+// API Route를 통한 제미나이 API 호출 함수
 export const callGeminiAPI = async ({
   systemPrompt,
   userPrompt,
@@ -52,63 +25,47 @@ export const callGeminiAPI = async ({
   maxTokens = 2000,
 }: GeminiRequest): Promise<GeminiResponse> => {
   try {
-    const client = getGeminiClient();
-    const geminiModel = client.getGenerativeModel({
-      model,
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
-        responseMimeType: 'application/json',
-      },
-      systemInstruction: systemPrompt,
-    });
-
     console.log('🤖 제미나이 API 호출 시작...');
     console.log('📝 시스템 프롬프트:', systemPrompt.substring(0, 200) + '...');
     console.log('👤 사용자 프롬프트:', userPrompt.substring(0, 200) + '...');
 
-    const result = await geminiModel.generateContent(userPrompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        systemPrompt,
+        userPrompt,
+        model,
+        temperature,
+        maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP 오류: ${response.status}`);
+    }
+
+    const data = await response.json();
 
     console.log('✅ 제미나이 API 응답 성공');
-    console.log('📄 응답 길이:', text.length, '문자');
+    console.log('📄 응답 길이:', data.text.length, '문자');
 
-    // 사용량 정보 (제미나이 API에서 제공하는 경우)
-    const usage = response.usageMetadata
-      ? {
-          promptTokens: response.usageMetadata.promptTokenCount || 0,
-          completionTokens: response.usageMetadata.candidatesTokenCount || 0,
-          totalTokens: response.usageMetadata.totalTokenCount || 0,
-        }
-      : undefined;
-
-    if (usage) {
-      console.log('📊 토큰 사용량:', usage);
+    if (data.usage) {
+      console.log('📊 토큰 사용량:', data.usage);
     }
 
     return {
-      text,
-      usage,
+      text: data.text,
+      usage: data.usage,
     };
   } catch (error) {
     console.error('❌ 제미나이 API 호출 실패:', error);
 
     // 에러 타입별 처리
     if (error instanceof Error) {
-      if (error.message.includes('API_KEY')) {
-        throw new Error(
-          '제미나이 API 키가 유효하지 않습니다. API 키를 확인해주세요.',
-        );
-      } else if (error.message.includes('QUOTA')) {
-        throw new Error(
-          '제미나이 API 할당량이 초과되었습니다. 나중에 다시 시도해주세요.',
-        );
-      } else if (error.message.includes('RATE_LIMIT')) {
-        throw new Error(
-          '제미나이 API 요청 한도가 초과되었습니다. 잠시 후 다시 시도해주세요.',
-        );
-      }
       throw new Error(`제미나이 API 오류: ${error.message}`);
     }
 
