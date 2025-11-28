@@ -57,18 +57,18 @@
   "scenarioStats": [
     {
       "id": "cityChaos",
-      "name": "cityChaos",
-      "description": "도시의 무법 상태와 위협 수준.",
-      "current": 75,
+      "name": "도시 혼란도",
+      "description": "도시의 무법 상태와 위협 수준. 낮을수록 안정적.",
+      "current": 60,
       "min": 0,
       "max": 100,
-      "initialValue": 75,
+      "initialValue": 60,
       "range": [0, 100]
     },
     {
       "id": "communityCohesion",
-      "name": "communityCohesion",
-      "description": "그룹의 내부 결속력.",
+      "name": "공동체 응집력",
+      "description": "그룹의 내부 결속력. 높을수록 단결됨.",
       "current": 40,
       "min": 0,
       "max": 100,
@@ -77,12 +77,12 @@
     },
     {
       "id": "survivalFoundation",
-      "name": "survivalFoundation",
-      "description": "7일 후를 대비하기 위한 준비 상태.",
-      "current": 5,
+      "name": "생존 기반",
+      "description": "7일 후를 대비하기 위한 준비 상태. 높을수록 생존 확률 증가.",
+      "current": 20,
       "min": 0,
       "max": 100,
-      "initialValue": 5,
+      "initialValue": 20,
       "range": [0, 100]
     }
   ],
@@ -140,39 +140,66 @@
   "flagDictionary": [
     {
       "flagName": "FLAG_ESCAPE_VEHICLE_SECURED",
-      "description": "탈출 수단을 확보했다. 트럭, 버스, 또는 다른 교통수단을 통해 도시를 떠날 준비가 완료되었다."
+      "description": "탈출 수단을 확보했다. 트럭, 버스, 또는 다른 교통수단을 통해 도시를 떠날 준비가 완료되었다.",
+      "triggerCondition": "Day 3-5에 '탈출 수단 확보', '차량 수색', '버스 정비' 등의 행동 선택 시",
+      "route": "탈출",
+      "availableDay": [3, 4, 5]
     },
     {
       "flagName": "FLAG_IDEOLOGY_ESTABLISHED",
-      "description": "당신의 이념이 도시의 다른 생존자들에게도 영감을 주어, 공동체는 새로운 도시 국가의 씨앗이 되었다."
+      "description": "당신의 이념이 도시의 다른 생존자들에게도 영감을 주어, 공동체는 새로운 도시 국가의 씨앗이 되었다.",
+      "triggerCondition": "communityCohesion 60 이상에서 '이념 선포', '공동체 헌장 작성' 선택 시",
+      "route": "항전",
+      "availableDay": [4, 5, 6]
     },
     {
       "flagName": "FLAG_DEFENSES_COMPLETE",
-      "description": "공동체의 방어 체계가 완성되었다. 바리케이드, 무기, 그리고 전략적 요충지 확보가 이루어졌다."
+      "description": "공동체의 방어 체계가 완성되었다. 바리케이드, 무기, 그리고 전략적 요충지 확보가 이루어졌다.",
+      "triggerCondition": "survivalFoundation 40 이상에서 '방어 시설 완성', '최종 바리케이드 구축' 선택 시",
+      "route": "항전",
+      "availableDay": [4, 5, 6]
     },
     {
       "flagName": "FLAG_LEADER_SACRIFICE",
-      "description": "리더가 동료들을 구하기 위해 자신을 희생하기로 결정했다. 최후의 순간에 모든 것을 걸었다."
+      "description": "리더가 동료들을 구하기 위해 자신을 희생하기로 결정했다. 최후의 순간에 모든 것을 걸었다.",
+      "triggerCondition": "Day 6-7에 위기 상황에서 '나를 희생한다', '시간을 번다' 선택 시",
+      "route": "탈출",
+      "availableDay": [6, 7]
     },
     {
       "flagName": "FLAG_ALLY_NETWORK_FORMED",
-      "description": "도시 내 다른 생존자 그룹들과 동맹을 맺었다. 연합의 힘으로 위기에 맞선다."
+      "description": "도시 내 다른 생존자 그룹들과 동맹을 맺었다. 연합의 힘으로 위기에 맞선다.",
+      "triggerCondition": "Day 2-4에 '외부 그룹 접촉', '동맹 제안', '연합 결성' 선택 시",
+      "route": "협상",
+      "availableDay": [2, 3, 4]
     },
     {
       "flagName": "FLAG_GOVERNMENT_CONTACT",
-      "description": "정부 또는 군 관계자와 비밀 협상 채널을 확보했다. 공식 루트를 통한 해결 가능성이 열렸다."
+      "description": "정부 또는 군 관계자와 비밀 협상 채널을 확보했다. 공식 루트를 통한 해결 가능성이 열렸다.",
+      "triggerCondition": "Day 3-5에 '군과 접촉', '협상 시도', '통신 장비로 연락' 선택 시",
+      "route": "협상",
+      "availableDay": [3, 4, 5]
     },
     {
       "flagName": "FLAG_UNDERGROUND_HIDEOUT",
-      "description": "지하 은신처를 구축했다. 군대의 수색망을 피해 장기간 숨을 수 있는 안전한 공간을 확보했다."
+      "description": "지하 은신처를 구축했다. 군대의 수색망을 피해 장기간 숨을 수 있는 안전한 공간을 확보했다.",
+      "triggerCondition": "Day 2-4에 '지하 탐색', '은신처 구축', '비밀 통로 발견' 선택 시",
+      "route": "협상",
+      "availableDay": [2, 3, 4]
     },
     {
       "flagName": "FLAG_RESOURCE_MONOPOLY",
-      "description": "도시의 핵심 자원(물, 식량, 연료)을 독점적으로 확보했다. 협상에서 강력한 카드를 가지게 되었다."
+      "description": "도시의 핵심 자원(물, 식량, 연료)을 독점적으로 확보했다. 협상에서 강력한 카드를 가지게 되었다.",
+      "triggerCondition": "Day 1-3에 '자원 창고 점령', '물자 독점', '식량 확보' 선택 시",
+      "route": "항전",
+      "availableDay": [1, 2, 3]
     },
     {
       "flagName": "FLAG_MARTYR_LEGEND",
-      "description": "동료의 영웅적 희생이 전설이 되어 도시 전체에 퍼졌다. 사람들의 마음에 불굴의 정신이 깃들었다."
+      "description": "동료의 영웅적 희생이 전설이 되어 도시 전체에 퍼졌다. 사람들의 마음에 불굴의 정신이 깃들었다.",
+      "triggerCondition": "동료 캐릭터가 위기에서 희생 선택 시 자동 부여",
+      "route": "항전",
+      "availableDay": [4, 5, 6, 7]
     }
   ],
   "goalCluster": {
@@ -195,12 +222,13 @@
     {
       "endingId": "A_CITY_ESCAPE",
       "title": "시티 이스케이프",
+      "route": "탈출",
       "description": "군대의 발소리가 멀어져 간다. 당신과 동료들은 버스 창문으로 불타는 도시를 바라본다. 모든 것을 버리고 떠났지만, 함께 살아남았다는 사실만으로도 충분했다. 새로운 땅에서 다시 시작할 수 있을까? 희망과 상실이 뒤섞인 채로, 여러분의 여정은 계속된다.",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "survivalFoundation",
-          "value": 40,
+          "value": 35,
           "comparison": "greater_equal"
         },
         {
@@ -217,14 +245,40 @@
       "isGoalSuccess": true
     },
     {
+      "endingId": "E_SILENT_SACRIFICE",
+      "title": "고요한 희생",
+      "route": "탈출",
+      "description": "당신의 마지막 선택으로 동료들은 안전하게 도시를 벗어났다. 하지만 당신은 남았다. 군대가 도착했을 때, 당신은 조용히 손을 들어 올린다. 누군가는 책임을 져야 했고, 그것이 리더의 몫이라고 생각했다. 멀어져 가는 동료들의 뒷모습을 보며, 당신은 마침내 평화를 느낀다.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "communityCohesion",
+          "value": 40,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "required_stat",
+          "statId": "survivalFoundation",
+          "value": 25,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "required_flag",
+          "flagName": "FLAG_LEADER_SACRIFICE"
+        }
+      ],
+      "isGoalSuccess": true
+    },
+    {
       "endingId": "B_NEW_SHERIFF",
       "title": "새로운 보안관",
+      "route": "항전",
       "description": "군 지휘관이 당신의 손을 잡으며 말한다. '당신들이 여기서 해낸 일을 보았습니다.' 공동체는 이제 도시의 새로운 질서가 되었다. 하지만 권력의 무게가 어깨를 짓누른다. 당신이 세운 법칙이 정말 모두를 위한 것이었을까? 승리의 쓸쓸함 속에서, 진짜 시험은 이제부터 시작이다.",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "survivalFoundation",
-          "value": 60,
+          "value": 50,
           "comparison": "greater_equal"
         },
         {
@@ -236,7 +290,7 @@
         {
           "type": "required_stat",
           "statId": "communityCohesion",
-          "value": 55,
+          "value": 50,
           "comparison": "greater_equal"
         }
       ],
@@ -245,18 +299,19 @@
     {
       "endingId": "D_OUR_LAW",
       "title": "우리들의 법칙",
+      "route": "항전",
       "description": "도시 곳곳에서 사람들이 당신의 이름을 외친다. 당신이 보여준 길이 희망의 등불이 되었다. 하지만 영웅이 된다는 것은 더 이상 평범한 사람으로 돌아갈 수 없다는 뜻이기도 하다. 모든 사람의 꿈을 짊어진 채, 당신은 웃으며 새로운 내일을 맞이한다. 이것이 당신이 원했던 미래였을까?",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "communityCohesion",
-          "value": 75,
+          "value": 70,
           "comparison": "greater_equal"
         },
         {
           "type": "required_stat",
           "statId": "cityChaos",
-          "value": 25,
+          "value": 40,
           "comparison": "less_equal"
         },
         {
@@ -269,27 +324,43 @@
       "isGoalSuccess": true
     },
     {
+      "endingId": "C_KING_ON_ASHES",
+      "title": "잿더미 위의 왕",
+      "route": "항전",
+      "description": "폐허가 된 아지트에서 당신은 홀로 앉아있다. 모든 선택이 옳다고 생각했는데, 왜 모두 떠나갔을까? 군대의 부츠 소리가 점점 가까워진다. 아무도 지킬 것이 남지 않았지만, 당신은 여전히 이곳의 왕이다. 공허한 승리의 맛은 이토록 쓰디쓴 것이었구나.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "communityCohesion",
+          "value": 25,
+          "comparison": "less_equal"
+        },
+        {
+          "type": "required_stat",
+          "statId": "survivalFoundation",
+          "value": 30,
+          "comparison": "greater_equal"
+        }
+      ],
+      "isGoalSuccess": false
+    },
+    {
       "endingId": "H_ALLIANCE_VICTORY",
       "title": "연합의 승리",
+      "route": "협상",
       "description": "도시 전체가 하나의 목소리로 외친다. 당신이 이끈 연합은 더 이상 작은 공동체가 아니다. 서로 다른 배경의 사람들이 모여 만든 새로운 사회, 그 첫걸음을 내딛었다. 군대마저 이 거대한 변화 앞에서 무릎을 꿇었다. 하지만 진정한 도전은 이제부터 시작이다. 연합을 지키는 것이 만드는 것보다 더 어려울 수도 있으니까.",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "communityCohesion",
-          "value": 65,
+          "value": 55,
           "comparison": "greater_equal"
         },
         {
           "type": "required_stat",
           "statId": "survivalFoundation",
-          "value": 45,
+          "value": 40,
           "comparison": "greater_equal"
-        },
-        {
-          "type": "required_stat",
-          "statId": "cityChaos",
-          "value": 55,
-          "comparison": "less_equal"
         },
         {
           "type": "required_flag",
@@ -301,25 +372,20 @@
     {
       "endingId": "I_NEGOTIATED_TRUCE",
       "title": "협상된 평화",
+      "route": "협상",
       "description": "회의실의 정적 속에서 서류에 사인이 떨어진다. 당신은 총성 대신 대화를 택했고, 그 결과 모두가 살아남을 길을 열었다. 군 지휘관은 당신을 존경의 눈빛으로 바라본다. '당신 같은 지도자가 더 많았다면...' 하지만 평화에는 항상 대가가 따른다. 과연 이 선택이 옳았을까?",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "communityCohesion",
-          "value": 50,
+          "value": 45,
           "comparison": "greater_equal"
         },
         {
           "type": "required_stat",
           "statId": "cityChaos",
-          "value": 45,
+          "value": 50,
           "comparison": "less_equal"
-        },
-        {
-          "type": "required_stat",
-          "statId": "survivalFoundation",
-          "value": 25,
-          "comparison": "greater_equal"
         },
         {
           "type": "required_flag",
@@ -331,12 +397,13 @@
     {
       "endingId": "G_UNDERGROUND_KINGDOM",
       "title": "지하왕국",
+      "route": "협상",
       "description": "지상의 세계는 군대에게 넘겨주었다. 하지만 지하는 다르다. 미로 같은 터널과 비밀 통로, 그리고 당신을 따르는 사람들. 여기서 당신은 진정한 왕이다. 햇빛은 볼 수 없지만, 자유는 있다. 언젠가 다시 지상으로 올라갈 날을 꿈꾸며, 당신은 어둠 속에서 새로운 희망을 키운다.",
       "systemConditions": [
         {
           "type": "required_stat",
           "statId": "survivalFoundation",
-          "value": 45,
+          "value": 40,
           "comparison": "greater_equal"
         },
         {
@@ -353,52 +420,9 @@
       "isGoalSuccess": true
     },
     {
-      "endingId": "E_SILENT_SACRIFICE",
-      "title": "고요한 희생",
-      "description": "당신의 마지막 선택으로 동료들은 안전하게 도시를 벗어났다. 하지만 당신은 남았다. 군대가 도착했을 때, 당신은 조용히 손을 들어 올린다. 누군가는 책임을 져야 했고, 그것이 리더의 몫이라고 생각했다. 멀어져 가는 동료들의 뒷모습을 보며, 당신은 마침내 평화를 느낀다.",
-      "systemConditions": [
-        {
-          "type": "required_stat",
-          "statId": "communityCohesion",
-          "value": 45,
-          "comparison": "greater_equal"
-        },
-        {
-          "type": "required_stat",
-          "statId": "survivalFoundation",
-          "value": 30,
-          "comparison": "greater_equal"
-        },
-        {
-          "type": "required_flag",
-          "flagName": "FLAG_LEADER_SACRIFICE"
-        }
-      ],
-      "isGoalSuccess": true
-    },
-    {
-      "endingId": "C_KING_ON_ASHES",
-      "title": "잿더미 위의 왕",
-      "description": "폐허가 된 아지트에서 당신은 홀로 앉아있다. 모든 선택이 옳다고 생각했는데, 왜 모두 떠나갔을까? 군대의 부츠 소리가 점점 가까워진다. 아무도 지킬 것이 남지 않았지만, 당신은 여전히 이곳의 왕이다. 공허한 승리의 맛은 이토록 쓰디쓴 것이었구나.",
-      "systemConditions": [
-        {
-          "type": "required_stat",
-          "statId": "communityCohesion",
-          "value": 20,
-          "comparison": "less_equal"
-        },
-        {
-          "type": "required_stat",
-          "statId": "survivalFoundation",
-          "value": 25,
-          "comparison": "greater_equal"
-        }
-      ],
-      "isGoalSuccess": false
-    },
-    {
       "endingId": "F_BROKEN_COVENANT",
       "title": "깨진 약속",
+      "route": "실패",
       "description": "7일이 지났다. 당신은 아무것도 이루지 못했다. 군대가 도시를 점령하고, 살아남은 사람들은 뿔뿔이 흩어진다. 박준경이 마지막으로 당신을 바라보며 고개를 젓는다. '당신을 믿었는데...' 그의 실망한 눈빛이 당신의 가슴을 찌른다. 모든 것이 끝났다. 하지만 정말 끝일까?",
       "systemConditions": [
         {
@@ -410,14 +434,8 @@
         {
           "type": "required_stat",
           "statId": "communityCohesion",
-          "value": 20,
+          "value": 25,
           "comparison": "less_equal"
-        },
-        {
-          "type": "required_stat",
-          "statId": "cityChaos",
-          "value": 70,
-          "comparison": "greater_equal"
         }
       ],
       "isGoalSuccess": false
@@ -425,6 +443,7 @@
     {
       "endingId": "ENDING_TIME_UP",
       "title": "결단의 날",
+      "route": "기본",
       "description": "7일의 시간이 흘렀다. 군인들의 부츠 소리가 도시를 메운다. 당신과 공동체는 최선을 다해 버텼지만, 시간은 우리 편이 아니었다. 도시의 운명은 이제 군의 손에 달렸다. 우리가 쌓아 올린 것들은 잿더미 속에서 어떤 의미를 가질까? 이것은 끝일까, 아니면 또 다른 시작일까.",
       "systemConditions": [],
       "isGoalSuccess": false

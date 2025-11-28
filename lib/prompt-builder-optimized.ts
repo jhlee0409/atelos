@@ -89,12 +89,20 @@ const compressFlags = (flags: { [key: string]: boolean | number }): string => {
 // 최근 대화 요약 (토큰 절약)
 const summarizeRecentChat = (chatHistory: any[], maxLength: number = 100): string => {
   if (!chatHistory || chatHistory.length === 0) return '';
-  
+
   const recentChat = chatHistory.slice(-2); // 최근 2개만
   return recentChat
     .map(chat => chat.message?.substring(0, 50) || '')
     .join(' → ')
     .substring(0, maxLength);
+};
+
+// 압축된 서사 단계 힌트 (토큰 최적화)
+const getCompactNarrativeHint = (currentDay: number): string => {
+  if (currentDay <= 2) return 'Phase: SETUP - Introduce characters, build tension';
+  if (currentDay <= 4) return 'Phase: RISING - Route branching, major conflicts';
+  if (currentDay === 5) return 'Phase: MIDPOINT - Route lock-in, point of no return';
+  return 'Phase: CLIMAX - Final resolution, emotional payoff';
 };
 
 // 메인 프롬프트 빌더 (최적화 v2)
@@ -150,10 +158,14 @@ export const buildOptimizedGamePromptV2 = (
     .replace('{{FLAGS}}', compressedFlags)
     .replace('{{CHARS}}', compressedChars);
 
+  // 서사 단계 힌트
+  const narrativeHint = getCompactNarrativeHint(currentDay);
+
   // 사용자 프롬프트 압축
   const userPrompt = `Previous: "${lastLog.substring(0, 50)}..."
 Choice: ${playerAction.actionDescription}
 ${relationshipInfo ? `Relations: ${relationshipInfo}` : ''}
+${narrativeHint}
 Continue story with character reactions.`;
 
   return {
