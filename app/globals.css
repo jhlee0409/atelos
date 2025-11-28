@@ -131,4 +131,15 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Landing page selection color */
+  ::selection {
+    background-color: rgb(127 29 29 / 0.8);
+    color: white;
+  }
+}
+
+/* Landing page specific styles */
+.opacity-0-initial {
+  opacity: 0;
 }
