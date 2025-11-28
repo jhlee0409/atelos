@@ -130,6 +130,42 @@ NARRATIVE PHASE: ACT 3 - CLIMAX & RESOLUTION
 - 조건 미달 시 → "결단의 시간" (기본 엔딩)`
 };
 
+// 회상 시스템 - 주요 결정 요약 (토큰 효율적)
+interface KeyDecision {
+  day: number;
+  choice: string;
+  consequence: string;
+  category: string;
+}
+
+const formatKeyDecisionsForPrompt = (
+  keyDecisions?: KeyDecision[],
+  maxDecisions: number = 5,
+): string => {
+  if (!keyDecisions || keyDecisions.length === 0) {
+    return '';
+  }
+
+  // 최근 결정들만 포함 (토큰 절약)
+  const recentDecisions = keyDecisions.slice(-maxDecisions);
+
+  const formattedDecisions = recentDecisions
+    .map(
+      (d) =>
+        `Day${d.day}: "${d.choice.substring(0, 30)}..." → ${d.consequence}`,
+    )
+    .join('\n');
+
+  return `
+PLAYER'S PAST DECISIONS (회상 - 참조하여 서사 연속성 유지):
+${formattedDecisions}
+
+IMPORTANT: Reference these past decisions naturally in the narrative when relevant.
+- Mention consequences of earlier choices
+- Show how characters remember player's actions
+- Create callbacks to meaningful moments`;
+};
+
 // 토큰 최적화된 프롬프트 빌더 (메인 함수)
 export const buildOptimizedGamePrompt = (
   scenario: ScenarioData,
@@ -142,6 +178,7 @@ export const buildOptimizedGamePrompt = (
     includeRelationshipTracking?: boolean;
     includeDetailedStats?: boolean;
     currentDay?: number;
+    keyDecisions?: KeyDecision[];
   } = {},
 ): GamePromptData => {
   const {
@@ -218,6 +255,12 @@ const buildLitePrompt = (
   const currentDay = options.currentDay || 1;
   const narrativePhase = getNarrativePhase(currentDay);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
+
+  // 회상 시스템 - 주요 결정 포맷팅
+  const keyDecisionsSection = formatKeyDecisionsForPrompt(
+    options.keyDecisions,
+    3, // 라이트 모드에서는 최근 3개만
+  );
 
   const currentStats = Object.entries(playerState.stats)
     .map(([key, value]) => `${key}: ${value}`)
@@ -338,7 +381,8 @@ FLAG ACQUISITION RULES (grant flag when condition is met):
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
-${phaseGuideline}`;
+${phaseGuideline}
+${keyDecisionsSection}`;
 
   const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
 Player chose: ${playerAction.actionDescription}
@@ -382,6 +426,12 @@ const buildFullPrompt = (
   const currentDay = options.currentDay || 1;
   const narrativePhase = getNarrativePhase(currentDay);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
+
+  // 회상 시스템 - 주요 결정 포맷팅 (풀 모드에서는 5개까지)
+  const keyDecisionsSection = formatKeyDecisionsForPrompt(
+    options.keyDecisions,
+    5,
+  );
 
   // 현재 상태 정보 구성
   const currentStats = Object.entries(playerState.stats)
@@ -487,7 +537,8 @@ const buildFullPrompt = (
 
 위의 직전 상황 결과를 바탕으로, 다음 이야기를 전개해주세요.
 
-${phaseGuideline}`;
+${phaseGuideline}
+${keyDecisionsSection}`;
 
   return {
     systemPrompt,

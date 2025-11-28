@@ -122,6 +122,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
         currentMood: 'anxious' as const,
         trustLevel: 0,
       })),
+    // 회상 시스템 - 주요 결정 기록 초기화
+    keyDecisions: [],
   };
 };
 
@@ -771,6 +773,90 @@ export default function GameClient({ scenario }: GameClientProps) {
         cleanedResponse,
         scenario,
       );
+
+      // 회상 시스템 - 주요 결정 기록
+      const recordKeyDecision = () => {
+        const currentDay = updatedSaveState.context.currentDay || 1;
+        const currentTurn = updatedSaveState.context.turnsInCurrentDay || 0;
+
+        // 선택 카테고리 결정
+        const determineCategory = (
+          choice: string,
+        ): 'survival' | 'relationship' | 'moral' | 'strategic' => {
+          const choiceLower = choice.toLowerCase();
+          if (
+            choiceLower.includes('자원') ||
+            choiceLower.includes('방어') ||
+            choiceLower.includes('탈출') ||
+            choiceLower.includes('생존')
+          ) {
+            return 'survival';
+          }
+          if (
+            choiceLower.includes('협상') ||
+            choiceLower.includes('신뢰') ||
+            choiceLower.includes('동맹') ||
+            choiceLower.includes('관계')
+          ) {
+            return 'relationship';
+          }
+          if (
+            choiceLower.includes('희생') ||
+            choiceLower.includes('보호') ||
+            choiceLower.includes('구출') ||
+            choiceLower.includes('선택')
+          ) {
+            return 'moral';
+          }
+          return 'strategic';
+        };
+
+        // AI 응답에서 영향받은 캐릭터 추출
+        const extractImpactedCharacters = (): string[] => {
+          const characters = scenario.characters
+            .map((c) => c.characterName)
+            .filter((name) => name !== '(플레이어)');
+          return characters.filter(
+            (name) =>
+              cleanedResponse.log.includes(name) ||
+              choiceDetails.includes(name),
+          );
+        };
+
+        // 결과 요약 (50자 이내)
+        const summarizeConsequence = (log: string): string => {
+          // Day 태그 제거
+          const cleanLog = log.replace(/\[Day \d+\]\s*/g, '').trim();
+          // 첫 문장 또는 50자까지
+          const firstSentence = cleanLog.split(/[.!?。]/)[0];
+          return firstSentence.length > 50
+            ? firstSentence.substring(0, 47) + '...'
+            : firstSentence;
+        };
+
+        const keyDecision = {
+          day: currentDay,
+          turn: currentTurn,
+          choice: choiceDetails,
+          consequence: summarizeConsequence(cleanedResponse.log),
+          category: determineCategory(choiceDetails),
+          flagsAcquired: cleanedResponse.statChanges.flags_acquired || [],
+          impactedCharacters: extractImpactedCharacters(),
+        };
+
+        // 최대 20개까지 저장 (오래된 것부터 삭제)
+        if (!updatedSaveState.keyDecisions) {
+          updatedSaveState.keyDecisions = [];
+        }
+        updatedSaveState.keyDecisions.push(keyDecision);
+        if (updatedSaveState.keyDecisions.length > 20) {
+          updatedSaveState.keyDecisions.shift();
+        }
+
+        console.log('📝 주요 결정 기록:', keyDecision);
+      };
+
+      recordKeyDecision();
       setSaveState(updatedSaveState);
 
       console.log('🔄 상태 업데이트 완료, 엔딩 조건 확인 시작...');

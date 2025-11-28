@@ -15,7 +15,8 @@ interface RouteInfo {
 
 // 루트 판정 로직
 const determineRoute = (saveState: SaveState): RouteInfo => {
-  const { scenarioStats, flags, currentDay } = saveState.context;
+  const { scenarioStats, flags } = saveState.context;
+  const currentDay = saveState.context.currentDay ?? 1;
 
   const cityChaos = scenarioStats['cityChaos'] ?? 60;
   const communityCohesion = scenarioStats['communityCohesion'] ?? 50;
@@ -125,7 +126,7 @@ export const RouteIndicator = ({
   isCompact?: boolean;
 }) => {
   const routeInfo = determineRoute(saveState);
-  const currentDay = saveState.context.currentDay;
+  const currentDay = saveState.context.currentDay ?? 1;
 
   if (isCompact) {
     return (
