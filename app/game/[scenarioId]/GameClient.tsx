@@ -93,6 +93,7 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       flags,
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
+      turnsInCurrentDay: 0, // 하루 내 대화 턴 수 초기화
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -267,17 +268,35 @@ const updateSaveState = (
       // pair 형식과 개별 필드 형식 모두 지원
       let personA: string, personB: string, value: number;
 
-      if ('pair' in change && change.pair) {
-        // "A-B" 형식 처리
-        const [nameA, nameB] = change.pair.split('-');
-        personA = normalizeName(nameA?.trim() || '');
-        personB = normalizeName(nameB?.trim() || '');
-        value = change.change || 0;
-      } else if ('personA' in change && 'personB' in change) {
-        // 개별 필드 형식 처리
-        personA = normalizeName(change.personA || '');
-        personB = normalizeName(change.personB || '');
-        value = change.change || 0;
+      // 문자열 형식 처리 (예: "박준경-한서아:-5 (갈등 심화)")
+      if (typeof change === 'string') {
+        // "이름-이름:숫자" 또는 "이름-이름:숫자 (설명)" 패턴 파싱
+        const stringMatch = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+        if (stringMatch) {
+          personA = normalizeName(stringMatch[1].trim());
+          personB = normalizeName(stringMatch[2].trim());
+          value = parseInt(stringMatch[3], 10);
+        } else {
+          console.warn('⚠️ 문자열 형식 관계도 파싱 실패 (무시됨):', change);
+          return;
+        }
+      } else if (typeof change === 'object' && change !== null) {
+        // 객체 형식 처리
+        if ('pair' in change && change.pair) {
+          // "A-B" 형식 처리
+          const [nameA, nameB] = change.pair.split('-');
+          personA = normalizeName(nameA?.trim() || '');
+          personB = normalizeName(nameB?.trim() || '');
+          value = change.change || 0;
+        } else if ('personA' in change && 'personB' in change) {
+          // 개별 필드 형식 처리
+          personA = normalizeName(change.personA || '');
+          personB = normalizeName(change.personB || '');
+          value = change.change || 0;
+        } else {
+          console.warn('⚠️ 비정상적인 관계도 객체 형식 (무시됨):', change);
+          return;
+        }
       } else {
         console.warn('⚠️ 비정상적인 관계도 데이터 형식 (무시됨):', change);
         return;
@@ -331,7 +350,15 @@ const updateSaveState = (
     });
   }
 
-  // 시간 진행 로직 개선
+  // 시간 진행 로직 개선 - 여러 대화 후 하루가 진행되도록
+  // 최소 대화 턴 수 (이 이상 대화해야 시간 진행 가능)
+  const MIN_TURNS_PER_DAY = 2;
+
+  // 현재 하루 내 턴 수 증가
+  newSaveState.context.turnsInCurrentDay =
+    (newSaveState.context.turnsInCurrentDay || 0) + 1;
+  const currentTurnsInDay = newSaveState.context.turnsInCurrentDay;
+
   if (
     scenario.endCondition.type === 'time_limit' &&
     scenario.endCondition.unit === 'hours'
@@ -342,15 +369,29 @@ const updateSaveState = (
       newSaveState.log = `[남은 시간: ${newSaveState.context.remainingHours}시간] ${aiResponse.log}`;
     }
   } else {
-    // 날짜 기반 시나리오 - AI의 판단에 따라 날짜 진행
-    // shouldAdvanceTime이 false가 아닐 경우 (true이거나 undefined일 경우) 시간을 진행시켜 호환성 유지
+    // 날짜 기반 시나리오 - 여러 대화 후 시간 진행
     const dayBeforeUpdate = newSaveState.context.currentDay || 1;
     let dayAfterUpdate = dayBeforeUpdate;
 
-    if (shouldAdvanceTime !== false) {
+    // 중요 이벤트 여부 확인 (플래그 획득 등)
+    const hasSignificantEvent = (flags_acquired && flags_acquired.length > 0);
+
+    // 시간 진행 조건:
+    // 1. 최소 턴 수를 충족하고 (MIN_TURNS_PER_DAY)
+    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (4턴 이상)
+    const enoughTurns = currentTurnsInDay >= MIN_TURNS_PER_DAY;
+    const shouldProgress =
+      shouldAdvanceTime === true ||
+      hasSignificantEvent ||
+      currentTurnsInDay >= 4; // 4턴 후에는 자동으로 시간 진행
+
+    if (enoughTurns && shouldProgress) {
       if (newSaveState.context.currentDay !== undefined) {
         newSaveState.context.currentDay += 1;
         dayAfterUpdate = newSaveState.context.currentDay;
+
+        // 턴 카운터 리셋
+        newSaveState.context.turnsInCurrentDay = 0;
 
         // 날짜가 바뀔 때 채팅 히스토리에 시스템 메시지 추가
         newSaveState.chatHistory.push({
@@ -360,11 +401,13 @@ const updateSaveState = (
         });
 
         console.log(
-          `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate}`,
+          `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate} (턴: ${currentTurnsInDay}, 이벤트: ${hasSignificantEvent})`,
         );
       }
     } else {
-      console.log(`⏳ 시간 유지. Day ${dayBeforeUpdate} (변화 없음)`);
+      console.log(
+        `⏳ 시간 유지. Day ${dayBeforeUpdate}, 턴 ${currentTurnsInDay}/${MIN_TURNS_PER_DAY} (shouldAdvance: ${shouldAdvanceTime}, 이벤트: ${hasSignificantEvent})`,
+      );
     }
     // 로그에 날짜 정보 포함 (시간이 흐르지 않아도 현재 날짜 표시)
     newSaveState.log = `[Day ${dayAfterUpdate}] ${aiResponse.log}`;

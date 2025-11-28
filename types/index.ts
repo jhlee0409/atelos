@@ -165,6 +165,7 @@ export interface SaveState {
     flags: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
+    turnsInCurrentDay?: number; // 현재 하루 내 대화 턴 수
   };
   community: {
     survivors: {
