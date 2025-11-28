@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import type { ScenarioData } from '@/types';
-import BaseContent from '@/pages/admin/ScenarioEditor/BaseContent';
-import CharacterContent from '@/pages/admin/ScenarioEditor/CharacterContent';
-import SystemRulesContent from '@/pages/admin/ScenarioEditor/SystemRulesContent';
-import CoreStoryElementsContent from '@/pages/admin/ScenarioEditor/CoreStoryElementsContent';
-import StickySidebar from '@/pages/admin/ScenarioEditor/StickySidebar';
-import ScenarioHeader from '@/pages/admin/ScenarioEditor/ScenarioHeader';
+import BaseContent from '@/components/admin/ScenarioEditor/BaseContent';
+import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
+import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
+import CoreStoryElementsContent from '@/components/admin/ScenarioEditor/CoreStoryElementsContent';
+import StickySidebar from '@/components/admin/ScenarioEditor/StickySidebar';
+import ScenarioHeader from '@/components/admin/ScenarioEditor/ScenarioHeader';
 import { toast } from 'sonner';
 import { STORAGE_KEY } from '@/constants/scenario';
 import { validateScenario } from '@/lib/validations';

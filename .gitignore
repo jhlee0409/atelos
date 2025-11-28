@@ -68,8 +68,8 @@ Thumbs.db
 pnpm-debug.log*
 
 
-# mocks
-/mocks
+# mocks - keep typescript files, ignore generated/temp data
+# /mocks/*.json is tracked for scenario definitions
 
 # cursor
 .cursor
