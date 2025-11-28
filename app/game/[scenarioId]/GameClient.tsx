@@ -113,6 +113,15 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       choice_a: '... 로딩 중 ...',
       choice_b: '... 로딩 중 ...',
     },
+    // 캐릭터 아크 초기화
+    characterArcs: charactersWithTraits
+      .filter((c) => c.characterName !== '(플레이어)')
+      .map((c) => ({
+        characterName: c.characterName,
+        moments: [],
+        currentMood: 'anxious' as const,
+        trustLevel: 0,
+      })),
   };
 };
 
@@ -411,6 +420,139 @@ const updateSaveState = (
     }
     // 로그에 날짜 정보 포함 (시간이 흐르지 않아도 현재 날짜 표시)
     newSaveState.log = `[Day ${dayAfterUpdate}] ${aiResponse.log}`;
+  }
+
+  // 캐릭터 아크 업데이트
+  if (newSaveState.characterArcs) {
+    const currentDay = newSaveState.context.currentDay || 1;
+
+    // 상태 변화 트래킹
+    survivorStatus.forEach((update: { name: string; newStatus: string }) => {
+      const arc = newSaveState.characterArcs?.find(
+        (a: { characterName: string }) => a.characterName === update.name,
+      );
+      if (arc) {
+        const impact =
+          update.newStatus === 'dead' || update.newStatus === 'injured'
+            ? 'negative'
+            : update.newStatus === 'healed' || update.newStatus === 'rescued'
+              ? 'positive'
+              : 'neutral';
+        arc.moments.push({
+          day: currentDay,
+          type: 'status',
+          description: `${update.name}의 상태가 ${update.newStatus}(으)로 변경됨`,
+          impact: impact as 'positive' | 'negative' | 'neutral',
+        });
+        // 분위기 업데이트
+        if (impact === 'negative') {
+          arc.currentMood = 'anxious';
+        } else if (impact === 'positive') {
+          arc.currentMood = 'hopeful';
+        }
+      }
+    });
+
+    // 관계 변화 트래킹 (플레이어와의 관계만 신뢰도에 반영)
+    if (
+      hiddenRelationships_change &&
+      Array.isArray(hiddenRelationships_change)
+    ) {
+      hiddenRelationships_change.forEach((change) => {
+        let personA: string = '',
+          personB: string = '',
+          value: number = 0;
+
+        if (typeof change === 'string') {
+          const match = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+          if (match) {
+            personA = match[1].trim();
+            personB = match[2].trim();
+            value = parseInt(match[3], 10);
+          }
+        } else if (typeof change === 'object' && change !== null) {
+          if ('pair' in change && change.pair) {
+            const [a, b] = change.pair.split('-');
+            personA = a?.trim() || '';
+            personB = b?.trim() || '';
+            value = change.change || 0;
+          } else if ('personA' in change && 'personB' in change) {
+            personA = change.personA || '';
+            personB = change.personB || '';
+            value = change.change || 0;
+          }
+        }
+
+        if (personA && personB && value !== 0) {
+          // 플레이어 관련 관계인지 확인
+          const isPlayerRelated =
+            personA.includes('플레이어') ||
+            personB.includes('플레이어') ||
+            personA.includes('리더') ||
+            personB.includes('리더');
+
+          const otherPerson = isPlayerRelated
+            ? personA.includes('플레이어') || personA.includes('리더')
+              ? personB
+              : personA
+            : null;
+
+          if (otherPerson) {
+            const arc = newSaveState.characterArcs?.find(
+              (a: { characterName: string }) => a.characterName === otherPerson,
+            );
+            if (arc) {
+              arc.trustLevel = Math.max(
+                -100,
+                Math.min(100, arc.trustLevel + value),
+              );
+              arc.moments.push({
+                day: currentDay,
+                type: 'relationship',
+                description:
+                  value > 0 ? '플레이어와의 신뢰가 상승' : '플레이어와 갈등 발생',
+                relatedCharacter: '플레이어',
+                impact: value > 0 ? 'positive' : 'negative',
+              });
+              // 신뢰도에 따른 분위기 변화
+              if (arc.trustLevel >= 30) {
+                arc.currentMood = 'determined';
+              } else if (arc.trustLevel <= -30) {
+                arc.currentMood = 'angry';
+              }
+            }
+          } else {
+            // NPC 간 관계 변화
+            [personA, personB].forEach((name) => {
+              const arc = newSaveState.characterArcs?.find(
+                (a: { characterName: string }) => a.characterName === name,
+              );
+              if (arc) {
+                const other = name === personA ? personB : personA;
+                arc.moments.push({
+                  day: currentDay,
+                  type: 'relationship',
+                  description:
+                    value > 0
+                      ? `${other}와(과)의 관계 개선`
+                      : `${other}와(과) 갈등 발생`,
+                  relatedCharacter: other,
+                  impact: value > 0 ? 'positive' : 'negative',
+                });
+              }
+            });
+          }
+        }
+      });
+    }
+
+    console.log(
+      '👥 캐릭터 아크 업데이트 완료:',
+      newSaveState.characterArcs.map(
+        (a: { characterName: string; trustLevel: number; moments: unknown[] }) =>
+          `${a.characterName}(신뢰:${a.trustLevel}, 순간:${a.moments.length})`,
+      ),
+    );
   }
 
   return newSaveState;
