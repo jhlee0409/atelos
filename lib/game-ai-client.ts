@@ -85,7 +85,7 @@ export const detectAndCleanLanguageMixing = (
   };
 };
 
-// 한국어 품질 검증 함수 (gemini-2.5-flash-lite 최적화 - 더 엄격한 기준)
+// 한국어 품질 검증 함수 (gemini-2.5-flash-lite 최적화 - 개선된 계산 로직)
 export const validateKoreanContent = (
   text: string,
 ): {
@@ -95,19 +95,32 @@ export const validateKoreanContent = (
 } => {
   const issues: string[] = [];
 
-  // 한국어 문자 비율 계산 (한글, 한자, 영어, 숫자, 기본 문장부호 허용)
+  // JSON 키와 시스템 용어를 제외한 실제 콘텐츠만 추출
+  const cleanedText = extractKoreanContent(text);
+
+  // 추출된 텍스트가 너무 짧으면 원본으로 검증
+  const textToValidate = cleanedText.length >= 10 ? cleanedText : text;
+
+  // 한국어 문자 비율 계산 (한글만 계산)
   const koreanPattern = /[가-힣ㄱ-ㅎㅏ-ㅣ]/g;
   const allowedPattern = /[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s.,!?'"()\-:;]/g;
 
-  const koreanMatches = text.match(koreanPattern) || [];
-  const allowedMatches = text.match(allowedPattern) || [];
+  const koreanMatches = textToValidate.match(koreanPattern) || [];
+  const allowedMatches = textToValidate.match(allowedPattern) || [];
 
-  const koreanRatio = koreanMatches.length / text.length;
-  const allowedRatio = allowedMatches.length / text.length;
+  // 공백과 문장부호를 제외한 실제 문자 수로 비율 계산
+  const contentChars = textToValidate.replace(/[\s.,!?'"()\-:;]/g, '');
+  const koreanRatio = contentChars.length > 0
+    ? koreanMatches.length / contentChars.length
+    : 0;
+  const allowedRatio = textToValidate.length > 0
+    ? allowedMatches.length / textToValidate.length
+    : 0;
 
-  // 한국어 비율이 너무 낮으면 문제 (80% 이상 요구 - 강화됨)
-  if (koreanRatio < 0.8) {
-    issues.push(`한국어 비율 낮음: ${Math.round(koreanRatio * 100)}% (80% 이상 필요)`);
+  // 한국어 비율 기준 완화 (실제 콘텐츠 기준 50% 이상이면 통과)
+  // JSON 키와 영문 ID가 제외되었으므로 기준 완화
+  if (koreanRatio < 0.5) {
+    issues.push(`한국어 비율 낮음: ${Math.round(koreanRatio * 100)}% (50% 이상 필요)`);
   }
 
   // 허용되지 않는 문자가 너무 많으면 문제
@@ -118,7 +131,7 @@ export const validateKoreanContent = (
   }
 
   // 텍스트가 너무 짧으면 검증 어려움
-  if (text.length < 10) {
+  if (textToValidate.length < 10) {
     issues.push('텍스트 너무 짧음');
   }
 
@@ -129,6 +142,26 @@ export const validateKoreanContent = (
     koreanRatio,
     issues,
   };
+};
+
+// JSON 키와 시스템 용어를 제외하고 실제 한국어 콘텐츠만 추출
+export const extractKoreanContent = (text: string): string => {
+  // JSON 키 패턴 제거 (예: "log":, "dilemma":, "choice_a": 등)
+  let cleaned = text
+    .replace(/"(log|dilemma|prompt|choice_a|choice_b|statChanges|scenarioStats|survivorStatus|hiddenRelationships_change|flags_acquired|shouldAdvanceTime|name|newStatus|pair|change)":/gi, '')
+    // 영문 stat ID 제거 (예: cityChaos, communityCohesion 등)
+    .replace(/\b(cityChaos|communityCohesion|survivalFoundation|citizenTrust|resourceLevel|safetyLevel|defenseCapability|communityMorale)\b/gi, '')
+    // FLAG_ 패턴 제거
+    .replace(/FLAG_[A-Z_]+/g, '')
+    // JSON 구조 문자 제거
+    .replace(/[{}[\]]/g, '')
+    // 따옴표 제거
+    .replace(/"/g, '')
+    // 연속 공백/콤마 정리
+    .replace(/[,\s]+/g, ' ')
+    .trim();
+
+  return cleaned;
 };
 
 // 선택지 품질 검증 함수 (신규)
@@ -620,33 +653,39 @@ export const analyzeResponseQuality = (
     );
   }
 
-  // 2. 서술 길이 체크
+  // 2. 서술 길이 체크 (모든 모드에서 200자 이상 요구)
   const wordCount = response.log.length;
-  if (usedLiteVersion && wordCount < 100) {
-    qualityScore -= 15;
-    issues.push(`서술 너무 짧음: ${wordCount}자`);
-  } else if (!usedLiteVersion && wordCount < 200) {
+  if (wordCount < 150) {
+    qualityScore -= 20;
+    issues.push(`서술 너무 짧음: ${wordCount}자 (최소 150자)`);
+  } else if (wordCount < 200) {
     qualityScore -= 10;
-    issues.push(`서술 부족: ${wordCount}자`);
+    issues.push(`서술 부족: ${wordCount}자 (권장 200자)`);
   }
 
-  // 3. 감정 표현 체크
+  // 3. 감정 표현 체크 (확장된 감정 단어 목록)
   const emotionalWords = [
-    '느꼈다',
-    '생각했다',
-    '마음',
-    '감정',
-    '불안',
-    '희망',
-    '걱정',
-    '기쁨',
+    // 내면 표현
+    '느꼈다', '생각했다', '느낀다', '생각한다',
+    // 감정 명사
+    '마음', '감정', '불안', '희망', '걱정', '기쁨', '분노', '슬픔', '두려움', '안도',
+    // 감정 표현 구
+    '가슴이', '마음이', '눈물', '떨렸다', '떨린다',
+    // 상태 표현
+    '긴장', '초조', '답답', '후회', '결심', '다짐',
+    // 관계/태도 감정
+    '신뢰', '의심', '배신', '우정', '적의', '동정',
   ];
-  const hasEmotionalContent = emotionalWords.some((word) =>
+  const emotionalMatchCount = emotionalWords.filter((word) =>
     response.log.includes(word),
-  );
-  if (!hasEmotionalContent) {
-    qualityScore -= 15;
-    issues.push('감정적 표현 부족');
+  ).length;
+
+  if (emotionalMatchCount === 0) {
+    qualityScore -= 20;
+    issues.push('감정적 표현 전혀 없음');
+  } else if (emotionalMatchCount < 2) {
+    qualityScore -= 10;
+    issues.push('감정적 표현 부족 (1개만 발견)');
   }
 
   // 4. 선택지 품질 체크
