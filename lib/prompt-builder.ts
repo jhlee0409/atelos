@@ -151,9 +151,13 @@ CRITICAL LANGUAGE REQUIREMENTS:
 STORY RULES:
 5. Write in fluent Korean with character personality
 6. Include character dialogue and reactions
-7. Show emotional depth and story continuity
+7. **EMOTIONAL DEPTH IS CRITICAL**: Every response MUST include:
+   - Inner thoughts: "...라고 느꼈다", "...라고 생각했다"
+   - Emotional words: 불안, 희망, 걱정, 기쁨, 분노, 슬픔, 두려움, 안도
+   - Character feelings: "마음이 무거웠다", "가슴이 조여왔다", "희망을 품었다"
 8. Create meaningful choices with consequences
 9. Reference character relationships and traits
+10. Minimum 200 characters for the log field - describe scene vividly
 
 CHOICE FORMAT RULES (CRITICAL - MUST FOLLOW):
 10. **LENGTH**: Each choice MUST be 15-50 Korean characters (not words)
@@ -171,9 +175,9 @@ CHOICE EXAMPLES (follow this format exactly):
 
 Output JSON:
 {
-  "log": "Korean narrative (100-150 characters) with character interactions",
+  "log": "Korean narrative (200-300 characters MINIMUM) with emotional depth and character interactions",
   "dilemma": {
-    "prompt": "Emotional Korean dilemma with character involvement (50-100 characters)",
+    "prompt": "Emotional Korean dilemma with character involvement (80-150 characters)",
     "choice_a": "First strategic choice in Korean (15-50 characters, ends with ~한다/~이다)",
     "choice_b": "Contrasting strategic choice in Korean (15-50 characters, ends with ~한다/~이다)"
   },
@@ -212,13 +216,16 @@ Focus: Character-driven narrative, emotional engagement, Korean immersion, consi
   const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
 Player chose: ${playerAction.actionDescription}
 
-Write the consequence in Korean. MUST include:
-1. **Character Reactions**: How each character responds based on their personality
-2. **Emotional Impact**: Inner thoughts and feelings of the community
-3. **Situation Development**: Concrete changes in the environment/situation
+Write the consequence in Korean (MINIMUM 200 characters). MUST include:
+1. **Character Reactions**: How each character responds with dialogue
+2. **EMOTIONAL EXPRESSIONS (REQUIRED)**: Use these phrases naturally:
+   - "...라고 느꼈다" / "...라고 생각했다"
+   - Emotions: 불안, 희망, 걱정, 기쁨, 분노, 두려움
+   - "마음이...", "가슴이..."
+3. **Vivid Scene Description**: Environment, atmosphere, tension
 4. **Next Challenge**: New dilemma that emerges from this choice
 
-Keep it engaging but concise. Show character growth and relationships.`;
+Write vividly with emotional depth. Character feelings are essential.`;
 
   return {
     systemPrompt,
