@@ -1,22 +1,73 @@
-import { cn, escapeHtml } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Bell, User, Drama, Sunrise, MessageCircle } from 'lucide-react';
+import React from 'react';
 
 /**
  * 메시지 내용을 안전하게 정제
- * React JSX는 기본적으로 이스케이프하지만, 방어적 계층으로 추가
- * @param content 원본 메시지 내용
- * @returns 정제된 메시지 내용
  */
-const sanitizeMessageContent = (content: string): string => {
+const sanitizeContent = (content: string): string => {
   if (!content || typeof content !== 'string') {
     return '';
   }
-  // HTML 태그 제거 (React의 기본 이스케이프 전에 추가 보안)
-  // 이 함수는 의도적으로 HTML을 제거 (AI가 가끔 <b>, <i> 등을 생성할 수 있음)
   return content
-    .replace(/<[^>]*>/g, '') // 모든 HTML 태그 제거
-    .replace(/javascript:/gi, '') // javascript: 프로토콜 제거
-    .replace(/on\w+=/gi, ''); // 이벤트 핸들러 제거
+    .replace(/<[^>]*>/g, '') // HTML 태그 제거
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '');
+};
+
+/**
+ * 마크다운을 React 요소로 변환
+ * 지원: **bold**, *italic*, ***bold italic***
+ */
+const renderMarkdown = (content: string): React.ReactNode[] => {
+  const sanitized = sanitizeContent(content);
+  const result: React.ReactNode[] = [];
+  let key = 0;
+
+  // 마크다운 패턴: ***bold italic***, **bold**, *italic*
+  const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(sanitized)) !== null) {
+    // 매치 전 일반 텍스트
+    if (match.index > lastIndex) {
+      result.push(sanitized.slice(lastIndex, match.index));
+    }
+
+    // 매치된 마크다운 처리
+    if (match[2]) {
+      // ***bold italic***
+      result.push(
+        <strong key={key++} className="font-bold italic">
+          {match[2]}
+        </strong>,
+      );
+    } else if (match[3]) {
+      // **bold**
+      result.push(
+        <strong key={key++} className="font-bold">
+          {match[3]}
+        </strong>,
+      );
+    } else if (match[4]) {
+      // *italic*
+      result.push(
+        <em key={key++} className="italic">
+          {match[4]}
+        </em>,
+      );
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  // 남은 텍스트
+  if (lastIndex < sanitized.length) {
+    result.push(sanitized.slice(lastIndex));
+  }
+
+  return result.length > 0 ? result : [sanitized];
 };
 
 export const ChatMessage = ({
@@ -97,7 +148,7 @@ export const ChatMessage = ({
           {message.type === 'system' && (
             <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
           )}
-          {sanitizeMessageContent(message.content)}
+          <span>{renderMarkdown(message.content)}</span>
         </div>
       </div>
     </div>
