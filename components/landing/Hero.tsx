@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import LandingButton from './LandingButton';
 
 const Hero: React.FC = () => {
@@ -33,9 +34,11 @@ const Hero: React.FC = () => {
         </p>
 
         <div className="opacity-0-initial animate-fade-in-delay-3 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <LandingButton variant="primary" onClick={() => scrollToSection('demo')}>
-            생존 시작하기
-          </LandingButton>
+          <Link href="/lobby">
+            <LandingButton variant="primary">
+              생존 시작하기
+            </LandingButton>
+          </Link>
           <LandingButton
             variant="outline"
             onClick={() => scrollToSection('features')}

@@ -41,10 +41,16 @@ const Navigation: React.FC = () => {
             SYSTEM
           </button>
           <button
-            onClick={() => scrollToSection('demo')}
+            onClick={() => scrollToSection('gameplay')}
             className="transition-colors hover:text-white"
           >
-            PROLOGUE
+            GAMEPLAY
+          </button>
+          <button
+            onClick={() => scrollToSection('endings')}
+            className="transition-colors hover:text-white"
+          >
+            ENDINGS
           </button>
           <Link
             href="/lobby"
