@@ -7,7 +7,7 @@ const Gameplay: React.FC = () => {
     {
       step: '01',
       title: '시나리오 선택',
-      description: '다양한 포스트 아포칼립스 상황에서 당신만의 이야기를 시작하세요.',
+      description: '스릴러, 드라마, SF 등 다양한 장르의 시나리오에서 당신만의 이야기를 시작하세요.',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -17,7 +17,7 @@ const Gameplay: React.FC = () => {
     {
       step: '02',
       title: '캐릭터 캐스팅',
-      description: '매 플레이마다 랜덤하게 부여되는 특성이 캐릭터의 운명을 바꿉니다.',
+      description: '매 플레이마다 랜덤하게 부여되는 특성이 캐릭터의 성격과 행동을 바꿉니다.',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -36,11 +36,11 @@ const Gameplay: React.FC = () => {
     },
     {
       step: '04',
-      title: '7일간의 생존',
-      description: '제한된 시간 안에 자원, 관계, 도시 상황을 관리하며 생존하세요.',
+      title: '엔딩 달성',
+      description: '시나리오별 다양한 조건과 플래그를 충족시켜 여러 엔딩을 발견하세요.',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
         </svg>
       ),
     },
@@ -89,10 +89,10 @@ const Gameplay: React.FC = () => {
         {/* Stats Section */}
         <div className="mt-20 grid grid-cols-2 gap-8 border-t border-zinc-800 pt-16 md:grid-cols-4">
           {[
-            { value: '7', label: 'Days to Survive' },
-            { value: '10+', label: 'Possible Endings' },
-            { value: '4', label: 'Survivor Characters' },
-            { value: '100%', label: 'AI Generated Story' },
+            { value: '∞', label: 'Unique Stories' },
+            { value: '10+', label: 'Endings per Scenario' },
+            { value: 'N', label: 'Custom Characters' },
+            { value: '100%', label: 'AI Generated' },
           ].map((stat, idx) => (
             <div key={idx} className="text-center">
               <div className="font-serif text-4xl font-bold text-red-500 md:text-5xl">

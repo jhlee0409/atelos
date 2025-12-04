@@ -3,43 +3,43 @@
 import React from 'react';
 
 const Endings: React.FC = () => {
-  const endingCategories = [
+  const endingFactors = [
     {
-      type: 'ESCAPE',
-      title: '탈출 루트',
-      description: '무너진 도시를 뒤로하고 새로운 희망을 향해 떠나는 결말',
-      color: 'text-blue-400',
-      borderColor: 'border-blue-500/30',
-      bgColor: 'bg-blue-950/20',
+      type: 'STATS',
+      title: '스탯 조건',
+      description: '시나리오마다 정의된 핵심 스탯들이 특정 수치에 도달하면 해당 엔딩 루트가 열립니다.',
+      color: 'text-amber-400',
+      borderColor: 'border-amber-500/30',
+      bgColor: 'bg-amber-950/20',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
     },
     {
-      type: 'DEFENSE',
-      title: '항전 루트',
-      description: '최후까지 도시를 지키며 생존자들의 보루가 되는 결말',
-      color: 'text-red-400',
-      borderColor: 'border-red-500/30',
-      bgColor: 'bg-red-950/20',
+      type: 'FLAGS',
+      title: '이벤트 플래그',
+      description: '특정 선택이나 사건을 경험했는지 여부가 엔딩 조건으로 작용합니다.',
+      color: 'text-purple-400',
+      borderColor: 'border-purple-500/30',
+      bgColor: 'bg-purple-950/20',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
         </svg>
       ),
     },
     {
-      type: 'NEGOTIATE',
-      title: '협상 루트',
-      description: '적과 동맹을 맺고 공존의 길을 모색하는 결말',
-      color: 'text-green-400',
-      borderColor: 'border-green-500/30',
-      bgColor: 'bg-green-950/20',
+      type: 'RELATIONSHIPS',
+      title: '관계 & 생존자',
+      description: '캐릭터들과의 관계, 생존자 수 등 상황적 조건이 엔딩의 성격을 결정합니다.',
+      color: 'text-cyan-400',
+      borderColor: 'border-cyan-500/30',
+      bgColor: 'bg-cyan-950/20',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
     },
@@ -60,43 +60,43 @@ const Endings: React.FC = () => {
           </h2>
           <div className="mx-auto mb-6 h-1 w-20 bg-red-900" />
           <p className="mx-auto max-w-2xl text-zinc-400">
-            당신의 선택이 만들어가는 세 가지 운명의 갈래길.
-            <br />각 루트마다 다양한 세부 엔딩이 기다립니다.
+            시나리오마다 다양한 엔딩이 준비되어 있습니다.
+            <br />세 가지 요소의 조합이 당신만의 결말을 결정합니다.
           </p>
         </div>
 
-        {/* Ending Routes */}
+        {/* Ending Factors */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {endingCategories.map((ending, idx) => (
+          {endingFactors.map((factor, idx) => (
             <div
               key={idx}
-              className={`group border ${ending.borderColor} ${ending.bgColor} p-8 transition-all duration-300 hover:bg-opacity-40`}
+              className={`group border ${factor.borderColor} ${factor.bgColor} p-8 transition-all duration-300 hover:bg-opacity-40`}
             >
               {/* Header */}
               <div className="mb-6 flex items-center gap-3">
-                <div className={ending.color}>{ending.icon}</div>
-                <span className={`text-xs font-bold uppercase tracking-wider ${ending.color}`}>
-                  {ending.type}
+                <div className={factor.color}>{factor.icon}</div>
+                <span className={`text-xs font-bold uppercase tracking-wider ${factor.color}`}>
+                  {factor.type}
                 </span>
               </div>
 
               {/* Content */}
               <h3 className="mb-3 font-serif text-2xl font-bold text-zinc-100">
-                {ending.title}
+                {factor.title}
               </h3>
               <p className="text-sm leading-relaxed text-zinc-400">
-                {ending.description}
+                {factor.description}
               </p>
 
               {/* Divider */}
               <div className={`my-6 h-px w-full bg-gradient-to-r from-transparent via-zinc-700 to-transparent`} />
 
-              {/* Hint */}
-              <div className="flex items-center gap-2 text-xs text-zinc-600">
+              {/* Example */}
+              <div className="flex items-center gap-2 text-xs text-zinc-500">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>직접 플레이하여 발견하세요</span>
+                <span>시나리오마다 다른 조건</span>
               </div>
             </div>
           ))}
@@ -107,13 +107,13 @@ const Endings: React.FC = () => {
           <div className="mb-4 flex items-center justify-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
             <span className="text-xs font-bold uppercase tracking-wider text-red-500">
-              Dynamic Narrative System
+              Branching Narrative
             </span>
           </div>
           <p className="text-zinc-400">
-            같은 선택을 해도 캐릭터의 특성, 자원 상태, 이전 결정에 따라
+            같은 선택을 해도 캐릭터 특성, 현재 스탯, 누적된 플래그에 따라
             <br className="hidden md:inline" />
-            <span className="text-zinc-200"> 전혀 다른 결과</span>가 펼쳐집니다.
+            <span className="text-zinc-200"> 전혀 다른 엔딩</span>으로 이어집니다.
           </p>
         </div>
       </div>
