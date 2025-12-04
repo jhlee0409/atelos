@@ -1,4 +1,5 @@
 import { ScenarioData, PlayerState, Character, KeyDecision } from '@/types';
+import { getCompactGenreStyle, getNarrativeStyleFromGenres } from './genre-narrative-styles';
 
 // ===========================================
 // 토큰 최적화 v2: 압축된 프롬프트 시스템
@@ -18,12 +19,15 @@ export interface GamePlayerAction {
 
 // 압축된 시스템 프롬프트 템플릿
 const COMPRESSED_SYSTEM_TEMPLATE = `You are GENESIS, AI director for {{TITLE}} scenario.
+Genre: {{GENRE}}
 
 RULES:
 1. Korean only (한국어). NO foreign scripts.
 2. JSON format strictly.
 3. Character-driven narrative with emotions.
 4. Track stats/flags/relationships.
+
+{{GENRE_STYLE}}
 
 WRITING STYLE:
 - **스탯 숫자 절대 금지**: 20, 40, 60 같은 수치 노출 금지
@@ -185,6 +189,13 @@ export const buildOptimizedGamePromptV2 = (
   const compressedStats = compressStats(playerState.stats);
   const compressedFlags = compressFlags(playerState.flags);
 
+  // 장르별 스타일 (압축 버전)
+  const genreText = scenario.genre?.join(', ') || '드라마';
+  const genreStyle = getNarrativeStyleFromGenres(scenario.genre || []);
+  const compactGenreStyle = `Tone: ${genreStyle.emotionalRange}
+Theme: ${genreStyle.thematicFocus}
+Dilemma: ${genreStyle.dilemmaTypes[0]}`;
+
   // 관계 정보 (선택적)
   const relationshipInfo = includeRelationships && scenario.initialRelationships
     ? scenario.initialRelationships
@@ -195,6 +206,8 @@ export const buildOptimizedGamePromptV2 = (
 
   const systemPrompt = COMPRESSED_SYSTEM_TEMPLATE
     .replace('{{TITLE}}', scenario.title)
+    .replace('{{GENRE}}', genreText)
+    .replace('{{GENRE_STYLE}}', compactGenreStyle)
     .replace('{{DAY}}', currentDay.toString())
     .replace('{{STATS}}', compressedStats)
     .replace('{{FLAGS}}', compressedFlags)
@@ -343,19 +356,27 @@ export const buildInitialDilemmaPromptV2 = (
   characters: Character[],
 ): string => {
   const compressedChars = compressCharacters(characters);
-  
+  const genreText = scenario.genre?.join(', ') || '드라마';
+  const genreStyle = getNarrativeStyleFromGenres(scenario.genre || []);
+
   return `ATELOS ${scenario.title} - Day 1 start.
+Genre: ${genreText}
 Characters: ${compressedChars}
 Goal: ${scenario.playerGoal}
 
+Genre Style:
+- Tone: ${genreStyle.emotionalRange}
+- Theme: ${genreStyle.thematicFocus}
+- Dilemma type: ${genreStyle.dilemmaTypes[0]}
+
 Generate Korean dilemma JSON:
 {
-  "prompt": "Urgent survival situation",
-  "choice_a": "Option A", 
-  "choice_b": "Option B"
+  "prompt": "Urgent ${genreText} situation (한국어로 작성)",
+  "choice_a": "Option A (한국어, ~한다로 끝남)",
+  "choice_b": "Option B (한국어, ~한다로 끝남)"
 }
 
-Korean only. No foreign text.`;
+Korean only. No foreign text. Match the ${genreText} genre tone.`;
 };
 
 // 프롬프트 품질 메트릭
