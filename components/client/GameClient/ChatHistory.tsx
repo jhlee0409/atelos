@@ -52,7 +52,7 @@ const splitAIMessageIntoParts = (
   const isThought = (text: string): boolean => {
     return (
       text.startsWith("'") ||
-      text.startsWith(''') ||
+      text.startsWith("'") ||
       text.startsWith("**'") ||
       text.startsWith("**'")
     );
