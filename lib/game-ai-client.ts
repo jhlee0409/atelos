@@ -241,6 +241,51 @@ export const validateStatChanges = (
   };
 };
 
+/**
+ * 서사 포맷팅 정리 - 스탯 노출 제거 및 대화 줄바꿈 추가
+ */
+export const cleanNarrativeFormatting = (text: string): string => {
+  let cleaned = text;
+
+  // 1. 스탯 수치 노출 제거 (다양한 패턴)
+  // "cityChaos 수치가 60에 달한다" → "상황이 심각하다"
+  // "도시 혼란도(60)" → "도시 혼란"
+  // "communityCohesion이 40이다" → 제거
+  const statPatterns = [
+    /cityChaos\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
+    /communityCohesion\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
+    /survivalFoundation\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
+    /도시\s*혼란도?\s*\(?\s*\d+\s*\)?/gi,
+    /공동체\s*응집력?\s*\(?\s*\d+\s*\)?/gi,
+    /생존\s*기반?\s*\(?\s*\d+\s*\)?/gi,
+    /\b(cityChaos|communityCohesion|survivalFoundation)\b/gi,
+  ];
+
+  for (const pattern of statPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // 2. 대화 전 줄바꿈 추가 (따옴표로 시작하는 대사)
+  // "안녕" 이 바로 붙어있으면 앞에 줄바꿈 추가
+  cleaned = cleaned
+    // 문장 끝(. ! ?) 바로 뒤에 따옴표가 오면 줄바꿈
+    .replace(/([.!?])\s*"/g, '$1\n\n"')
+    .replace(/([.!?])\s*"/g, '$1\n\n"')
+    .replace(/([.!?])\s*「/g, '$1\n\n「')
+    // 따옴표로 끝나는 대사 뒤에 서술이 오면 줄바꿈
+    .replace(/"\s+([가-힣])/g, '"\n\n$1')
+    .replace(/"\s+([가-힣])/g, '"\n\n$1')
+    .replace(/」\s+([가-힣])/g, '」\n\n$1');
+
+  // 3. 연속 줄바꿈 정리 (3개 이상 → 2개)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // 4. 앞뒤 공백 정리
+  cleaned = cleaned.trim();
+
+  return cleaned;
+};
+
 // AI 응답 언어 정리 및 검증 (gemini-2.5-flash-lite 최적화 - 강화된 검증)
 export const cleanAndValidateAIResponse = (
   response: AIResponse,
@@ -315,12 +360,16 @@ export const cleanAndValidateAIResponse = (
     statIssues.push(...statValidation.issues);
   }
 
+  // 서사 포맷팅 정리 (스탯 노출 제거, 대화 줄바꿈 추가)
+  const formattedLog = cleanNarrativeFormatting(logCleaning.cleanedText);
+  const formattedPrompt = cleanNarrativeFormatting(promptCleaning.cleanedText);
+
   // 정리된 응답 생성 (스탯 변화 보정 포함)
   const cleanedResponse: AIResponse = {
     ...response,
-    log: logCleaning.cleanedText,
+    log: formattedLog,
     dilemma: {
-      prompt: promptCleaning.cleanedText,
+      prompt: formattedPrompt,
       choice_a: choiceACleaning.cleanedText,
       choice_b: choiceBCleaning.cleanedText,
     },
