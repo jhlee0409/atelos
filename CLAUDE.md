@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ATELOS is a Next.js 15 + React 19 interactive narrative game platform featuring AI-powered storytelling. It's a post-apocalyptic scenario-driven game where players make choices that affect the story outcome through Gemini AI (gemini-2.0-flash) integration. The game is primarily in Korean with English internal identifiers.
+ATELOS is a Next.js 15 + React 19 interactive narrative game platform featuring AI-powered storytelling. It's a post-apocalyptic scenario-driven game where players make choices that affect the story outcome through Gemini AI (gemini-2.5-flash-lite) integration. The game is primarily in Korean with English internal identifiers.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ ATELOS is a Next.js 15 + React 19 interactive narrative game platform featuring 
 - **Language**: TypeScript 5
 - **Styling**: TailwindCSS 3.4 + tailwindcss-animate
 - **UI Components**: Radix UI primitives (accordion, dialog, dropdown, tabs, etc.)
-- **AI**: Google Generative AI (@google/generative-ai) - Gemini 2.0 Flash
+- **AI**: Google Generative AI (@google/generative-ai) - Gemini 2.5 Flash Lite
 - **Forms**: React Hook Form + Zod validation
 - **Package Manager**: pnpm
 

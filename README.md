@@ -5,7 +5,7 @@ AI 기반 인터랙티브 내러티브 게임 플랫폼
 [![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
-[![Gemini AI](https://img.shields.io/badge/Gemini-2.0--flash-orange)](https://ai.google.dev/)
+[![Gemini AI](https://img.shields.io/badge/Gemini-2.5--flash--lite-orange)](https://ai.google.dev/)
 
 ## 소개
 
@@ -157,7 +157,7 @@ Day 7이 지나면 시간 제한 엔딩이 발생합니다.
 - **Radix UI** - 접근성 UI 컴포넌트
 
 ### AI
-- **Google Gemini 2.0 Flash** - 서사 생성 AI
+- **Google Gemini 2.5 Flash Lite** - 서사 생성 AI
 
 ### 폼 & 검증
 - **React Hook Form** - 폼 상태 관리
