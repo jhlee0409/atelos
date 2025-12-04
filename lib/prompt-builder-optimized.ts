@@ -61,10 +61,27 @@ OUTPUT:
 
 TIME: shouldAdvanceTime=false (default), true ONLY for major day-ending events.`;
 
-// 초경량 프롬프트 (150-200 토큰)
+// 초경량 프롬프트 (150-200 토큰) - JSON 형식 명시
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.
 Stats: {{STATS}}
-Write Korean story + 2 choices as JSON.`;
+
+You MUST respond with ONLY this JSON (no other text):
+{
+  "log": "한국어 서사 (100자 이상)",
+  "dilemma": {
+    "prompt": "상황 설명",
+    "choice_a": "선택지A (~한다로 끝남)",
+    "choice_b": "선택지B (~한다로 끝남)"
+  },
+  "statChanges": {
+    "scenarioStats": {"cityChaos": 5},
+    "flags_acquired": [],
+    "survivorStatus": [],
+    "hiddenRelationships_change": []
+  }
+}
+
+Rules: Korean only. Choices must end with ~한다/~이다. Include stat changes.`;
 
 // 캐릭터 정보 압축
 const compressCharacters = (characters: Character[]): string => {
