@@ -5,8 +5,8 @@ import React from 'react';
 const Features: React.FC = () => {
   const features = [
     {
-      title: 'Real-time AI Narrative',
-      desc: '정해진 스크립트는 없습니다. Gemini AI가 당신의 선택에 반응하여 매번 새로운 스토리와 딜레마를 실시간으로 생성합니다.',
+      title: 'AI-Powered Narrative',
+      desc: '정해진 스크립트는 없습니다. AI가 당신의 선택에 반응하여 매번 새로운 스토리와 딜레마를 실시간으로 생성합니다.',
       icon: (
         <svg
           className="h-8 w-8"
@@ -24,8 +24,8 @@ const Features: React.FC = () => {
       ),
     },
     {
-      title: 'The Butterfly Effect',
-      desc: '도시 혼란도, 자원, 신뢰도. 당신의 사소한 결정이 7일 후 도시의 운명을 결정짓습니다. 수십 가지의 멀티 엔딩을 경험하세요.',
+      title: 'Dynamic Stats System',
+      desc: '시나리오마다 다른 스탯과 조건들. 당신의 선택이 수치를 변화시키고, 그 변화가 이야기의 방향을 결정합니다.',
       icon: (
         <svg
           className="h-8 w-8"
@@ -43,8 +43,8 @@ const Features: React.FC = () => {
       ),
     },
     {
-      title: 'Moral Dilemmas',
-      desc: '옳고 그름은 무의미합니다. 생존을 위해 타인을 희생할 것인가, 위험을 감수하고 인간성을 지킬 것인가 선택해야 합니다.',
+      title: 'Meaningful Choices',
+      desc: '쉬운 정답은 없습니다. 모든 선택에는 대가가 따르고, 때로는 최선의 결정도 예상치 못한 결과를 낳습니다.',
       icon: (
         <svg
           className="h-8 w-8"
@@ -70,8 +70,11 @@ const Features: React.FC = () => {
     >
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-16 text-center">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-red-500">
+            Core System
+          </span>
           <h2 className="mb-4 font-serif text-3xl font-bold text-white md:text-4xl">
-            SURVIVAL SYSTEM
+            INTERACTIVE NARRATIVE
           </h2>
           <div className="mx-auto h-1 w-20 bg-red-900" />
         </div>

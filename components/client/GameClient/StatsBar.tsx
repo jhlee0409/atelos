@@ -22,7 +22,7 @@ export const StatsBar = ({
   };
 
   return (
-    <div className="sticky top-0 z-20 border-b border-gray-700/50 bg-gray-900/95 backdrop-blur-sm">
+    <div className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur-sm">
       <div className="px-4 py-2">
         {/* 루트 인디케이터 */}
         <RouteIndicator saveState={saveState} isCompact={!isExpanded} />
@@ -30,7 +30,7 @@ export const StatsBar = ({
         {/* 토글 버튼 */}
         <button
           onClick={onToggle}
-          className="mt-2 flex w-full items-center justify-center py-1 text-gray-500 hover:text-gray-400"
+          className="mt-2 flex w-full items-center justify-center py-1 text-zinc-600 transition-colors hover:text-zinc-400"
         >
           {isExpanded ? (
             <ChevronUp className="h-4 w-4" />

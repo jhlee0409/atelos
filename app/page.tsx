@@ -4,7 +4,8 @@ import {
   Navigation,
   Hero,
   Features,
-  PrologueDemo,
+  Gameplay,
+  Endings,
   CallToAction,
   Footer,
 } from '@/components/landing';
@@ -16,7 +17,8 @@ export default function LandingPage() {
       <main>
         <Hero />
         <Features />
-        <PrologueDemo />
+        <Gameplay />
+        <Endings />
         <CallToAction />
       </main>
       <Footer />

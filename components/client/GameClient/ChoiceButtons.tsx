@@ -25,13 +25,13 @@ export const ChoiceButtons = ({
       : 'AI가 다음 이야기를 생성 중입니다...';
 
     return (
-      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
         <div className="mx-auto max-w-2xl">
           <div className="flex items-center justify-center space-x-2 py-6">
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
-            <span className="ml-3 text-sm text-gray-400">{loadingMessage}</span>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500 [animation-delay:-0.3s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500 [animation-delay:-0.15s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500"></div>
+            <span className="ml-3 text-sm text-zinc-400">{loadingMessage}</span>
           </div>
         </div>
       </div>
@@ -40,9 +40,9 @@ export const ChoiceButtons = ({
 
   if (error) {
     return (
-      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
         <div className="mx-auto max-w-2xl">
-          <div className="rounded-lg bg-red-900/50 p-4 text-center text-red-300 backdrop-blur-sm">
+          <div className="border border-red-900/50 bg-red-950/30 p-4 text-center text-red-400 backdrop-blur-sm">
             <AlertTriangle className="mr-2 inline h-4 w-4" />
             오류: {error}
           </div>
@@ -59,13 +59,13 @@ export const ChoiceButtons = ({
   ) {
     console.log('⚠️ 딜레마가 아직 준비되지 않음:', saveState.dilemma);
     return (
-      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
         <div className="mx-auto max-w-2xl">
           <div className="flex items-center justify-center space-x-2 py-6">
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.3s]"></div>
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.15s]"></div>
-            <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500"></div>
-            <span className="ml-3 text-sm text-gray-400">
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500 [animation-delay:-0.3s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500 [animation-delay:-0.15s]"></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-red-500"></div>
+            <span className="ml-3 text-sm text-zinc-400">
               첫 번째 딜레마를 준비하고 있습니다...
             </span>
           </div>
@@ -75,7 +75,7 @@ export const ChoiceButtons = ({
   }
 
   return (
-    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
       <div className="mx-auto max-w-2xl">
         {/* Dilemma Prompt */}
         <DilemmaPrompt prompt={saveState.dilemma.prompt} isUrgent={isUrgent} />
@@ -120,12 +120,12 @@ const ChoiceButton = ({
   const [isHintVisible, setIsHintVisible] = useState(false);
 
   const baseClasses =
-    'flex-1 p-4 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg min-h-[48px] relative overflow-hidden';
+    'flex-1 p-4 font-bold transition-all duration-300 transform hover:-translate-y-1 active:scale-95 min-h-[48px] relative overflow-hidden border';
 
   const variantClasses =
     variant === 'primary'
-      ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white'
-      : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white';
+      ? 'bg-red-900 hover:bg-red-800 text-white border-red-700 shadow-[0_0_15px_rgba(127,29,29,0.5)]'
+      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
 
   const urgencyClasses = urgency ? 'animate-pulse ring-2 ring-yellow-400' : '';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : '';
@@ -280,14 +280,14 @@ export const DilemmaPrompt = ({
   isUrgent: boolean;
 }) => {
   return (
-    <div className="mb-4 rounded-2xl bg-gray-900/80 p-4 text-center backdrop-blur-sm">
-      <p className="text-sm leading-relaxed text-yellow-300">
+    <div className="mb-4 border border-zinc-800 bg-zinc-900/80 p-4 text-center backdrop-blur-sm">
+      <p className="text-sm leading-relaxed text-zinc-300">
         {sanitizePrompt(prompt)}
       </p>
       {isUrgent && (
-        <div className="mt-2 flex items-center justify-center space-x-1 text-xs text-yellow-400">
+        <div className="mt-2 flex items-center justify-center space-x-1 text-xs text-red-400">
           <AlertTriangle className="h-3 w-3" />
-          <span>중요한 결정입니다</span>
+          <span className="uppercase tracking-wider">Critical Decision</span>
           <AlertTriangle className="h-3 w-3" />
         </div>
       )}

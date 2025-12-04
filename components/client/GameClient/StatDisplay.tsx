@@ -42,12 +42,12 @@ export const StatDisplay = ({
   if (isCompact) {
     return (
       <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-shrink-0 text-xs text-gray-400">
+        <span className="min-w-0 flex-shrink-0 text-xs text-zinc-500">
           {name}
         </span>
-        <div className="h-1.5 flex-1 rounded-full bg-gray-700">
+        <div className="h-1.5 flex-1 bg-zinc-800">
           <div
-            className={cn('h-1.5 rounded-full transition-all', stateColor)}
+            className={cn('h-1.5 transition-all', stateColor)}
             style={{ width: `${percentage}%` }}
           />
         </div>
@@ -58,12 +58,12 @@ export const StatDisplay = ({
   return (
     <div className="w-full">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-sm text-gray-400">{name}</span>
-        <span className="text-xs text-gray-500">{Math.round(percentage)}%</span>
+        <span className="text-sm text-zinc-400">{name}</span>
+        <span className="text-xs text-zinc-600">{Math.round(percentage)}%</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-gray-700">
+      <div className="h-2 w-full bg-zinc-800">
         <div
-          className={cn('h-2 rounded-full transition-all', stateColor)}
+          className={cn('h-2 transition-all', stateColor)}
           style={{ width: `${percentage}%` }}
         />
       </div>
