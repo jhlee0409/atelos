@@ -636,7 +636,7 @@ export const generateGameResponse = async (
     const geminiResponse = await callGeminiAPI({
       systemPrompt: promptData.systemPrompt,
       userPrompt: promptData.userPrompt,
-      model: 'gemini-2.5-flash-lite-preview-09-2025',
+      model: 'gemini-2.5-flash-lite',
       temperature: 0.5,
       maxTokens: Math.min(
         dynamicSettings.useUltraLite ? 1200 : 2000,
