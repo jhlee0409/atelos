@@ -15,6 +15,15 @@ export const detectAndCleanLanguageMixing = (
   hasIssues: boolean;
   issues: string[];
 } => {
+  // null/undefined 방어 처리
+  if (!text || typeof text !== 'string') {
+    return {
+      cleanedText: text || '',
+      hasIssues: false,
+      issues: [],
+    };
+  }
+
   const issues: string[] = [];
   let cleanedText = text;
   let hasIssues = false;
@@ -93,6 +102,15 @@ export const validateKoreanContent = (
   koreanRatio: number;
   issues: string[];
 } => {
+  // null/undefined 방어 처리
+  if (!text || typeof text !== 'string') {
+    return {
+      isValid: false,
+      koreanRatio: 0,
+      issues: ['텍스트가 비어있거나 유효하지 않음'],
+    };
+  }
+
   const issues: string[] = [];
 
   // JSON 키와 시스템 용어를 제외한 실제 콘텐츠만 추출
@@ -171,6 +189,14 @@ export const validateChoiceFormat = (
   isValid: boolean;
   issues: string[];
 } => {
+  // null/undefined 방어 처리
+  if (!choice || typeof choice !== 'string') {
+    return {
+      isValid: false,
+      issues: ['선택지가 비어있거나 유효하지 않음'],
+    };
+  }
+
   const issues: string[] = [];
 
   // 1. 길이 검증 (15-80자)
@@ -335,20 +361,36 @@ export const cleanAndValidateAIResponse = (
   let hasChoiceIssues = false;
   let hasStatIssues = false;
 
+  // 응답이 없거나 불완전한 경우 기본값 사용
+  const safeResponse: AIResponse = {
+    log: response?.log || '상황이 전개되고 있습니다...',
+    dilemma: {
+      prompt: response?.dilemma?.prompt || '다음 행동을 선택하세요.',
+      choice_a: response?.dilemma?.choice_a || '신중하게 상황을 지켜본다',
+      choice_b: response?.dilemma?.choice_b || '즉시 행동에 나선다',
+    },
+    statChanges: {
+      scenarioStats: response?.statChanges?.scenarioStats || {},
+      survivorStatus: response?.statChanges?.survivorStatus || [],
+      hiddenRelationships_change: response?.statChanges?.hiddenRelationships_change || [],
+      flags_acquired: response?.statChanges?.flags_acquired || [],
+    },
+  };
+
   // log 필드 정리
-  const logCleaning = detectAndCleanLanguageMixing(response.log);
+  const logCleaning = detectAndCleanLanguageMixing(safeResponse.log);
   if (logCleaning.hasIssues) {
     hasLanguageIssues = true;
     languageIssues.push(...logCleaning.issues.map((issue) => `log: ${issue}`));
   }
 
   // dilemma 필드들 정리
-  const promptCleaning = detectAndCleanLanguageMixing(response.dilemma.prompt);
+  const promptCleaning = detectAndCleanLanguageMixing(safeResponse.dilemma.prompt);
   const choiceACleaning = detectAndCleanLanguageMixing(
-    response.dilemma.choice_a,
+    safeResponse.dilemma.choice_a,
   );
   const choiceBCleaning = detectAndCleanLanguageMixing(
-    response.dilemma.choice_b,
+    safeResponse.dilemma.choice_b,
   );
 
   if (promptCleaning.hasIssues) {
@@ -384,7 +426,7 @@ export const cleanAndValidateAIResponse = (
   }
 
   // 스탯 변화량 검증 및 보정 (신규)
-  const statValidation = validateStatChanges(response.statChanges?.scenarioStats || {});
+  const statValidation = validateStatChanges(safeResponse.statChanges.scenarioStats);
   if (!statValidation.isValid) {
     hasStatIssues = true;
     statIssues.push(...statValidation.issues);
@@ -396,7 +438,7 @@ export const cleanAndValidateAIResponse = (
 
   // 정리된 응답 생성 (스탯 변화 보정 포함)
   const cleanedResponse: AIResponse = {
-    ...response,
+    ...safeResponse,
     log: formattedLog,
     dilemma: {
       prompt: formattedPrompt,
@@ -404,7 +446,7 @@ export const cleanAndValidateAIResponse = (
       choice_b: choiceBCleaning.cleanedText,
     },
     statChanges: {
-      ...response.statChanges,
+      ...safeResponse.statChanges,
       scenarioStats: statValidation.correctedChanges,
     },
   };

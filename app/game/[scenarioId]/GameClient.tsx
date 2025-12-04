@@ -281,16 +281,70 @@ const updateSaveState = (
 
       // 문자열 형식 처리 (예: "박준경-한서아:-5 (갈등 심화)")
       if (typeof change === 'string') {
-        // "이름-이름:숫자" 또는 "이름-이름: 숫자" 또는 "이름-이름:숫자 (설명)" 패턴 파싱
-        // \s* 추가하여 콜론 뒤 공백 허용
-        const stringMatch = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
-        if (stringMatch) {
-          personA = normalizeName(stringMatch[1].trim());
-          personB = normalizeName(stringMatch[2].trim());
-          value = parseInt(stringMatch[3], 10);
+        // 패턴 1: "이름-이름:숫자" 또는 "이름-이름: 숫자" (표준 형식)
+        const standardMatch = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
+        if (standardMatch) {
+          personA = normalizeName(standardMatch[1].trim());
+          personB = normalizeName(standardMatch[2].trim());
+          value = parseInt(standardMatch[3], 10);
         } else {
-          console.warn('⚠️ 문자열 형식 관계도 파싱 실패 (무시됨):', change);
-          return;
+          // 패턴 2: "이름:설명" 형식 (숫자 없음) - 설명에서 증가/감소 추론
+          const singleNameMatch = change.match(/^([^:]+):\s*(.+)$/);
+          if (singleNameMatch) {
+            const name = singleNameMatch[1].trim();
+            const description = singleNameMatch[2].toLowerCase();
+
+            // 설명에서 관계 변화 추론
+            const isPositive = description.includes('증가') ||
+                              description.includes('상승') ||
+                              description.includes('강화') ||
+                              description.includes('신뢰') ||
+                              description.includes('존중') ||
+                              description.includes('호감');
+            const isNegative = description.includes('감소') ||
+                              description.includes('하락') ||
+                              description.includes('심화') ||
+                              description.includes('악화') ||
+                              description.includes('적대') ||
+                              description.includes('불신') ||
+                              description.includes('실망');
+
+            if (isPositive || isNegative) {
+              personA = '(플레이어)';
+              personB = normalizeName(name);
+              value = isPositive ? 5 : -5; // 기본값으로 ±5 적용
+            } else {
+              // 변화 방향을 알 수 없으면 무시
+              console.debug('⚠️ 관계도 변화 방향 불명확 (무시):', change);
+              return;
+            }
+          } else {
+            // 패턴 3: "이름-이름:설명" 형식 (숫자 없이 설명만)
+            const pairDescMatch = change.match(/^([^-]+)-([^:]+):\s*(.+)$/);
+            if (pairDescMatch) {
+              personA = normalizeName(pairDescMatch[1].trim());
+              personB = normalizeName(pairDescMatch[2].trim());
+              const description = pairDescMatch[3].toLowerCase();
+
+              const isPositive = description.includes('증가') ||
+                                description.includes('상승') ||
+                                description.includes('강화') ||
+                                description.includes('개선');
+              const isNegative = description.includes('감소') ||
+                                description.includes('심화') ||
+                                description.includes('악화') ||
+                                description.includes('긴장');
+
+              value = isPositive ? 5 : isNegative ? -5 : 0;
+              if (value === 0) {
+                console.debug('⚠️ 관계도 변화 방향 불명확 (무시):', change);
+                return;
+              }
+            } else {
+              console.debug('⚠️ 문자열 형식 관계도 파싱 실패 (무시):', change);
+              return;
+            }
+          }
         }
       } else if (typeof change === 'object' && change !== null) {
         // 객체 형식 처리
@@ -467,12 +521,46 @@ const updateSaveState = (
           value: number = 0;
 
         if (typeof change === 'string') {
-          // \s* 추가하여 콜론 뒤 공백 허용
-          const match = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
-          if (match) {
-            personA = match[1].trim();
-            personB = match[2].trim();
-            value = parseInt(match[3], 10);
+          // 패턴 1: "이름-이름:숫자" (표준 형식)
+          const standardMatch = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
+          if (standardMatch) {
+            personA = standardMatch[1].trim();
+            personB = standardMatch[2].trim();
+            value = parseInt(standardMatch[3], 10);
+          } else {
+            // 패턴 2: "이름:설명" 또는 "이름-이름:설명" 형식
+            const descMatch = change.match(/^([^:]+):\s*(.+)$/);
+            if (descMatch) {
+              const namePart = descMatch[1].trim();
+              const description = descMatch[2].toLowerCase();
+
+              // 이름 부분에 대시가 있으면 두 사람 간의 관계
+              if (namePart.includes('-')) {
+                const [nameA, nameB] = namePart.split('-');
+                personA = nameA.trim();
+                personB = nameB.trim();
+              } else {
+                // 단일 이름이면 플레이어와의 관계
+                personA = '(플레이어)';
+                personB = namePart;
+              }
+
+              // 설명에서 변화 방향 추론
+              const isPositive = description.includes('증가') ||
+                                description.includes('상승') ||
+                                description.includes('강화') ||
+                                description.includes('신뢰') ||
+                                description.includes('존중') ||
+                                description.includes('개선');
+              const isNegative = description.includes('감소') ||
+                                description.includes('심화') ||
+                                description.includes('악화') ||
+                                description.includes('긴장') ||
+                                description.includes('불신') ||
+                                description.includes('적대');
+
+              value = isPositive ? 5 : isNegative ? -5 : 0;
+            }
           }
         } else if (typeof change === 'object' && change !== null) {
           if ('pair' in change && change.pair) {
