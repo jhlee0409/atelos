@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { ScenarioData } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import type { ScenarioData, Character, ScenarioStat, ScenarioFlag, EndingArchetype, Trait } from '@/types';
 import BaseContent from '@/components/admin/ScenarioEditor/BaseContent';
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
@@ -13,6 +13,16 @@ import { STORAGE_KEY } from '@/constants/scenario';
 import { validateScenario } from '@/lib/validations';
 import { getScenarioData } from '@/mocks';
 import GeminiTest from '@/components/ui/gemini-test';
+import AIScenarioGenerator from '@/components/admin/AIScenarioGenerator';
+import type {
+  GenerationCategory,
+  ScenarioOverviewResult,
+  CharacterResult,
+  StatResult,
+  FlagResult,
+  EndingResult,
+  TraitsResult,
+} from '@/lib/ai-scenario-generator';
 
 const ADMIN_AUTH_KEY = 'atelos_admin_auth';
 
@@ -93,6 +103,19 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
   );
 }
 
+// 비교 연산자 변환 함수
+const convertComparison = (comp: string): 'greater_equal' | 'less_equal' | 'equal' | 'greater_than' | 'less_than' | 'not_equal' => {
+  const map: Record<string, 'greater_equal' | 'less_equal' | 'equal' | 'greater_than' | 'less_than' | 'not_equal'> = {
+    '>=': 'greater_equal',
+    '<=': 'less_equal',
+    '==': 'equal',
+    '>': 'greater_than',
+    '<': 'less_than',
+    '!=': 'not_equal',
+  };
+  return map[comp] || 'greater_equal';
+};
+
 function ScenarioEditor() {
   const [scenario, setScenario] = useState<ScenarioData>(() => {
     const mockScenario = getScenarioData('ZERO_HOUR');
@@ -102,6 +125,221 @@ function ScenarioEditor() {
     return mockScenario;
   });
   const [errors, setErrors] = useState<string[]>([]);
+
+  // AI 생성 결과를 시나리오에 적용하는 핸들러
+  const handleAIApply = useCallback(
+    (category: GenerationCategory, data: unknown, selectedIndices: number[]) => {
+      switch (category) {
+        case 'scenario_overview': {
+          const overview = data as ScenarioOverviewResult;
+          setScenario((prev) => ({
+            ...prev,
+            scenarioId: overview.scenarioId || prev.scenarioId,
+            title: overview.title || prev.title,
+            synopsis: overview.synopsis || prev.synopsis,
+            playerGoal: overview.playerGoal || prev.playerGoal,
+            genre: overview.genre?.length ? overview.genre : prev.genre,
+            coreKeywords: overview.coreKeywords?.length
+              ? overview.coreKeywords
+              : prev.coreKeywords,
+          }));
+          toast.success('시나리오 개요가 적용되었습니다.');
+          break;
+        }
+
+        case 'characters': {
+          const { characters } = data as { characters: CharacterResult[] };
+          const selectedCharacters = selectedIndices
+            .map((i) => characters[i])
+            .filter(Boolean);
+
+          const newCharacters: Character[] = selectedCharacters.map((char) => ({
+            roleId: char.roleId,
+            roleName: char.roleName,
+            characterName: char.characterName,
+            backstory: char.backstory || '',
+            imageUrl: '',
+            weightedTraitTypes: char.suggestedTraits || [],
+            currentTrait: null,
+          }));
+
+          setScenario((prev) => ({
+            ...prev,
+            characters: [...prev.characters, ...newCharacters],
+          }));
+          toast.success(`${selectedCharacters.length}명의 캐릭터가 추가되었습니다.`);
+          break;
+        }
+
+        case 'stats': {
+          const { stats } = data as { stats: StatResult[] };
+          const selectedStats = selectedIndices
+            .map((i) => stats[i])
+            .filter(Boolean);
+
+          const newStats: ScenarioStat[] = selectedStats.map((stat) => ({
+            id: stat.id,
+            name: stat.name,
+            description: stat.description || '',
+            min: stat.min || 0,
+            max: stat.max || 100,
+            current: stat.initialValue || 50,
+            initialValue: stat.initialValue || 50,
+            range: [stat.min || 0, stat.max || 100] as [number, number],
+          }));
+
+          setScenario((prev) => ({
+            ...prev,
+            scenarioStats: [...prev.scenarioStats, ...newStats],
+          }));
+          toast.success(`${selectedStats.length}개의 스탯이 추가되었습니다.`);
+          break;
+        }
+
+        case 'flags': {
+          const { flags } = data as { flags: FlagResult[] };
+          const selectedFlags = selectedIndices
+            .map((i) => flags[i])
+            .filter(Boolean);
+
+          const newFlags: ScenarioFlag[] = selectedFlags.map((flag) => ({
+            flagName: flag.flagName,
+            description: flag.description || '',
+            type: flag.type || 'boolean',
+            initial: flag.type === 'count' ? 0 : false,
+            triggerCondition: flag.triggerCondition || '',
+          }));
+
+          setScenario((prev) => ({
+            ...prev,
+            flagDictionary: [...prev.flagDictionary, ...newFlags],
+          }));
+          toast.success(`${selectedFlags.length}개의 플래그가 추가되었습니다.`);
+          break;
+        }
+
+        case 'endings': {
+          const { endings } = data as { endings: EndingResult[] };
+          const selectedEndings = selectedIndices
+            .map((i) => endings[i])
+            .filter(Boolean);
+
+          const newEndings: EndingArchetype[] = selectedEndings.map((ending) => {
+            const systemConditions: EndingArchetype['systemConditions'] = [];
+
+            // 스탯 조건 추가
+            ending.suggestedConditions?.stats?.forEach((statCond) => {
+              systemConditions.push({
+                type: 'required_stat',
+                statId: statCond.statId,
+                comparison: convertComparison(statCond.comparison),
+                value: statCond.value,
+              });
+            });
+
+            // 플래그 조건 추가
+            ending.suggestedConditions?.flags?.forEach((flagName) => {
+              systemConditions.push({
+                type: 'required_flag',
+                flagName,
+              });
+            });
+
+            return {
+              endingId: ending.endingId,
+              title: ending.title,
+              description: ending.description || '',
+              isGoalSuccess: ending.isGoalSuccess || false,
+              systemConditions,
+            };
+          });
+
+          setScenario((prev) => ({
+            ...prev,
+            endingArchetypes: [...prev.endingArchetypes, ...newEndings],
+          }));
+          toast.success(`${selectedEndings.length}개의 엔딩이 추가되었습니다.`);
+          break;
+        }
+
+        case 'traits': {
+          const traitsData = data as TraitsResult;
+          const allTraits = [
+            ...(traitsData.buffs || []).map((t, i) => ({ ...t, isBuff: true, originalIdx: i })),
+            ...(traitsData.debuffs || []).map((t, i) => ({ ...t, isBuff: false, originalIdx: (traitsData.buffs?.length || 0) + i })),
+          ];
+
+          const selectedTraits = selectedIndices.map((i) => allTraits[i]).filter(Boolean);
+
+          const newBuffs: Trait[] = selectedTraits
+            .filter((t) => t.isBuff)
+            .map((t) => ({
+              traitId: t.traitId,
+              traitName: t.traitName,
+              type: 'positive' as const,
+              weightType: t.traitId,
+              displayText: t.description,
+              systemInstruction: t.effect,
+              iconUrl: '',
+            }));
+
+          const newDebuffs: Trait[] = selectedTraits
+            .filter((t) => !t.isBuff)
+            .map((t) => ({
+              traitId: t.traitId,
+              traitName: t.traitName,
+              type: 'negative' as const,
+              weightType: t.traitId,
+              displayText: t.description,
+              systemInstruction: t.effect,
+              iconUrl: '',
+            }));
+
+          setScenario((prev) => ({
+            ...prev,
+            traitPool: {
+              buffs: [...prev.traitPool.buffs, ...newBuffs],
+              debuffs: [...prev.traitPool.debuffs, ...newDebuffs],
+            },
+          }));
+          toast.success(`${selectedTraits.length}개의 특성이 추가되었습니다.`);
+          break;
+        }
+
+        case 'keywords': {
+          const { keywords } = data as { keywords: string[] };
+          const selectedKeywords = selectedIndices
+            .map((i) => keywords[i])
+            .filter(Boolean);
+
+          setScenario((prev) => ({
+            ...prev,
+            coreKeywords: [...new Set([...prev.coreKeywords, ...selectedKeywords])],
+          }));
+          toast.success(`${selectedKeywords.length}개의 키워드가 추가되었습니다.`);
+          break;
+        }
+
+        case 'genre': {
+          const { genres } = data as { genres: string[] };
+          const selectedGenres = selectedIndices
+            .map((i) => genres[i])
+            .filter(Boolean);
+
+          setScenario((prev) => ({
+            ...prev,
+            genre: [...new Set([...prev.genre, ...selectedGenres])],
+          }));
+          toast.success(`${selectedGenres.length}개의 장르가 추가되었습니다.`);
+          break;
+        }
+
+        default:
+          break;
+      }
+    },
+    [],
+  );
 
   // Save functions
   const handleTempSave = () => {
@@ -126,6 +364,16 @@ function ScenarioEditor() {
     toast.success('시나리오가 저장되고 활성화되었습니다.');
   };
 
+  // AI Generator용 컨텍스트 생성
+  const aiContext = {
+    genre: scenario.genre,
+    title: scenario.title,
+    synopsis: scenario.synopsis,
+    existingCharacters: scenario.characters.map((c) => c.characterName),
+    existingStats: scenario.scenarioStats.map((s) => s.name),
+    existingFlags: scenario.flagDictionary.map((f) => f.flagName),
+  };
+
   return (
     <div className="min-h-screen bg-telos-black">
       <div className="flex">
@@ -136,6 +384,14 @@ function ScenarioEditor() {
           {/* Gemini API Test Section */}
           <div className="mb-8 flex justify-center">
             <GeminiTest />
+          </div>
+
+          {/* AI Scenario Generator */}
+          <div className="mb-8">
+            <AIScenarioGenerator
+              context={aiContext}
+              onApply={handleAIApply}
+            />
           </div>
 
           <div className="space-y-8">
