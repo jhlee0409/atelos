@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const {
       systemPrompt,
       userPrompt,
-      model = 'gemini-2.5-flash-lite-preview-09-2025',
+      model = 'gemini-2.5-flash-lite',
       temperature = 0.5,
       maxTokens = 2000,
     } = body;
