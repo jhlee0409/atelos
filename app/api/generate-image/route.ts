@@ -110,9 +110,9 @@ export async function POST(request: NextRequest) {
 
     const client = getGeminiClient();
 
-    // Gemini 2.5 Flash Image 모델 사용
+    // Gemini 2.5 Flash Image 모델 사용 (프로덕션)
     const model = client.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash-image',
       generationConfig: {
         // @ts-expect-error - responseModalities is valid for image generation
         responseModalities: ['Text', 'Image'],
