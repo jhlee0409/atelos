@@ -486,15 +486,15 @@ const updateSaveState = (
         }
 
         if (personA && personB && value !== 0) {
-          // 플레이어 관련 관계인지 확인
-          const isPlayerRelated =
-            personA.includes('플레이어') ||
-            personB.includes('플레이어') ||
-            personA.includes('리더') ||
-            personB.includes('리더');
+          // 플레이어 관련 관계인지 확인 (normalizeName과 동일한 별칭 지원)
+          const playerAliases = ['플레이어', '리더', 'player', '나', '당신'];
+          const isPlayerName = (name: string) =>
+            playerAliases.some((alias) => name.toLowerCase().includes(alias.toLowerCase()));
+
+          const isPlayerRelated = isPlayerName(personA) || isPlayerName(personB);
 
           const otherPerson = isPlayerRelated
-            ? personA.includes('플레이어') || personA.includes('리더')
+            ? isPlayerName(personA)
               ? personB
               : personA
             : null;
@@ -775,9 +775,10 @@ export default function GameClient({ scenario }: GameClientProps) {
       );
 
       // 회상 시스템 - 주요 결정 기록
+      // Bug fix: 상태 업데이트 전의 day/turn 사용 (newSaveState)
       const recordKeyDecision = () => {
-        const currentDay = updatedSaveState.context.currentDay || 1;
-        const currentTurn = updatedSaveState.context.turnsInCurrentDay || 0;
+        const currentDay = newSaveState.context.currentDay || 1;
+        const currentTurn = newSaveState.context.turnsInCurrentDay || 0;
 
         // 선택 카테고리 결정
         const determineCategory = (

@@ -71,34 +71,34 @@ const determineRoute = (saveState: SaveState): RouteInfo => {
   };
 };
 
-// 탈출 루트 점수
+// 탈출 루트 점수 (ZERO_HOUR.json 기준)
 const calculateEscapeScore = (flags: { [key: string]: boolean | number }): number => {
   let score = 0;
-  if (flags['FLAG_ESCAPE_VEHICLE_SECURED']) score += 50;
-  if (flags['FLAG_GOVERNMENT_CONTACT']) score += 30;
-  if (flags['FLAG_UNDERGROUND_HIDEOUT']) score += 20;
+  if (flags['FLAG_ESCAPE_VEHICLE_SECURED']) score += 50; // route: 탈출
+  if (flags['FLAG_LEADER_SACRIFICE']) score += 30; // route: 탈출
   return score;
 };
 
-// 항전 루트 점수
+// 항전 루트 점수 (ZERO_HOUR.json 기준)
 const calculateDefenseScore = (flags: { [key: string]: boolean | number }): number => {
   let score = 0;
-  if (flags['FLAG_DEFENSES_COMPLETE']) score += 50;
-  if (flags['FLAG_RESOURCE_MONOPOLY']) score += 30;
-  if (flags['FLAG_LEADER_SACRIFICE']) score += 20;
+  if (flags['FLAG_DEFENSES_COMPLETE']) score += 50; // route: 항전
+  if (flags['FLAG_RESOURCE_MONOPOLY']) score += 30; // route: 항전
+  if (flags['FLAG_IDEOLOGY_ESTABLISHED']) score += 20; // route: 항전
   return score;
 };
 
-// 협상 루트 점수
+// 협상 루트 점수 (ZERO_HOUR.json 기준)
 const calculateNegotiationScore = (
   flags: { [key: string]: boolean | number },
-  communityCohesion: number
+  communityCohesion: number,
 ): number => {
   let score = 0;
-  if (flags['FLAG_ALLY_NETWORK_FORMED']) score += 50;
-  if (flags['FLAG_IDEOLOGY_ESTABLISHED']) score += 30;
-  if (communityCohesion >= 70) score += 20;
-  else if (communityCohesion >= 50) score += 10;
+  if (flags['FLAG_ALLY_NETWORK_FORMED']) score += 50; // route: 협상
+  if (flags['FLAG_GOVERNMENT_CONTACT']) score += 30; // route: 협상
+  if (flags['FLAG_UNDERGROUND_HIDEOUT']) score += 20; // route: 협상
+  if (communityCohesion >= 70) score += 10;
+  else if (communityCohesion >= 50) score += 5;
   return score;
 };
 
