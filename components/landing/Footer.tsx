@@ -25,12 +25,6 @@ const Footer: React.FC = () => {
           >
             Play
           </Link>
-          <Link
-            href="/admin"
-            className="text-zinc-400 transition-colors hover:text-white"
-          >
-            Admin
-          </Link>
         </div>
 
         <div className="text-xs text-zinc-600">
