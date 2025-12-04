@@ -165,6 +165,7 @@ export interface SaveState {
     flags: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
+    turnsInCurrentDay?: number; // 현재 하루 내 대화 턴 수
   };
   community: {
     survivors: {
@@ -186,6 +187,8 @@ export interface SaveState {
     choice_a: string;
     choice_b: string;
   };
+  characterArcs?: CharacterArc[]; // 캐릭터 아크 트래킹
+  keyDecisions?: KeyDecision[]; // 회상 시스템 - 주요 결정 기록
 }
 
 export interface AIResponse {
@@ -208,6 +211,33 @@ export interface PlayerAction {
   actionId: string;
   actionDescription: string;
   playerFeedback: string;
+}
+
+// 캐릭터 아크 시스템 - 캐릭터별 성장/변화 트래킹
+export interface CharacterMoment {
+  day: number;
+  type: 'relationship' | 'status' | 'decision' | 'revelation';
+  description: string;
+  relatedCharacter?: string; // 관계 변화 시 상대 캐릭터
+  impact: 'positive' | 'negative' | 'neutral';
+}
+
+export interface CharacterArc {
+  characterName: string;
+  moments: CharacterMoment[];
+  currentMood: 'hopeful' | 'anxious' | 'angry' | 'resigned' | 'determined';
+  trustLevel: number; // -100 ~ 100, 플레이어와의 신뢰도
+}
+
+// 회상 시스템 - 주요 결정 기록
+export interface KeyDecision {
+  day: number;
+  turn: number;
+  choice: string; // 플레이어가 선택한 선택지 텍스트
+  consequence: string; // 선택의 결과 요약 (50자 이내)
+  category: 'survival' | 'relationship' | 'moral' | 'strategic';
+  flagsAcquired?: string[]; // 이 선택으로 획득한 플래그
+  impactedCharacters?: string[]; // 영향받은 캐릭터들
 }
 
 export interface AvailableAction {

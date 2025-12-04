@@ -20,6 +20,152 @@ export interface GamePlayerAction {
 // 프롬프트 복잡도 레벨 정의
 export type PromptComplexity = 'minimal' | 'lite' | 'full' | 'detailed';
 
+// 3막 구조 서사 단계 정의
+export type NarrativePhase = 'setup' | 'rising_action' | 'midpoint' | 'climax';
+
+// 현재 일차에 따른 서사 단계 결정
+export const getNarrativePhase = (currentDay: number): NarrativePhase => {
+  if (currentDay <= 2) return 'setup';
+  if (currentDay <= 4) return 'rising_action';
+  if (currentDay === 5) return 'midpoint';
+  return 'climax';
+};
+
+// 서사 단계별 AI 가이드라인
+const NARRATIVE_PHASE_GUIDELINES: Record<NarrativePhase, string> = {
+  setup: `
+### 📖 서사 단계: 1막 - 설정 (Day 1-2) ###
+NARRATIVE PHASE: ACT 1 - SETUP (Common Route)
+
+목표: 세계관 확립, 캐릭터 소개, 초기 위기 제시
+- 모든 생존자 캐릭터를 자연스럽게 등장시켜 성격을 보여줄 것
+- 공동체의 현재 상황과 외부 위협을 명확히 설정할 것
+- 플레이어가 각 캐릭터와 관계를 쌓을 기회를 제공할 것
+- 아직 루트 분기가 되지 않음 - 다양한 가능성을 열어둘 것
+
+서사 톤:
+- 긴박하지만 아직 희망이 있는 분위기
+- 캐릭터 간 갈등의 씨앗을 심을 것
+- 플레이어의 리더십을 시험하는 상황 제시
+
+딜레마 스타일:
+- 캐릭터 관계 형성 중심
+- 자원 확보 vs 안전 유지 같은 기본적 선택
+- 어느 쪽을 선택해도 극단적 결과는 없음`,
+
+  rising_action: `
+### 📖 서사 단계: 2막 전반 - 상승 (Day 3-4) ###
+NARRATIVE PHASE: ACT 2A - RISING ACTION (Route Branching)
+
+목표: 긴장 고조, 루트 분기 시작, 핵심 갈등 심화
+- 이전 선택들의 결과가 드러나기 시작할 것
+- 탈출/항전/협상 중 하나의 방향으로 기울어지는 선택 제시
+- 캐릭터 간 대립이 표면화될 것
+- 중요한 플래그 획득 기회 제공
+
+서사 톤:
+- 긴장감 고조, 갈등 심화
+- 외부 위협이 가시화됨
+- 내부 분열의 조짐
+
+딜레마 스타일:
+- 루트 결정에 영향을 미치는 중대한 선택
+- 누군가를 희생하거나 포기해야 하는 상황
+- 선택에 따라 특정 캐릭터와 갈등 or 신뢰 형성
+
+루트 힌트 (플래그 기반):
+- 탈출 루트: 이동 수단 확보, 외부 연락처 확인
+- 항전 루트: 방어 시설 강화, 무기 확보
+- 협상 루트: 외부 세력과 접촉, 동맹 형성`,
+
+  midpoint: `
+### 📖 서사 단계: 2막 후반 - 전환점 (Day 5) ###
+NARRATIVE PHASE: ACT 2B - MIDPOINT (Route Lock-in)
+
+목표: 루트 확정, 돌이킬 수 없는 결정, 위기의 정점
+- 지금까지의 선택에 따라 루트가 확정됨
+- 극적인 반전 또는 중대한 사건 발생
+- 희생이나 배신 등 감정적 클라이맥스
+- 엔딩을 향한 방향이 명확해짐
+
+서사 톤:
+- 절정의 긴장감
+- "돌아올 수 없는 다리를 건넌다"는 느낌
+- 감정적 무게감이 큰 장면
+
+딜레마 스타일:
+- 공동체의 운명을 결정하는 선택
+- 명확한 득실이 있는 무거운 결정
+- 선택 후 특정 엔딩 루트로 고정됨
+
+이 시점의 주요 플래그:
+- FLAG_ESCAPE_VEHICLE_SECURED → 탈출 루트 가능
+- FLAG_DEFENSES_COMPLETE → 항전 루트 가능
+- FLAG_ALLY_NETWORK_FORMED → 협상 루트 가능`,
+
+  climax: `
+### 📖 서사 단계: 3막 - 결말 (Day 6-7) ###
+NARRATIVE PHASE: ACT 3 - CLIMAX & RESOLUTION
+
+목표: 최종 대결, 감정적 해소, 엔딩 도달
+- 확정된 루트에 맞는 클라이맥스 전개
+- 모든 캐릭터 아크 마무리
+- 플레이어 선택의 최종 결과 보여주기
+- 감동적이거나 충격적인 결말로 이끌 것
+
+서사 톤:
+- 최고조의 긴장과 감정
+- 희생, 구원, 또는 비극적 결말
+- 서사적 정의 (narrative justice)
+
+딜레마 스타일:
+- 마지막 선택은 "어떻게 끝낼 것인가"
+- 개인 vs 공동체의 최종 결정
+- 감정적 임팩트 극대화
+
+엔딩 힌트 (현재 상태 기반):
+- cityChaos ≤40 & communityCohesion ≥70 → "우리들의 법칙" (공동체 승리)
+- survivalFoundation ≥50 & communityCohesion ≥50 → "새로운 보안관" (질서 확립)
+- FLAG_ESCAPE_VEHICLE_SECURED → "탈출자들" (성공적 탈출)
+- 조건 미달 시 → "결단의 시간" (기본 엔딩)`
+};
+
+// 회상 시스템 - 주요 결정 요약 (토큰 효율적)
+interface KeyDecision {
+  day: number;
+  choice: string;
+  consequence: string;
+  category: string;
+}
+
+const formatKeyDecisionsForPrompt = (
+  keyDecisions?: KeyDecision[],
+  maxDecisions: number = 5,
+): string => {
+  if (!keyDecisions || keyDecisions.length === 0) {
+    return '';
+  }
+
+  // 최근 결정들만 포함 (토큰 절약)
+  const recentDecisions = keyDecisions.slice(-maxDecisions);
+
+  const formattedDecisions = recentDecisions
+    .map(
+      (d) =>
+        `Day${d.day}: "${d.choice.substring(0, 30)}..." → ${d.consequence}`,
+    )
+    .join('\n');
+
+  return `
+PLAYER'S PAST DECISIONS (회상 - 참조하여 서사 연속성 유지):
+${formattedDecisions}
+
+IMPORTANT: Reference these past decisions naturally in the narrative when relevant.
+- Mention consequences of earlier choices
+- Show how characters remember player's actions
+- Create callbacks to meaningful moments`;
+};
+
 // 토큰 최적화된 프롬프트 빌더 (메인 함수)
 export const buildOptimizedGamePrompt = (
   scenario: ScenarioData,
@@ -32,6 +178,7 @@ export const buildOptimizedGamePrompt = (
     includeRelationshipTracking?: boolean;
     includeDetailedStats?: boolean;
     currentDay?: number;
+    keyDecisions?: KeyDecision[];
   } = {},
 ): GamePromptData => {
   const {
@@ -105,6 +252,16 @@ const buildLitePrompt = (
   playerAction: GamePlayerAction,
   options: any,
 ): GamePromptData => {
+  const currentDay = options.currentDay || 1;
+  const narrativePhase = getNarrativePhase(currentDay);
+  const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
+
+  // 회상 시스템 - 주요 결정 포맷팅
+  const keyDecisionsSection = formatKeyDecisionsForPrompt(
+    options.keyDecisions,
+    3, // 라이트 모드에서는 최근 3개만
+  );
+
   const currentStats = Object.entries(playerState.stats)
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
@@ -186,9 +343,20 @@ Output JSON:
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
     "flags_acquired": ["FLAG_NAME"],
-    "shouldAdvanceTime": true
+    "shouldAdvanceTime": false
   }
 }
+
+TIME PROGRESSION GUIDELINES (IMPORTANT):
+- **shouldAdvanceTime: false** (default): For regular dialogue, discussions, minor interactions
+- **shouldAdvanceTime: true**: ONLY for major events that conclude the day:
+  * Major battle or confrontation resolved
+  * Important negotiation completed
+  * Critical resource secured
+  * Significant journey/travel completed
+  * Major construction/project finished
+- Multiple conversations happen within a single day - don't rush time!
+- Let players make 2-4 decisions before a day passes
 
 STAT CHANGE GUIDELINES (CRITICAL):
 - **NORMAL actions** (dialogue, minor exploration): ±5 to ±10
@@ -211,7 +379,10 @@ FLAG ACQUISITION RULES (grant flag when condition is met):
 - **FLAG_MARTYR_LEGEND**: A hero's sacrifice becomes legendary
 - Only grant 1-2 flags per response when truly earned through player actions
 
-Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.`;
+Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
+
+${phaseGuideline}
+${keyDecisionsSection}`;
 
   const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
 Player chose: ${playerAction.actionDescription}
@@ -252,6 +423,16 @@ const buildFullPrompt = (
   lastLog: string,
   options: any,
 ): GamePromptData => {
+  const currentDay = options.currentDay || 1;
+  const narrativePhase = getNarrativePhase(currentDay);
+  const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
+
+  // 회상 시스템 - 주요 결정 포맷팅 (풀 모드에서는 5개까지)
+  const keyDecisionsSection = formatKeyDecisionsForPrompt(
+    options.keyDecisions,
+    5,
+  );
+
   // 현재 상태 정보 구성
   const currentStats = Object.entries(playerState.stats)
     .map(([key, value]) => {
@@ -316,7 +497,7 @@ const buildFullPrompt = (
     .replace('{{PLAYER_GOAL}}', scenario.playerGoal)
     .replace('{{CHARACTER_BIBLE}}', characterBible)
     .replace('{{SCENARIO_STATS_DESC}}', scenarioStatsDesc)
-    .replace('{{CURRENT_DAY}}', '1') // 기본값, 실제 게임에서는 동적으로 설정
+    .replace('{{CURRENT_DAY}}', currentDay.toString())
     .replace(
       '{{CITY_CHAOS}}',
       playerState.stats['cityChaos']?.toString() || '70',
@@ -354,7 +535,10 @@ const buildFullPrompt = (
 [PLAN_ESCAPE] 탈출 계획 수립
 [STRENGTHEN_MORALE] 사기 진작
 
-위의 직전 상황 결과를 바탕으로, 다음 이야기를 전개해주세요.`;
+위의 직전 상황 결과를 바탕으로, 다음 이야기를 전개해주세요.
+
+${phaseGuideline}
+${keyDecisionsSection}`;
 
   return {
     systemPrompt,
@@ -456,9 +640,18 @@ Requirements:
 4. Write in immersive Korean narrative (no system terminology exposed)
 5. Create two meaningful choices with clear consequences
 
+CRITICAL FORMATTING RULES:
+- **스탯 수치 절대 노출 금지**: "cityChaos", "60" 같은 내부 수치나 변수명을 서사에 쓰지 마세요
+- **줄바꿈 필수**: 각 캐릭터 대사 전후에 \\n 줄바꿈을 넣으세요
+- **마크다운 사용**: 중요한 대사는 **굵게**, 감정은 *기울임*으로 강조
+- **대화 구분**: 장면 묘사와 캐릭터 대사를 줄바꿈으로 명확히 구분하세요
+
+예시 형식:
+"혼란스러운 도시의 아침이었다.\\n\\n**\\"우리가 여기서 버틸 수 있을까?\\"** 강철민이 냉소적으로 말했다.\\n\\n한서아가 고개를 저었다. *그녀의 눈빛에는 희망이 서려 있었다.*"
+
 Output ONLY this JSON structure:
 {
-  "prompt": "Korean narrative describing the situation and dilemma",
+  "prompt": "Korean narrative with proper line breaks (use \\\\n)",
   "choice_a": "First choice option in Korean",
   "choice_b": "Second choice option in Korean"
 }
@@ -467,5 +660,6 @@ Critical Rules:
 - NO text outside the JSON structure
 - NO + symbols before numbers (use 5, -3 format only)
 - ALL content in Korean for immersive experience
-- NO exposure of system IDs, flags, or technical terms`;
+- NO exposure of system IDs, flags, stats numbers, or technical terms
+- USE \\n for line breaks between paragraphs and dialogues`;
 };

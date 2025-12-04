@@ -1,4 +1,4 @@
-import { ScenarioData, PlayerState, Character } from '@/types';
+import { ScenarioData, PlayerState, Character, KeyDecision } from '@/types';
 
 // ===========================================
 // 토큰 최적화 v2: 압축된 프롬프트 시스템
@@ -25,6 +25,13 @@ RULES:
 3. Character-driven narrative with emotions.
 4. Track stats/flags/relationships.
 
+WRITING STYLE:
+- 스탯 수치/스탯명 절대 노출 금지 ("시티 카오스 60" ❌, "cityChaos" ❌, "도시가 혼란에 빠졌다" ✓)
+- 대사와 묘사를 줄바꿈으로 구분하세요
+- **중요한 대사**나 *감정*은 마크다운으로 강조하세요
+- 같은 표현을 반복하지 마세요 (눈빛, 분위기 등 다양하게)
+- 각 캐릭터의 대사는 새 문단으로 시작하세요
+
 CURRENT STATE:
 - Day {{DAY}}/7
 - Stats: {{STATS}}
@@ -33,7 +40,7 @@ CURRENT STATE:
 
 OUTPUT:
 {
-  "log": "Korean story (100-150 words)",
+  "log": "Korean story (100-150 words, use \\n for paragraphs)",
   "dilemma": {
     "prompt": "Korean dilemma",
     "choice_a": "Choice A",
@@ -43,9 +50,12 @@ OUTPUT:
     "scenarioStats": {},
     "flags_acquired": [],
     "survivorStatus": [],
-    "hiddenRelationships_change": []
+    "hiddenRelationships_change": [],
+    "shouldAdvanceTime": false
   }
-}`;
+}
+
+TIME: shouldAdvanceTime=false (default), true ONLY for major day-ending events.`;
 
 // 초경량 프롬프트 (150-200 토큰)
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.
@@ -86,7 +96,7 @@ const compressFlags = (flags: { [key: string]: boolean | number }): string => {
 // 최근 대화 요약 (토큰 절약)
 const summarizeRecentChat = (chatHistory: any[], maxLength: number = 100): string => {
   if (!chatHistory || chatHistory.length === 0) return '';
-  
+
   const recentChat = chatHistory.slice(-2); // 최근 2개만
   return recentChat
     .map(chat => chat.message?.substring(0, 50) || '')
@@ -94,7 +104,27 @@ const summarizeRecentChat = (chatHistory: any[], maxLength: number = 100): strin
     .substring(0, maxLength);
 };
 
+// 압축된 서사 단계 힌트 (토큰 최적화)
+const getCompactNarrativeHint = (currentDay: number): string => {
+  if (currentDay <= 2) return 'Phase: SETUP - Introduce characters, build tension';
+  if (currentDay <= 4) return 'Phase: RISING - Route branching, major conflicts';
+  if (currentDay === 5) return 'Phase: MIDPOINT - Route lock-in, point of no return';
+  return 'Phase: CLIMAX - Final resolution, emotional payoff';
+};
+
 // 메인 프롬프트 빌더 (최적화 v2)
+// 압축된 주요 결정 포맷 (토큰 최적화)
+const formatKeyDecisionsCompact = (
+  keyDecisions?: KeyDecision[],
+  maxDecisions: number = 3,
+): string => {
+  if (!keyDecisions || keyDecisions.length === 0) return '';
+  const recent = keyDecisions.slice(-maxDecisions);
+  return recent
+    .map((d) => `D${d.day}:"${d.choice.substring(0, 20)}..."→${d.consequence.substring(0, 20)}`)
+    .join('|');
+};
+
 export const buildOptimizedGamePromptV2 = (
   scenario: ScenarioData,
   playerState: PlayerState,
@@ -104,12 +134,14 @@ export const buildOptimizedGamePromptV2 = (
     ultraLite?: boolean;
     currentDay?: number;
     includeRelationships?: boolean;
+    keyDecisions?: KeyDecision[];
   } = {},
 ): GamePromptData => {
-  const { 
-    ultraLite = false, 
+  const {
+    ultraLite = false,
     currentDay = 1,
-    includeRelationships = false 
+    includeRelationships = false,
+    keyDecisions,
   } = options;
 
   // 초경량 모드
@@ -147,11 +179,19 @@ export const buildOptimizedGamePromptV2 = (
     .replace('{{FLAGS}}', compressedFlags)
     .replace('{{CHARS}}', compressedChars);
 
+  // 서사 단계 힌트
+  const narrativeHint = getCompactNarrativeHint(currentDay);
+
+  // 회상 시스템 - 주요 결정 (서사 연속성)
+  const pastDecisions = formatKeyDecisionsCompact(keyDecisions, 3);
+
   // 사용자 프롬프트 압축
   const userPrompt = `Previous: "${lastLog.substring(0, 50)}..."
 Choice: ${playerAction.actionDescription}
 ${relationshipInfo ? `Relations: ${relationshipInfo}` : ''}
-Continue story with character reactions.`;
+${pastDecisions ? `PastChoices: ${pastDecisions}` : ''}
+${narrativeHint}
+Continue story with character reactions, referencing past choices for continuity.`;
 
   return {
     systemPrompt,

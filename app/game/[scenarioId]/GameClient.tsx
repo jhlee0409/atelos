@@ -93,6 +93,7 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       flags,
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
+      turnsInCurrentDay: 0, // 하루 내 대화 턴 수 초기화
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -103,15 +104,26 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       })),
       hiddenRelationships,
     },
-    log:
-      `[Day 1] ${scenario.synopsis}` ||
-      '게임이 시작되었습니다. 첫 번째 선택을 내려주세요.',
+    log: scenario.synopsis
+      ? `[Day 1] ${scenario.synopsis}`
+      : '게임이 시작되었습니다. 첫 번째 선택을 내려주세요.',
     chatHistory: [], // 새 게임 시 채팅 기록 초기화
     dilemma: {
       prompt: '... 로딩 중 ...',
       choice_a: '... 로딩 중 ...',
       choice_b: '... 로딩 중 ...',
     },
+    // 캐릭터 아크 초기화
+    characterArcs: charactersWithTraits
+      .filter((c) => c.characterName !== '(플레이어)')
+      .map((c) => ({
+        characterName: c.characterName,
+        moments: [],
+        currentMood: 'anxious' as const,
+        trustLevel: 0,
+      })),
+    // 회상 시스템 - 주요 결정 기록 초기화
+    keyDecisions: [],
   };
 };
 
@@ -267,17 +279,35 @@ const updateSaveState = (
       // pair 형식과 개별 필드 형식 모두 지원
       let personA: string, personB: string, value: number;
 
-      if ('pair' in change && change.pair) {
-        // "A-B" 형식 처리
-        const [nameA, nameB] = change.pair.split('-');
-        personA = normalizeName(nameA?.trim() || '');
-        personB = normalizeName(nameB?.trim() || '');
-        value = change.change || 0;
-      } else if ('personA' in change && 'personB' in change) {
-        // 개별 필드 형식 처리
-        personA = normalizeName(change.personA || '');
-        personB = normalizeName(change.personB || '');
-        value = change.change || 0;
+      // 문자열 형식 처리 (예: "박준경-한서아:-5 (갈등 심화)")
+      if (typeof change === 'string') {
+        // "이름-이름:숫자" 또는 "이름-이름:숫자 (설명)" 패턴 파싱
+        const stringMatch = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+        if (stringMatch) {
+          personA = normalizeName(stringMatch[1].trim());
+          personB = normalizeName(stringMatch[2].trim());
+          value = parseInt(stringMatch[3], 10);
+        } else {
+          console.warn('⚠️ 문자열 형식 관계도 파싱 실패 (무시됨):', change);
+          return;
+        }
+      } else if (typeof change === 'object' && change !== null) {
+        // 객체 형식 처리
+        if ('pair' in change && change.pair) {
+          // "A-B" 형식 처리
+          const [nameA, nameB] = change.pair.split('-');
+          personA = normalizeName(nameA?.trim() || '');
+          personB = normalizeName(nameB?.trim() || '');
+          value = change.change || 0;
+        } else if ('personA' in change && 'personB' in change) {
+          // 개별 필드 형식 처리
+          personA = normalizeName(change.personA || '');
+          personB = normalizeName(change.personB || '');
+          value = change.change || 0;
+        } else {
+          console.warn('⚠️ 비정상적인 관계도 객체 형식 (무시됨):', change);
+          return;
+        }
       } else {
         console.warn('⚠️ 비정상적인 관계도 데이터 형식 (무시됨):', change);
         return;
@@ -331,7 +361,15 @@ const updateSaveState = (
     });
   }
 
-  // 시간 진행 로직 개선
+  // 시간 진행 로직 개선 - 여러 대화 후 하루가 진행되도록
+  // 최소 대화 턴 수 (이 이상 대화해야 시간 진행 가능)
+  const MIN_TURNS_PER_DAY = 2;
+
+  // 현재 하루 내 턴 수 증가
+  newSaveState.context.turnsInCurrentDay =
+    (newSaveState.context.turnsInCurrentDay || 0) + 1;
+  const currentTurnsInDay = newSaveState.context.turnsInCurrentDay;
+
   if (
     scenario.endCondition.type === 'time_limit' &&
     scenario.endCondition.unit === 'hours'
@@ -342,15 +380,29 @@ const updateSaveState = (
       newSaveState.log = `[남은 시간: ${newSaveState.context.remainingHours}시간] ${aiResponse.log}`;
     }
   } else {
-    // 날짜 기반 시나리오 - AI의 판단에 따라 날짜 진행
-    // shouldAdvanceTime이 false가 아닐 경우 (true이거나 undefined일 경우) 시간을 진행시켜 호환성 유지
+    // 날짜 기반 시나리오 - 여러 대화 후 시간 진행
     const dayBeforeUpdate = newSaveState.context.currentDay || 1;
     let dayAfterUpdate = dayBeforeUpdate;
 
-    if (shouldAdvanceTime !== false) {
+    // 중요 이벤트 여부 확인 (플래그 획득 등)
+    const hasSignificantEvent = (flags_acquired && flags_acquired.length > 0);
+
+    // 시간 진행 조건:
+    // 1. 최소 턴 수를 충족하고 (MIN_TURNS_PER_DAY)
+    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (4턴 이상)
+    const enoughTurns = currentTurnsInDay >= MIN_TURNS_PER_DAY;
+    const shouldProgress =
+      shouldAdvanceTime === true ||
+      hasSignificantEvent ||
+      currentTurnsInDay >= 4; // 4턴 후에는 자동으로 시간 진행
+
+    if (enoughTurns && shouldProgress) {
       if (newSaveState.context.currentDay !== undefined) {
         newSaveState.context.currentDay += 1;
         dayAfterUpdate = newSaveState.context.currentDay;
+
+        // 턴 카운터 리셋
+        newSaveState.context.turnsInCurrentDay = 0;
 
         // 날짜가 바뀔 때 채팅 히스토리에 시스템 메시지 추가
         newSaveState.chatHistory.push({
@@ -360,14 +412,159 @@ const updateSaveState = (
         });
 
         console.log(
-          `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate}`,
+          `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate} (턴: ${currentTurnsInDay}, 이벤트: ${hasSignificantEvent})`,
         );
       }
     } else {
-      console.log(`⏳ 시간 유지. Day ${dayBeforeUpdate} (변화 없음)`);
+      console.log(
+        `⏳ 시간 유지. Day ${dayBeforeUpdate}, 턴 ${currentTurnsInDay}/${MIN_TURNS_PER_DAY} (shouldAdvance: ${shouldAdvanceTime}, 이벤트: ${hasSignificantEvent})`,
+      );
     }
     // 로그에 날짜 정보 포함 (시간이 흐르지 않아도 현재 날짜 표시)
     newSaveState.log = `[Day ${dayAfterUpdate}] ${aiResponse.log}`;
+  }
+
+  // 캐릭터 아크 업데이트
+  if (newSaveState.characterArcs) {
+    const currentDay = newSaveState.context.currentDay || 1;
+
+    // 상태 변화 트래킹
+    survivorStatus.forEach((update: { name: string; newStatus: string }) => {
+      const arc = newSaveState.characterArcs?.find(
+        (a: { characterName: string }) => a.characterName === update.name,
+      );
+      if (arc) {
+        const impact =
+          update.newStatus === 'dead' || update.newStatus === 'injured'
+            ? 'negative'
+            : update.newStatus === 'healed' || update.newStatus === 'rescued'
+              ? 'positive'
+              : 'neutral';
+        arc.moments.push({
+          day: currentDay,
+          type: 'status',
+          description: `${update.name}의 상태가 ${update.newStatus}(으)로 변경됨`,
+          impact: impact as 'positive' | 'negative' | 'neutral',
+        });
+        // 분위기 업데이트
+        if (impact === 'negative') {
+          arc.currentMood = 'anxious';
+        } else if (impact === 'positive') {
+          arc.currentMood = 'hopeful';
+        }
+      }
+    });
+
+    // 관계 변화 트래킹 (플레이어와의 관계만 신뢰도에 반영)
+    if (
+      hiddenRelationships_change &&
+      Array.isArray(hiddenRelationships_change)
+    ) {
+      hiddenRelationships_change.forEach((change) => {
+        let personA: string = '',
+          personB: string = '',
+          value: number = 0;
+
+        if (typeof change === 'string') {
+          const match = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+          if (match) {
+            personA = match[1].trim();
+            personB = match[2].trim();
+            value = parseInt(match[3], 10);
+          }
+        } else if (typeof change === 'object' && change !== null) {
+          if ('pair' in change && change.pair) {
+            const [a, b] = change.pair.split('-');
+            personA = a?.trim() || '';
+            personB = b?.trim() || '';
+            value = change.change || 0;
+          } else if ('personA' in change && 'personB' in change) {
+            personA = change.personA || '';
+            personB = change.personB || '';
+            value = change.change || 0;
+          }
+        }
+
+        if (personA && personB && value !== 0) {
+          // 플레이어 관련 관계인지 확인 (normalizeName과 동일한 로직)
+          const isPlayerName = (name: string) => {
+            const lowerName = name.toLowerCase();
+            // 서브스트링 매칭: 플레이어, 리더, player
+            if (
+              lowerName.includes('플레이어') ||
+              lowerName.includes('리더') ||
+              lowerName.includes('player')
+            ) {
+              return true;
+            }
+            // 정확한 매칭: 나, 당신 (오탐지 방지)
+            return name === '나' || name === '당신';
+          };
+
+          const isPlayerRelated = isPlayerName(personA) || isPlayerName(personB);
+
+          const otherPerson = isPlayerRelated
+            ? isPlayerName(personA)
+              ? personB
+              : personA
+            : null;
+
+          if (otherPerson) {
+            const arc = newSaveState.characterArcs?.find(
+              (a: { characterName: string }) => a.characterName === otherPerson,
+            );
+            if (arc) {
+              arc.trustLevel = Math.max(
+                -100,
+                Math.min(100, arc.trustLevel + value),
+              );
+              arc.moments.push({
+                day: currentDay,
+                type: 'relationship',
+                description:
+                  value > 0 ? '플레이어와의 신뢰가 상승' : '플레이어와 갈등 발생',
+                relatedCharacter: '플레이어',
+                impact: value > 0 ? 'positive' : 'negative',
+              });
+              // 신뢰도에 따른 분위기 변화
+              if (arc.trustLevel >= 30) {
+                arc.currentMood = 'determined';
+              } else if (arc.trustLevel <= -30) {
+                arc.currentMood = 'angry';
+              }
+            }
+          } else {
+            // NPC 간 관계 변화
+            [personA, personB].forEach((name) => {
+              const arc = newSaveState.characterArcs?.find(
+                (a: { characterName: string }) => a.characterName === name,
+              );
+              if (arc) {
+                const other = name === personA ? personB : personA;
+                arc.moments.push({
+                  day: currentDay,
+                  type: 'relationship',
+                  description:
+                    value > 0
+                      ? `${other}와(과)의 관계 개선`
+                      : `${other}와(과) 갈등 발생`,
+                  relatedCharacter: other,
+                  impact: value > 0 ? 'positive' : 'negative',
+                });
+              }
+            });
+          }
+        }
+      });
+    }
+
+    console.log(
+      '👥 캐릭터 아크 업데이트 완료:',
+      newSaveState.characterArcs.map(
+        (a: { characterName: string; trustLevel: number; moments: unknown[] }) =>
+          `${a.characterName}(신뢰:${a.trustLevel}, 순간:${a.moments.length})`,
+      ),
+    );
   }
 
   return newSaveState;
@@ -586,6 +783,91 @@ export default function GameClient({ scenario }: GameClientProps) {
         cleanedResponse,
         scenario,
       );
+
+      // 회상 시스템 - 주요 결정 기록
+      // Bug fix: 상태 업데이트 전의 day/turn 사용 (newSaveState)
+      const recordKeyDecision = () => {
+        const currentDay = newSaveState.context.currentDay || 1;
+        const currentTurn = newSaveState.context.turnsInCurrentDay || 0;
+
+        // 선택 카테고리 결정
+        const determineCategory = (
+          choice: string,
+        ): 'survival' | 'relationship' | 'moral' | 'strategic' => {
+          const choiceLower = choice.toLowerCase();
+          if (
+            choiceLower.includes('자원') ||
+            choiceLower.includes('방어') ||
+            choiceLower.includes('탈출') ||
+            choiceLower.includes('생존')
+          ) {
+            return 'survival';
+          }
+          if (
+            choiceLower.includes('협상') ||
+            choiceLower.includes('신뢰') ||
+            choiceLower.includes('동맹') ||
+            choiceLower.includes('관계')
+          ) {
+            return 'relationship';
+          }
+          if (
+            choiceLower.includes('희생') ||
+            choiceLower.includes('보호') ||
+            choiceLower.includes('구출') ||
+            choiceLower.includes('선택')
+          ) {
+            return 'moral';
+          }
+          return 'strategic';
+        };
+
+        // AI 응답에서 영향받은 캐릭터 추출
+        const extractImpactedCharacters = (): string[] => {
+          const characters = scenario.characters
+            .map((c) => c.characterName)
+            .filter((name) => name !== '(플레이어)');
+          return characters.filter(
+            (name) =>
+              cleanedResponse.log.includes(name) ||
+              choiceDetails.includes(name),
+          );
+        };
+
+        // 결과 요약 (50자 이내)
+        const summarizeConsequence = (log: string): string => {
+          // Day 태그 제거
+          const cleanLog = log.replace(/\[Day \d+\]\s*/g, '').trim();
+          // 첫 문장 또는 50자까지
+          const firstSentence = cleanLog.split(/[.!?。]/)[0];
+          return firstSentence.length > 50
+            ? firstSentence.substring(0, 47) + '...'
+            : firstSentence;
+        };
+
+        const keyDecision = {
+          day: currentDay,
+          turn: currentTurn,
+          choice: choiceDetails,
+          consequence: summarizeConsequence(cleanedResponse.log),
+          category: determineCategory(choiceDetails),
+          flagsAcquired: cleanedResponse.statChanges.flags_acquired || [],
+          impactedCharacters: extractImpactedCharacters(),
+        };
+
+        // 최대 20개까지 저장 (오래된 것부터 삭제)
+        if (!updatedSaveState.keyDecisions) {
+          updatedSaveState.keyDecisions = [];
+        }
+        updatedSaveState.keyDecisions.push(keyDecision);
+        if (updatedSaveState.keyDecisions.length > 20) {
+          updatedSaveState.keyDecisions.shift();
+        }
+
+        console.log('📝 주요 결정 기록:', keyDecision);
+      };
+
+      recordKeyDecision();
       setSaveState(updatedSaveState);
 
       console.log('🔄 상태 업데이트 완료, 엔딩 조건 확인 시작...');

@@ -241,6 +241,63 @@ export const validateStatChanges = (
   };
 };
 
+/**
+ * 서사 포맷팅 정리 - 스탯 노출 제거 및 대화 줄바꿈 추가
+ */
+export const cleanNarrativeFormatting = (text: string): string => {
+  let cleaned = text;
+
+  // 1. 스탯 수치 노출 제거 (다양한 패턴)
+  // "'시티 카오스' 수치가 60이라니" → 제거
+  // "도시 혼란도(60)" → "도시 혼란"
+  // "communityCohesion이 40이다" → 제거
+  const statPatterns = [
+    // 영어 스탯명 (원문)
+    /cityChaos\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    /communityCohesion\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    /survivalFoundation\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    // 영어 스탯명 한국어 음역 (따옴표 포함)
+    /['']시티\s*카오스['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    /['']커뮤니티\s*코히전['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    /['']서바이벌\s*파운데이션['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    // 한국어 스탯명 (괄호 숫자)
+    /도시\s*혼란도?\s*\(?\s*\d+\s*\)?/gi,
+    /공동체\s*응집력?\s*\(?\s*\d+\s*\)?/gi,
+    /생존\s*기반?\s*\(?\s*\d+\s*\)?/gi,
+    // 일반적인 "수치가 XX" 패턴 (스탯 관련 문장 전체 제거)
+    /[가-힣A-Za-z'']+\s*수치가?\s*\d+[에이]?[가이]?\s*(달한다는|달하는|이다|였다|이라니|라니)?[^.]*\./gi,
+    // 영어 스탯명 단독 (노출 방지)
+    /\b(cityChaos|communityCohesion|survivalFoundation)\b/gi,
+  ];
+
+  for (const pattern of statPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // 빈 문장 정리 (연속된 마침표 제거)
+  cleaned = cleaned.replace(/\.\s*\./g, '.').replace(/^\s*\./g, '');
+
+  // 2. 대화 전후 줄바꿈 추가
+  // 주의: ." 나 !" 패턴은 닫는 따옴표이므로 분리하지 않음 (\s+ 필수)
+  cleaned = cleaned
+    // 문장 끝 + 공백 + 여는 따옴표 → 줄바꿈 (공백이 있어야 새 대사)
+    .replace(/([.!?])\s+"/g, '$1\n\n"')
+    .replace(/([.!?])\s+"/g, '$1\n\n"')
+    .replace(/([.!?])\s+「/g, '$1\n\n「')
+    // 닫는 따옴표 + 공백 + 한글 서술 → 줄바꿈
+    .replace(/"\s+([가-힣])/g, '"\n\n$1')
+    .replace(/"\s+([가-힣])/g, '"\n\n$1')
+    .replace(/」\s+([가-힣])/g, '」\n\n$1');
+
+  // 3. 연속 줄바꿈 정리 (3개 이상 → 2개)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // 4. 앞뒤 공백 정리
+  cleaned = cleaned.trim();
+
+  return cleaned;
+};
+
 // AI 응답 언어 정리 및 검증 (gemini-2.5-flash-lite 최적화 - 강화된 검증)
 export const cleanAndValidateAIResponse = (
   response: AIResponse,
@@ -315,12 +372,16 @@ export const cleanAndValidateAIResponse = (
     statIssues.push(...statValidation.issues);
   }
 
+  // 서사 포맷팅 정리 (스탯 노출 제거, 대화 줄바꿈 추가)
+  const formattedLog = cleanNarrativeFormatting(logCleaning.cleanedText);
+  const formattedPrompt = cleanNarrativeFormatting(promptCleaning.cleanedText);
+
   // 정리된 응답 생성 (스탯 변화 보정 포함)
   const cleanedResponse: AIResponse = {
     ...response,
-    log: logCleaning.cleanedText,
+    log: formattedLog,
     dilemma: {
-      prompt: promptCleaning.cleanedText,
+      prompt: formattedPrompt,
       choice_a: choiceACleaning.cleanedText,
       choice_b: choiceBCleaning.cleanedText,
     },
@@ -373,6 +434,7 @@ export interface SaveState {
     flags: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
+    turnsInCurrentDay?: number; // 현재 하루 내 대화 턴 수
   };
   community: {
     survivors: {
@@ -473,6 +535,7 @@ export const generateGameResponse = async (
           ultraLite: dynamicSettings.useUltraLite,
           currentDay: saveState.context.currentDay || 1,
           includeRelationships: dynamicSettings.includeRelationships,
+          keyDecisions: saveState.keyDecisions,
         },
       );
     } else {
@@ -498,6 +561,7 @@ export const generateGameResponse = async (
           includeRelationshipTracking: aiSettings.includeRelationshipTracking,
           includeDetailedStats: aiSettings.includeDetailedStats,
           currentDay: saveState.context.currentDay || 1,
+          keyDecisions: saveState.keyDecisions,
         },
       );
     }
