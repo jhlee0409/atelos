@@ -25,6 +25,13 @@ RULES:
 3. Character-driven narrative with emotions.
 4. Track stats/flags/relationships.
 
+WRITING STYLE:
+- 스탯 수치를 직접 언급하지 마세요 (예: "도시 혼란도(60)" ❌, "혼란스러운 도시" ✓)
+- 대사와 묘사를 줄바꿈으로 구분하세요
+- **중요한 대사**나 *감정*은 마크다운으로 강조하세요
+- 같은 표현을 반복하지 마세요 (눈빛, 분위기 등 다양하게)
+- 각 캐릭터의 대사는 새 문단으로 시작하세요
+
 CURRENT STATE:
 - Day {{DAY}}/7
 - Stats: {{STATS}}
@@ -33,7 +40,7 @@ CURRENT STATE:
 
 OUTPUT:
 {
-  "log": "Korean story (100-150 words)",
+  "log": "Korean story (100-150 words, use \\n for paragraphs)",
   "dilemma": {
     "prompt": "Korean dilemma",
     "choice_a": "Choice A",
