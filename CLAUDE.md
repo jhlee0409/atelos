@@ -50,7 +50,6 @@ atelos/
 │   │   └── GameClient.tsx            # Main game client component
 │   └── api/
 │       ├── gemini/route.ts           # Main AI API endpoint
-│       ├── prologue/route.ts         # Landing page demo API
 │       └── admin/auth/route.ts       # Admin authentication
 ├── components/
 │   ├── ui/                           # Radix-based UI primitives (50+ components)
@@ -74,7 +73,6 @@ atelos/
 │   │   ├── Features.tsx              # Feature highlights
 │   │   ├── Gameplay.tsx              # Gameplay explanation
 │   │   ├── Endings.tsx               # Ending showcase
-│   │   ├── PrologueDemo.tsx          # Interactive AI demo
 │   │   ├── CallToAction.tsx
 │   │   ├── Navigation.tsx
 │   │   └── Footer.tsx
@@ -108,7 +106,7 @@ atelos/
 
 ### Core Application Flow
 
-1. **Landing Page** (`/`) → Marketing & interactive prologue demo
+1. **Landing Page** (`/`) → Marketing page
 2. **Scenario Selection** (`/lobby`) → **Scenario Details** (`/scenarios/[id]`) → **Game Play** (`/game/[id]`)
 3. **Admin Interface** (`/admin`) - Password-protected scenario editor
 
@@ -234,11 +232,6 @@ Main AI endpoint for game responses. Handles:
 - Game narrative generation
 - Stat change calculations
 - Character interactions
-
-#### `/api/prologue` (POST)
-Landing page demo endpoint. Generates a short prologue based on an item the player specifies.
-- Input: `{ item: string }`
-- Output: `{ prologue: string }`
 
 #### `/api/admin/auth` (POST)
 Admin authentication endpoint.

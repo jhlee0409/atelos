@@ -205,17 +205,6 @@ pnpm lint
 ### POST /api/gemini
 메인 AI 엔드포인트. 게임 서사를 생성합니다.
 
-### POST /api/prologue
-랜딩 페이지 데모용. 아이템 기반 프롤로그 생성.
-
-```json
-// Request
-{ "item": "낡은 회중시계" }
-
-// Response
-{ "prologue": "폐허 속에서 눈을 떴을 때..." }
-```
-
 ### POST /api/admin/auth
 관리자 인증 엔드포인트.
 
