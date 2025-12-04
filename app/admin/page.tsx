@@ -14,6 +14,13 @@ import { validateScenario } from '@/lib/validations';
 import { getScenarioData } from '@/mocks';
 import GeminiTest from '@/components/ui/gemini-test';
 import AIScenarioGenerator from '@/components/admin/AIScenarioGenerator';
+import ScenarioList from '@/components/admin/ScenarioList';
+import {
+  fetchScenario,
+  createScenario,
+  updateScenario,
+  createEmptyScenario,
+} from '@/lib/scenario-api';
 import type {
   GenerationCategory,
   ScenarioOverviewResult,
@@ -118,13 +125,37 @@ const convertComparison = (comp: string): 'greater_equal' | 'less_equal' | 'equa
 
 function ScenarioEditor() {
   const [scenario, setScenario] = useState<ScenarioData>(() => {
-    const mockScenario = getScenarioData('ZERO_HOUR');
-    if (!mockScenario) {
-      throw new Error('ZERO_HOUR scenario not found');
-    }
-    return mockScenario;
+    // 기본적으로 빈 시나리오로 시작
+    return createEmptyScenario();
   });
   const [errors, setErrors] = useState<string[]>([]);
+  const [isNewScenario, setIsNewScenario] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingScenario, setIsLoadingScenario] = useState(false);
+
+  // 시나리오 선택 핸들러
+  const handleSelectScenario = useCallback(async (scenarioId: string) => {
+    setIsLoadingScenario(true);
+    try {
+      const response = await fetchScenario(scenarioId);
+      setScenario(response.scenario);
+      setIsNewScenario(false);
+      setErrors([]);
+      toast.success(`"${response.scenario.title}" 시나리오를 불러왔습니다.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '시나리오를 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoadingScenario(false);
+    }
+  }, []);
+
+  // 새 시나리오 생성 핸들러
+  const handleCreateNew = useCallback(() => {
+    setScenario(createEmptyScenario());
+    setIsNewScenario(true);
+    setErrors([]);
+    toast.info('새 시나리오를 작성하세요.');
+  }, []);
 
   // AI 생성 결과를 시나리오에 적용하는 핸들러
   const handleAIApply = useCallback(
@@ -342,12 +373,36 @@ function ScenarioEditor() {
   );
 
   // Save functions
-  const handleTempSave = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scenario));
-    toast.success('임시 저장되었습니다.');
+  const handleTempSave = async () => {
+    if (!scenario.scenarioId) {
+      toast.error('시나리오 ID를 먼저 입력해주세요.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (isNewScenario) {
+        await createScenario(scenario);
+        setIsNewScenario(false);
+      } else {
+        await updateScenario(scenario);
+      }
+      // localStorage에도 백업
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenario));
+      toast.success('시나리오가 저장되었습니다.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSaveAndActivate = () => {
+  const handleSaveAndActivate = async () => {
+    if (!scenario.scenarioId) {
+      toast.error('시나리오 ID를 먼저 입력해주세요.');
+      return;
+    }
+
     const validationErrors = validateScenario(scenario);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
@@ -357,11 +412,26 @@ function ScenarioEditor() {
       return;
     }
 
-    const finalScenario = { ...scenario, status: '활성' as const };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalScenario));
-    setScenario(finalScenario);
-    setErrors([]);
-    toast.success('시나리오가 저장되고 활성화되었습니다.');
+    const finalScenario = { ...scenario, status: 'active' as const };
+
+    setIsSaving(true);
+    try {
+      if (isNewScenario) {
+        await createScenario(finalScenario);
+        setIsNewScenario(false);
+      } else {
+        await updateScenario(finalScenario);
+      }
+      setScenario(finalScenario);
+      setErrors([]);
+      // localStorage에도 백업
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalScenario));
+      toast.success('시나리오가 저장되고 활성화되었습니다.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // AI Generator용 컨텍스트 생성
@@ -385,6 +455,25 @@ function ScenarioEditor() {
           <div className="mb-8 flex justify-center">
             <GeminiTest />
           </div>
+
+          {/* Scenario List */}
+          <div className="mb-8">
+            <ScenarioList
+              onSelectScenario={handleSelectScenario}
+              onCreateNew={handleCreateNew}
+              currentScenarioId={scenario.scenarioId}
+            />
+          </div>
+
+          {/* Loading Overlay */}
+          {isLoadingScenario && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-zinc-500 border-t-white rounded-full animate-spin" />
+                <span className="text-white">시나리오 불러오는 중...</span>
+              </div>
+            </div>
+          )}
 
           {/* AI Scenario Generator */}
           <div className="mb-8">
@@ -429,6 +518,7 @@ function ScenarioEditor() {
           handleSaveAndActivate={handleSaveAndActivate}
           handleTempSave={handleTempSave}
           errors={errors}
+          isSaving={isSaving}
         />
       </div>
     </div>

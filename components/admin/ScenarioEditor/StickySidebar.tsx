@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Save, AlertCircle } from 'lucide-react';
+import { Save, AlertCircle, Loader2 } from 'lucide-react';
 import { ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ type Props = {
   handleSaveAndActivate: () => void;
   handleTempSave: () => void;
   errors: string[];
+  isSaving?: boolean;
 };
 
 export default function StickySidebar({
@@ -28,6 +29,7 @@ export default function StickySidebar({
   handleSaveAndActivate,
   handleTempSave,
   errors,
+  isSaving = false,
 }: Props) {
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   return (
@@ -74,17 +76,23 @@ export default function StickySidebar({
             onClick={handleSaveAndActivate}
             className="w-full bg-kairos-gold font-medium text-telos-black hover:bg-kairos-gold/90"
             size="lg"
+            disabled={isSaving}
           >
-            <Save className="mr-2 h-4 w-4" />
-            저장 및 활성화
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? '저장 중...' : '저장 및 활성화'}
           </Button>
           <Button
             onClick={handleTempSave}
             variant="outline"
             className="w-full border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
             size="lg"
+            disabled={isSaving}
           >
-            임시 저장
+            {isSaving ? '저장 중...' : '임시 저장'}
           </Button>
         </div>
 
