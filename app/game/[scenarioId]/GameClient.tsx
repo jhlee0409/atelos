@@ -281,8 +281,9 @@ const updateSaveState = (
 
       // 문자열 형식 처리 (예: "박준경-한서아:-5 (갈등 심화)")
       if (typeof change === 'string') {
-        // "이름-이름:숫자" 또는 "이름-이름:숫자 (설명)" 패턴 파싱
-        const stringMatch = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+        // "이름-이름:숫자" 또는 "이름-이름: 숫자" 또는 "이름-이름:숫자 (설명)" 패턴 파싱
+        // \s* 추가하여 콜론 뒤 공백 허용
+        const stringMatch = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
         if (stringMatch) {
           personA = normalizeName(stringMatch[1].trim());
           personB = normalizeName(stringMatch[2].trim());
@@ -466,7 +467,8 @@ const updateSaveState = (
           value: number = 0;
 
         if (typeof change === 'string') {
-          const match = change.match(/^([^-]+)-([^:]+):(-?\d+)/);
+          // \s* 추가하여 콜론 뒤 공백 허용
+          const match = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
           if (match) {
             personA = match[1].trim();
             personB = match[2].trim();

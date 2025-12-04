@@ -31,11 +31,6 @@ const splitAIMessageIntoParts = (
     return [{ type: 'ai', content, timestamp: baseTimestamp }];
   }
 
-  // 문단이 1개면 분리하지 않음
-  if (paragraphs.length === 1) {
-    return [{ type: 'ai', content: paragraphs[0], timestamp: baseTimestamp }];
-  }
-
   // 대화인지 확인 (쌍따옴표, 꺾쇠)
   const isDialogue = (text: string): boolean => {
     return (
@@ -58,19 +53,30 @@ const splitAIMessageIntoParts = (
     );
   };
 
-  return paragraphs.map((paragraph, index) => {
-    let type: 'ai-dialogue' | 'ai-thought' | 'ai-narration' = 'ai-narration';
-    if (isDialogue(paragraph)) {
-      type = 'ai-dialogue';
-    } else if (isThought(paragraph)) {
-      type = 'ai-thought';
+  // 메시지 타입 결정 함수
+  const determineType = (text: string): 'ai-dialogue' | 'ai-thought' | 'ai-narration' => {
+    if (isDialogue(text)) {
+      return 'ai-dialogue';
+    } else if (isThought(text)) {
+      return 'ai-thought';
     }
-    return {
-      type,
-      content: paragraph,
-      timestamp: baseTimestamp + index,
-    };
-  });
+    return 'ai-narration';
+  };
+
+  // 문단이 1개여도 타입을 구분
+  if (paragraphs.length === 1) {
+    return [{
+      type: determineType(paragraphs[0]),
+      content: paragraphs[0],
+      timestamp: baseTimestamp,
+    }];
+  }
+
+  return paragraphs.map((paragraph, index) => ({
+    type: determineType(paragraph),
+    content: paragraph,
+    timestamp: baseTimestamp + index,
+  }));
 };
 
 export const ChatHistory = ({ saveState }: { saveState: SaveState }) => {
