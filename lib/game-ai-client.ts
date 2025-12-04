@@ -474,6 +474,7 @@ export const generateGameResponse = async (
           ultraLite: dynamicSettings.useUltraLite,
           currentDay: saveState.context.currentDay || 1,
           includeRelationships: dynamicSettings.includeRelationships,
+          keyDecisions: saveState.keyDecisions,
         },
       );
     } else {
@@ -499,6 +500,7 @@ export const generateGameResponse = async (
           includeRelationshipTracking: aiSettings.includeRelationshipTracking,
           includeDetailedStats: aiSettings.includeDetailedStats,
           currentDay: saveState.context.currentDay || 1,
+          keyDecisions: saveState.keyDecisions,
         },
       );
     }

@@ -486,10 +486,20 @@ const updateSaveState = (
         }
 
         if (personA && personB && value !== 0) {
-          // 플레이어 관련 관계인지 확인 (normalizeName과 동일한 별칭 지원)
-          const playerAliases = ['플레이어', '리더', 'player', '나', '당신'];
-          const isPlayerName = (name: string) =>
-            playerAliases.some((alias) => name.toLowerCase().includes(alias.toLowerCase()));
+          // 플레이어 관련 관계인지 확인 (normalizeName과 동일한 로직)
+          const isPlayerName = (name: string) => {
+            const lowerName = name.toLowerCase();
+            // 서브스트링 매칭: 플레이어, 리더, player
+            if (
+              lowerName.includes('플레이어') ||
+              lowerName.includes('리더') ||
+              lowerName.includes('player')
+            ) {
+              return true;
+            }
+            // 정확한 매칭: 나, 당신 (오탐지 방지)
+            return name === '나' || name === '당신';
+          };
 
           const isPlayerRelated = isPlayerName(personA) || isPlayerName(personB);
 

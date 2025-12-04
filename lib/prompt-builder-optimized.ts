@@ -1,4 +1,4 @@
-import { ScenarioData, PlayerState, Character } from '@/types';
+import { ScenarioData, PlayerState, Character, KeyDecision } from '@/types';
 
 // ===========================================
 // 토큰 최적화 v2: 압축된 프롬프트 시스템
@@ -106,6 +106,18 @@ const getCompactNarrativeHint = (currentDay: number): string => {
 };
 
 // 메인 프롬프트 빌더 (최적화 v2)
+// 압축된 주요 결정 포맷 (토큰 최적화)
+const formatKeyDecisionsCompact = (
+  keyDecisions?: KeyDecision[],
+  maxDecisions: number = 3,
+): string => {
+  if (!keyDecisions || keyDecisions.length === 0) return '';
+  const recent = keyDecisions.slice(-maxDecisions);
+  return recent
+    .map((d) => `D${d.day}:"${d.choice.substring(0, 20)}..."→${d.consequence.substring(0, 20)}`)
+    .join('|');
+};
+
 export const buildOptimizedGamePromptV2 = (
   scenario: ScenarioData,
   playerState: PlayerState,
@@ -115,12 +127,14 @@ export const buildOptimizedGamePromptV2 = (
     ultraLite?: boolean;
     currentDay?: number;
     includeRelationships?: boolean;
+    keyDecisions?: KeyDecision[];
   } = {},
 ): GamePromptData => {
-  const { 
-    ultraLite = false, 
+  const {
+    ultraLite = false,
     currentDay = 1,
-    includeRelationships = false 
+    includeRelationships = false,
+    keyDecisions,
   } = options;
 
   // 초경량 모드
@@ -161,12 +175,16 @@ export const buildOptimizedGamePromptV2 = (
   // 서사 단계 힌트
   const narrativeHint = getCompactNarrativeHint(currentDay);
 
+  // 회상 시스템 - 주요 결정 (서사 연속성)
+  const pastDecisions = formatKeyDecisionsCompact(keyDecisions, 3);
+
   // 사용자 프롬프트 압축
   const userPrompt = `Previous: "${lastLog.substring(0, 50)}..."
 Choice: ${playerAction.actionDescription}
 ${relationshipInfo ? `Relations: ${relationshipInfo}` : ''}
+${pastDecisions ? `PastChoices: ${pastDecisions}` : ''}
 ${narrativeHint}
-Continue story with character reactions.`;
+Continue story with character reactions, referencing past choices for continuity.`;
 
   return {
     systemPrompt,
