@@ -248,22 +248,34 @@ export const cleanNarrativeFormatting = (text: string): string => {
   let cleaned = text;
 
   // 1. 스탯 수치 노출 제거 (다양한 패턴)
-  // "cityChaos 수치가 60에 달한다" → "상황이 심각하다"
+  // "'시티 카오스' 수치가 60이라니" → 제거
   // "도시 혼란도(60)" → "도시 혼란"
   // "communityCohesion이 40이다" → 제거
   const statPatterns = [
-    /cityChaos\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
-    /communityCohesion\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
-    /survivalFoundation\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다)?[^.]*[.,]?\s*/gi,
+    // 영어 스탯명 (원문)
+    /cityChaos\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    /communityCohesion\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    /survivalFoundation\s*수치가?\s*\d+[에이]?\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\s*/gi,
+    // 영어 스탯명 한국어 음역 (따옴표 포함)
+    /['']시티\s*카오스['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    /['']커뮤니티\s*코히전['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    /['']서바이벌\s*파운데이션['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
+    // 한국어 스탯명 (괄호 숫자)
     /도시\s*혼란도?\s*\(?\s*\d+\s*\)?/gi,
     /공동체\s*응집력?\s*\(?\s*\d+\s*\)?/gi,
     /생존\s*기반?\s*\(?\s*\d+\s*\)?/gi,
+    // 일반적인 "수치가 XX" 패턴 (스탯 관련 문장 전체 제거)
+    /[가-힣A-Za-z'']+\s*수치가?\s*\d+[에이]?[가이]?\s*(달한다는|달하는|이다|였다|이라니|라니)?[^.]*\./gi,
+    // 영어 스탯명 단독 (노출 방지)
     /\b(cityChaos|communityCohesion|survivalFoundation)\b/gi,
   ];
 
   for (const pattern of statPatterns) {
     cleaned = cleaned.replace(pattern, '');
   }
+
+  // 빈 문장 정리 (연속된 마침표 제거)
+  cleaned = cleaned.replace(/\.\s*\./g, '.').replace(/^\s*\./g, '');
 
   // 2. 대화 전후 줄바꿈 추가
   // 주의: ." 나 !" 패턴은 닫는 따옴표이므로 분리하지 않음 (\s+ 필수)

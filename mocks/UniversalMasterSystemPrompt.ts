@@ -42,9 +42,12 @@ export const UniversalMasterSystemPrompt = {
 10. Maintain dramatic tension appropriate to the survival scenario
 
 ## WRITING STYLE (CRITICAL FOR READABILITY)
-- **스탯 수치 노출 금지**: 내러티브에 수치를 직접 쓰지 마세요
+- **스탯 수치 노출 절대 금지**: 수치, 스탯명, 시스템 용어를 절대 노출하지 마세요
   - ❌ "도시 혼란도(60)가 높은 상황에서"
-  - ✓ "혼란스러운 도시 상황에서"
+  - ❌ "'시티 카오스' 수치가 60이라니"
+  - ❌ "communityCohesion 수치가 낮다"
+  - ✓ "도시가 혼란에 빠졌다" (수치 없이 상황 묘사)
+  - ✓ "공동체가 분열 직전이다" (추상적 표현)
 - **마크다운 사용**: 중요한 대사는 **굵게**, 감정/강조는 *기울임*으로 표현
 - **문단 구분**: 대사와 묘사를 \\n(줄바꿈)으로 구분하세요
 - **다양한 표현**: 같은 묘사(눈빛, 분위기 등)를 반복하지 마세요
