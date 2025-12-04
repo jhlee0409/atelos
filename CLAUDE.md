@@ -37,54 +37,80 @@ pnpm run lint
 
 ```
 atelos/
-├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout with providers
-│   ├── page.tsx                  # Admin/Scenario Editor (/)
-│   ├── lobby/page.tsx            # Scenario selection (/lobby)
-│   ├── scenarios/[scenarioId]/   # Scenario details pages
-│   └── game/[scenarioId]/        # Game play pages
-│       └── GameClient.tsx        # Main game client component
+├── app/                              # Next.js App Router pages
+│   ├── layout.tsx                    # Root layout with providers
+│   ├── page.tsx                      # Landing page (/)
+│   ├── admin/page.tsx                # Scenario Editor with auth (/admin)
+│   ├── lobby/page.tsx                # Scenario selection (/lobby)
+│   ├── scenarios/[scenarioId]/       # Scenario details pages
+│   │   ├── page.tsx
+│   │   └── ScenarioDetailClient.tsx
+│   ├── game/[scenarioId]/            # Game play pages
+│   │   ├── page.tsx
+│   │   └── GameClient.tsx            # Main game client component
+│   └── api/
+│       ├── gemini/route.ts           # Main AI API endpoint
+│       ├── prologue/route.ts         # Landing page demo API
+│       └── admin/auth/route.ts       # Admin authentication
 ├── components/
-│   ├── ui/                       # Radix-based UI primitives
-│   ├── lobby/                    # Lobby-specific components
-│   └── theme-provider.tsx        # Dark/light theme support
-├── lib/                          # Core business logic
-│   ├── game-ai-client.ts         # AI response generation & validation
-│   ├── gemini-client.ts          # Gemini API wrapper
-│   ├── prompt-builder.ts         # Standard prompt construction
-│   ├── prompt-builder-optimized.ts # Token-optimized prompts (v2)
-│   ├── ending-checker.ts         # Ending condition evaluation
-│   ├── game-builder.ts           # Initial game state & fallbacks
-│   ├── chat-history-manager.ts   # Chat history compression
-│   ├── simulation-utils.ts       # Stat calculations & dilemmas
-│   ├── validations.ts            # Form validation schemas
-│   └── utils.ts                  # General utilities (cn, etc.)
-├── pages/                        # Legacy component organization
-│   ├── admin/ScenarioEditor/     # Scenario editor components
-│   └── client/GameClient/        # Game UI components
-│       ├── ChoiceButtons.tsx     # Player choice interface
-│       ├── ChatHistory.tsx       # Message history display
-│       ├── ChatMessage.tsx       # Individual message component
-│       ├── StatsBar.tsx          # Compact stat display
-│       └── StatDisplay.tsx       # Detailed stat visualization
+│   ├── ui/                           # Radix-based UI primitives (50+ components)
+│   ├── client/GameClient/            # Game UI components
+│   │   ├── ChatHistory.tsx           # Message history display
+│   │   ├── ChatMessage.tsx           # Individual message component
+│   │   ├── ChoiceButtons.tsx         # Player choice interface
+│   │   ├── StatsBar.tsx              # Compact stat display
+│   │   ├── StatDisplay.tsx           # Detailed stat visualization
+│   │   ├── CharacterArcPanel.tsx     # Character mood/trust display
+│   │   └── RouteIndicator.tsx        # Narrative route tracker
+│   ├── admin/ScenarioEditor/         # Scenario editor components
+│   │   ├── BaseContent.tsx           # Basic scenario info
+│   │   ├── CharacterContent.tsx      # Character management
+│   │   ├── SystemRulesContent.tsx    # Stats, flags, endings
+│   │   ├── CoreStoryElementsContent.tsx
+│   │   ├── ScenarioHeader.tsx
+│   │   └── StickySidebar.tsx
+│   ├── landing/                      # Landing page components
+│   │   ├── Hero.tsx                  # Hero section
+│   │   ├── Features.tsx              # Feature highlights
+│   │   ├── Gameplay.tsx              # Gameplay explanation
+│   │   ├── Endings.tsx               # Ending showcase
+│   │   ├── PrologueDemo.tsx          # Interactive AI demo
+│   │   ├── CallToAction.tsx
+│   │   ├── Navigation.tsx
+│   │   └── Footer.tsx
+│   └── theme-provider.tsx            # Dark/light theme support
+├── lib/                              # Core business logic
+│   ├── game-ai-client.ts             # AI response generation & validation
+│   ├── gemini-client.ts              # Gemini API wrapper
+│   ├── prompt-builder.ts             # Standard prompt construction
+│   ├── prompt-builder-optimized.ts   # Token-optimized prompts (v2)
+│   ├── ending-checker.ts             # Ending condition evaluation
+│   ├── game-builder.ts               # Initial game state & fallbacks
+│   ├── chat-history-manager.ts       # Chat history compression
+│   ├── simulation-utils.ts           # Stat calculations & dilemmas
+│   ├── validations.ts                # Form validation schemas
+│   └── utils.ts                      # General utilities (cn, etc.)
 ├── constants/
-│   ├── korean-english-mapping.ts # i18n mappings for stats/flags/roles
-│   ├── comparison-operators.ts   # Condition evaluation operators
-│   └── scenario.ts               # Scenario constants
+│   ├── korean-english-mapping.ts     # i18n mappings for stats/flags/roles
+│   ├── comparison-operators.ts       # Condition evaluation operators
+│   └── scenario.ts                   # Scenario constants
 ├── types/
-│   └── index.ts                  # All TypeScript type definitions
+│   └── index.ts                      # All TypeScript type definitions
 ├── mocks/
-│   └── ZERO_HOUR.json            # Test scenario data
+│   ├── ZERO_HOUR.json                # Test scenario data
+│   ├── UniversalMasterSystemPrompt.ts
+│   └── index.ts                      # Scenario data exports
 └── hooks/
-    └── use-mobile.tsx            # Mobile detection hook
+    └── use-mobile.tsx                # Mobile detection hook
 ```
 
 ## High-Level Architecture
 
 ### Core Application Flow
 
-1. **Scenario Selection** (`/lobby`) → **Scenario Details** (`/scenarios/[id]`) → **Game Play** (`/game/[id]`)
-2. **Admin Interface** (`/`) - Scenario editor for creating/editing game content
+1. **Landing Page** (`/`) → Marketing & interactive prologue demo
+2. **Scenario Selection** (`/lobby`) → **Scenario Details** (`/scenarios/[id]`) → **Game Play** (`/game/[id]`)
+3. **Admin Interface** (`/admin`) - Password-protected scenario editor
 
 ### Key System Components
 
@@ -97,6 +123,8 @@ Core types that define the game:
 - `AIResponse`: Structure of AI-generated content (log, dilemma, stat changes)
 - `EndingArchetype`: Ending conditions and descriptions
 - `SystemCondition`: Stat/flag/survivor conditions for endings
+- `CharacterArc`: Character mood and trust tracking
+- `KeyDecision`: Player decision history for flashback system
 
 #### Game State Management
 
@@ -104,7 +132,19 @@ Core types that define the game:
 - **Flags**: Boolean or count-based event tracking
 - **Relationships**: Character relationship values with signed numeric values
 - **Time System**: Day-based progression (7-day scenarios)
-- **Chat History**: Full message history for context and display
+- **Chat History**: Full message history with multiple message types
+- **Character Arcs**: Track character moods and trust levels
+- **Route Tracking**: Determine narrative path (탈출/항전/협상)
+
+#### Chat Message Types
+
+The game supports multiple message types for rich narrative display:
+- `system`: System notifications and day changes
+- `player`: Player choices
+- `ai`: General AI narrative responses
+- `ai-dialogue`: Character dialogue (with quote styling)
+- `ai-thought`: Internal monologue/thoughts (italic styling)
+- `ai-narration`: Scene descriptions (minimal styling)
 
 #### AI Integration (`lib/game-ai-client.ts`)
 
@@ -114,6 +154,7 @@ Key functions:
 - `validateGameResponse()`: Response structure validation
 - `cleanAndValidateAIResponse()`: Korean language quality validation
 - `getOptimalAISettings()`: Adaptive settings based on game phase
+- `createPlayerAction()`: Create player action objects
 
 Language validation features:
 - Detects and removes Arabic, Thai, Hindi, Cyrillic characters
@@ -143,18 +184,34 @@ Token optimization strategy:
 - Time limit ending triggers after Day 7 (ENDING_TIME_UP)
 - Falls back to default "결단의 시간" ending if no conditions met
 
+#### Route System (`RouteIndicator.tsx`)
+
+Determines narrative path based on flags:
+- **탈출 (Escape)**: FLAG_ESCAPE_VEHICLE_SECURED, FLAG_LEADER_SACRIFICE
+- **항전 (Defense)**: FLAG_DEFENSES_COMPLETE, FLAG_RESOURCE_MONOPOLY, FLAG_IDEOLOGY_ESTABLISHED
+- **협상 (Negotiation)**: FLAG_ALLY_NETWORK_FORMED, FLAG_GOVERNMENT_CONTACT, FLAG_UNDERGROUND_HIDEOUT
+
+Route is "미정" (undetermined) until Day 3, then calculated based on accumulated flag scores.
+
+#### Character Arc System (`CharacterArcPanel.tsx`)
+
+Tracks character development throughout the game:
+- **Moods**: hopeful, anxious, angry, resigned, determined
+- **Trust Level**: -100 to 100, displayed via border colors
+- **Moments**: Events that shape character development
+
 ### Component Architecture
 
 #### GameClient.tsx (Main Game Component)
 
 State management:
-- `saveState`: Complete game state
+- `saveState`: Complete game state (includes character arcs, key decisions)
 - `isLoading` / `isInitialDilemmaLoading`: Loading states
 - `triggeredEnding`: Active ending state
 - `languageWarning`: AI language issue notifications
 
 Key functions:
-- `createInitialSaveState()`: Initialize game from scenario
+- `createInitialSaveState()`: Initialize game from scenario with character arcs
 - `updateSaveState()`: Apply AI response changes with stat amplification
 - `handlePlayerChoice()`: Process player selection and call AI
 
@@ -166,8 +223,27 @@ Key functions:
 4. Player makes choice → `handlePlayerChoice()` called
 5. AI generates narrative via `generateGameResponse()`
 6. State updates with amplified stat changes
-7. Ending conditions checked (Day 5+)
-8. Game continues until ending triggered
+7. Route indicator updates based on flags
+8. Ending conditions checked (Day 5+)
+9. Game continues until ending triggered
+
+### API Routes
+
+#### `/api/gemini` (POST)
+Main AI endpoint for game responses. Handles:
+- Game narrative generation
+- Stat change calculations
+- Character interactions
+
+#### `/api/prologue` (POST)
+Landing page demo endpoint. Generates a short prologue based on an item the player specifies.
+- Input: `{ item: string }`
+- Output: `{ prologue: string }`
+
+#### `/api/admin/auth` (POST)
+Admin authentication endpoint.
+- Input: `{ password: string }`
+- Validates against `ADMIN_PASSWORD` env variable
 
 ## Language Considerations
 
@@ -185,7 +261,10 @@ Korean is the primary user-facing language with English internal identifiers.
 Utility functions:
 - `getStatIdByKorean()`: Reverse lookup for Korean → English
 - `getKoreanStatName()`: Forward lookup English → Korean
-- Similar for flags, roles, traits, status
+- `getKoreanFlagName()`: Forward lookup with FLAG_ prefix handling
+- `getKoreanRoleName()`, `getKoreanTraitName()`, `getKoreanStatusName()`
+- `isValidStatId()`, `isValidFlagId()`: Type guard validation functions
+- `getAllStatIds()`, `getAllFlagIds()`: Get all available IDs
 
 ## Development Patterns
 
@@ -234,6 +313,14 @@ Prompt includes:
    - `survivor_count`: { comparison, value }
 3. Set `isGoalSuccess` boolean for success/failure classification
 
+### Adding New Flags
+
+1. Add to scenario's `flagDictionary` array
+2. Define `flagName`, `description`, `type` (boolean/count), `initial`
+3. Optionally add `triggerCondition` for AI guidance
+4. Add to `FLAG_MAPPING` in `constants/korean-english-mapping.ts`
+5. If route-related, update `RouteIndicator.tsx` score calculations
+
 ### Testing Scenarios
 
 Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
@@ -248,9 +335,10 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 
 ## Environment Setup
 
-Required environment variable:
+Required environment variables:
 ```
 GOOGLE_GEMINI_API_KEY=your-gemini-api-key
+ADMIN_PASSWORD=your-admin-password  # For /admin route protection
 ```
 
 **Note**: The API key is only used server-side via `/api/gemini` route and is never exposed to the client.
@@ -277,6 +365,20 @@ From `next.config.mjs`:
   - 🎉 Endings
   - ⚠️/❌ Warnings/errors
 
+### Component Naming
+
+- Game components: `components/client/GameClient/`
+- Admin components: `components/admin/ScenarioEditor/`
+- Landing page: `components/landing/`
+- UI primitives: `components/ui/`
+
+### CSS Classes
+
+Custom colors defined in `tailwind.config.ts`:
+- `telos-black`: Primary dark background
+- `red-900`, `red-950`: Accent colors for warnings/urgency
+- `zinc-*`: Neutral grays for UI elements
+
 ## Common Debugging
 
 ### AI Response Issues
@@ -286,10 +388,25 @@ From `next.config.mjs`:
 
 ### Stat Not Updating
 1. Verify stat ID matches `scenarioStats` definition
-2. Check `mapStatNameToId()` mapping in `updateSaveState()`
+2. Check mapping in `korean-english-mapping.ts`
 3. Verify amplification isn't clamping to bounds
 
 ### Ending Not Triggering
 1. Confirm Day >= 5 (endings only check after Day 5)
 2. Log `checkEndingConditions()` output
 3. Verify all `systemConditions` are satisfiable
+
+### Route Not Displaying Correctly
+1. Check flag acquisition in game state
+2. Verify flag names match exactly (with FLAG_ prefix)
+3. Check `RouteIndicator.tsx` score calculation logic
+
+### Character Arc Issues
+1. Verify `characterArcs` is initialized in `createInitialSaveState()`
+2. Check AI response includes character updates
+3. Verify character names match between scenario and arcs
+
+### Admin Access Issues
+1. Check `ADMIN_PASSWORD` environment variable is set
+2. Clear sessionStorage if stuck (`sessionStorage.removeItem('atelos_admin_auth')`)
+3. Verify `/api/admin/auth` endpoint is responding
