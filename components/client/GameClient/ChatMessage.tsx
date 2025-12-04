@@ -70,7 +70,7 @@ export const ChatMessage = ({
   isLatest = false,
 }: {
   message: {
-    type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-narration';
+    type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-thought' | 'ai-narration';
     content: string;
     timestamp: number;
   };
@@ -129,6 +129,16 @@ export const ChatMessage = ({
           label: '',
           showLabel: false,
         };
+      case 'ai-thought':
+        // 독백/생각 말풍선 - 은은한 색상, 이탤릭 스타일
+        return {
+          container: 'flex justify-start mb-2',
+          bubble:
+            'bg-gradient-to-r from-slate-600/80 to-slate-500/80 text-slate-100 px-4 py-3 rounded-2xl rounded-bl-none max-w-lg shadow-sm border-l-4 border-slate-400/50 italic',
+          icon: MessageCircle,
+          label: '',
+          showLabel: false,
+        };
       case 'ai-narration':
         // 서술 말풍선 - 어두운 색상, 간결한 스타일
         return {
@@ -176,6 +186,11 @@ export const ChatMessage = ({
               <span className="italic">
                 {renderInlineMarkdown(sanitizedContent, 'dlg')}
               </span>
+            </div>
+          ) : message.type === 'ai-thought' ? (
+            <div className="flex items-start gap-2">
+              <MessageCircle className="mt-0.5 h-4 w-4 flex-shrink-0 opacity-50" />
+              <span>{renderInlineMarkdown(sanitizedContent, 'tht')}</span>
             </div>
           ) : (
             <span>{renderInlineMarkdown(sanitizedContent, 'msg')}</span>
