@@ -89,7 +89,7 @@ function ScenarioCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-semibold text-lg group-hover:text-white transition-colors">
+                  <h3 className="font-semibold text-lg text-zinc-100 group-hover:text-white transition-colors">
                     {scenario.title || '(제목 없음)'}
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1">
@@ -205,7 +205,7 @@ export function ScenarioListPage() {
   };
 
   return (
-    <div className="min-h-screen bg-telos-black">
+    <div className="min-h-screen bg-telos-black dark">
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* 헤더 */}
         <div className="mb-8">

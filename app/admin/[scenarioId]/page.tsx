@@ -51,13 +51,13 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-telos-black">
-      <div className="w-full max-w-md border border-zinc-800 bg-zinc-900/50 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-telos-black dark">
+      <div className="w-full max-w-md border border-zinc-800 bg-zinc-900/50 p-8 rounded-lg">
         <div className="mb-8 text-center">
           <h1 className="mb-2 font-serif text-3xl font-bold text-white">
             ADMIN
           </h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-400">
             관리자 비밀번호를 입력하세요
           </p>
         </div>
@@ -69,13 +69,13 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="비밀번호"
-              className="w-full border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-red-900 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-red-900 focus:outline-none"
               autoFocus
             />
           </div>
 
           {error && (
-            <div className="border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400">
+            <div className="rounded-md border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400">
               {error}
             </div>
           )}
@@ -83,7 +83,7 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
           <button
             type="submit"
             disabled={isLoading || !password}
-            className="w-full bg-red-900 py-3 font-medium text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-md bg-red-900 py-3 font-medium text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? '확인 중...' : '접속'}
           </button>
@@ -198,8 +198,8 @@ function ScenarioDetailContent() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-telos-black">
-        <div className="flex items-center gap-3 text-zinc-500">
+      <div className="flex min-h-screen items-center justify-center bg-telos-black dark">
+        <div className="flex items-center gap-3 text-zinc-400">
           <Loader2 className="h-6 w-6 animate-spin" />
           시나리오 불러오는 중...
         </div>
@@ -209,10 +209,10 @@ function ScenarioDetailContent() {
 
   if (error || !scenario) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-telos-black">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-telos-black dark">
         <p className="mb-4 text-red-400">{error || '시나리오를 찾을 수 없습니다.'}</p>
         <Link href="/admin">
-          <Button variant="outline">
+          <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
             <ArrowLeft className="mr-2 h-4 w-4" />
             목록으로 돌아가기
           </Button>
@@ -295,8 +295,8 @@ export default function ScenarioDetailPage() {
 
   if (isAuthenticated === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-telos-black">
-        <div className="text-zinc-500">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-telos-black dark">
+        <div className="text-zinc-400">Loading...</div>
       </div>
     );
   }

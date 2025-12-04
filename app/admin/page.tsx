@@ -39,13 +39,13 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-telos-black">
-      <div className="w-full max-w-md border border-zinc-800 bg-zinc-900/50 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-telos-black dark">
+      <div className="w-full max-w-md border border-zinc-800 bg-zinc-900/50 p-8 rounded-lg">
         <div className="mb-8 text-center">
           <h1 className="mb-2 font-serif text-3xl font-bold text-white">
             ADMIN
           </h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-400">
             관리자 비밀번호를 입력하세요
           </p>
         </div>
@@ -57,13 +57,13 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="비밀번호"
-              className="w-full border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-red-900 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-red-900 focus:outline-none"
               autoFocus
             />
           </div>
 
           {error && (
-            <div className="border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400">
+            <div className="rounded-md border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400">
               {error}
             </div>
           )}
@@ -71,7 +71,7 @@ function AdminLogin({ onAuthenticated }: { onAuthenticated: () => void }) {
           <button
             type="submit"
             disabled={isLoading || !password}
-            className="w-full bg-red-900 py-3 font-medium text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-md bg-red-900 py-3 font-medium text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? '확인 중...' : '접속'}
           </button>
@@ -91,8 +91,8 @@ export default function AdminPage() {
 
   if (isAuthenticated === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-telos-black">
-        <div className="text-zinc-500">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-telos-black dark">
+        <div className="text-zinc-400">Loading...</div>
       </div>
     );
   }
