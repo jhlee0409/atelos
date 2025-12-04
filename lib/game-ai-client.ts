@@ -265,14 +265,14 @@ export const cleanNarrativeFormatting = (text: string): string => {
     cleaned = cleaned.replace(pattern, '');
   }
 
-  // 2. 대화 전 줄바꿈 추가 (따옴표로 시작하는 대사)
-  // "안녕" 이 바로 붙어있으면 앞에 줄바꿈 추가
+  // 2. 대화 전후 줄바꿈 추가
+  // 주의: ." 나 !" 패턴은 닫는 따옴표이므로 분리하지 않음 (\s+ 필수)
   cleaned = cleaned
-    // 문장 끝(. ! ?) 바로 뒤에 따옴표가 오면 줄바꿈
-    .replace(/([.!?])\s*"/g, '$1\n\n"')
-    .replace(/([.!?])\s*"/g, '$1\n\n"')
-    .replace(/([.!?])\s*「/g, '$1\n\n「')
-    // 따옴표로 끝나는 대사 뒤에 서술이 오면 줄바꿈
+    // 문장 끝 + 공백 + 여는 따옴표 → 줄바꿈 (공백이 있어야 새 대사)
+    .replace(/([.!?])\s+"/g, '$1\n\n"')
+    .replace(/([.!?])\s+"/g, '$1\n\n"')
+    .replace(/([.!?])\s+「/g, '$1\n\n「')
+    // 닫는 따옴표 + 공백 + 한글 서술 → 줄바꿈
     .replace(/"\s+([가-힣])/g, '"\n\n$1')
     .replace(/"\s+([가-힣])/g, '"\n\n$1')
     .replace(/」\s+([가-힣])/g, '」\n\n$1');
