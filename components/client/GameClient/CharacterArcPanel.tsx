@@ -12,8 +12,8 @@ const MOOD_EMOJI: Record<string, string> = {
 // 신뢰도에 따른 색상
 const getTrustColor = (trustLevel: number): string => {
   if (trustLevel >= 30) return 'border-green-500/50';
-  if (trustLevel >= -30) return 'border-gray-600/50';
-  return 'border-red-500/50';
+  if (trustLevel >= -30) return 'border-zinc-700';
+  return 'border-red-900/50';
 };
 
 export const CharacterArcPanel = ({
@@ -31,7 +31,7 @@ export const CharacterArcPanel = ({
   if (isCompact) {
     return (
       <div className="flex items-center gap-1">
-        <span className="text-xs text-gray-500">생존자</span>
+        <span className="text-xs text-zinc-600">생존자</span>
         <div className="flex gap-0.5">
           {characterArcs.slice(0, 5).map((arc) => (
             <span
@@ -53,10 +53,10 @@ export const CharacterArcPanel = ({
       {characterArcs.map((arc) => (
         <div
           key={arc.characterName}
-          className={`flex items-center gap-1.5 rounded-full border bg-gray-800/30 px-2.5 py-1 ${getTrustColor(arc.trustLevel)}`}
+          className={`flex items-center gap-1.5 border bg-zinc-900/30 px-2.5 py-1 ${getTrustColor(arc.trustLevel)}`}
         >
           <span className="text-sm">{MOOD_EMOJI[arc.currentMood]}</span>
-          <span className="text-xs text-gray-300">{arc.characterName}</span>
+          <span className="text-xs text-zinc-400">{arc.characterName}</span>
         </div>
       ))}
     </div>

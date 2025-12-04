@@ -983,12 +983,25 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   if (triggeredEnding) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black text-white">
-        <div className="mx-auto max-w-2xl rounded-lg bg-gray-900 p-8 text-center shadow-2xl">
-          <h1 className="mb-4 text-4xl font-bold text-red-500">
+      <div className="flex min-h-screen w-full items-center justify-center bg-telos-black text-zinc-100">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent" />
+        <div className="relative z-10 mx-auto max-w-2xl border border-zinc-800 bg-zinc-900/50 p-12 text-center backdrop-blur-sm">
+          <span className="mb-6 inline-block border border-red-900/50 bg-red-950/30 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-red-500">
+            {triggeredEnding.isGoalSuccess ? 'Mission Complete' : 'Game Over'}
+          </span>
+          <h1 className="mb-6 font-serif text-4xl font-bold text-white md:text-5xl">
             {triggeredEnding.title}
           </h1>
-          <p className="text-lg text-gray-300">{triggeredEnding.description}</p>
+          <div className="mx-auto mb-8 h-1 w-20 bg-red-900" />
+          <p className="text-lg leading-relaxed text-zinc-400">
+            {triggeredEnding.description}
+          </p>
+          <a
+            href="/lobby"
+            className="mt-10 inline-block border border-red-700 bg-red-900 px-8 py-3 font-bold text-white shadow-[0_0_15px_rgba(127,29,29,0.5)] transition-all duration-300 hover:-translate-y-1 hover:bg-red-800"
+          >
+            로비로 돌아가기
+          </a>
         </div>
       </div>
     );
@@ -1000,11 +1013,11 @@ export default function GameClient({ scenario }: GameClientProps) {
   );
 
   return (
-    <div className="flex h-screen w-full flex-col bg-black text-white">
+    <div className="flex h-screen w-full flex-col bg-telos-black text-zinc-100">
       {/* Language Warning Banner */}
       {languageWarning && (
-        <div className="bg-yellow-600 px-4 py-2 text-center text-sm text-white">
-          🌐 {languageWarning}
+        <div className="border-b border-red-900/50 bg-red-950/30 px-4 py-2 text-center text-sm text-red-400">
+          {languageWarning}
         </div>
       )}
 

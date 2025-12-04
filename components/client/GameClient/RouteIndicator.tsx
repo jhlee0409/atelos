@@ -29,7 +29,7 @@ const determineRoute = (saveState: SaveState): RouteInfo => {
       type: '미정',
       label: '이야기가 시작됩니다',
       icon: <Compass className="h-4 w-4" />,
-      color: 'text-gray-400',
+      color: 'text-zinc-500',
     };
   }
 
@@ -41,7 +41,7 @@ const determineRoute = (saveState: SaveState): RouteInfo => {
       type: '미정',
       label: '운명의 갈림길',
       icon: <Compass className="h-4 w-4" />,
-      color: 'text-yellow-400',
+      color: 'text-red-400',
     };
   }
 
@@ -117,20 +117,24 @@ export const RouteIndicator = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={routeInfo.color}>{routeInfo.icon}</span>
-          <span className="text-xs text-gray-300">{routeInfo.label}</span>
+          <span className="text-xs text-zinc-400">{routeInfo.label}</span>
         </div>
-        <span className="text-xs text-gray-500">Day {currentDay}</span>
+        <span className="border border-red-900/50 bg-red-950/30 px-2 py-0.5 text-xs font-bold text-red-500">
+          Day {currentDay}
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg bg-gray-800/30 px-3 py-2">
+    <div className="flex items-center justify-between border border-zinc-800 bg-zinc-900/30 px-3 py-2">
       <div className="flex items-center gap-2">
         <span className={routeInfo.color}>{routeInfo.icon}</span>
         <span className={`text-sm ${routeInfo.color}`}>{routeInfo.label}</span>
       </div>
-      <span className="text-sm text-gray-400">Day {currentDay}/7</span>
+      <span className="border border-red-900/50 bg-red-950/30 px-2 py-0.5 text-xs font-bold text-red-500">
+        Day {currentDay}/7
+      </span>
     </div>
   );
 };
