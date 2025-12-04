@@ -1,5 +1,9 @@
 import { ScenarioData, PlayerState, Character } from '@/types';
 import { UniversalMasterSystemPrompt } from '@/mocks/UniversalMasterSystemPrompt';
+import {
+  formatGenreStyleForPrompt,
+  getNarrativeStyleFromGenres,
+} from './genre-narrative-styles';
 
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
@@ -256,6 +260,15 @@ const buildLitePrompt = (
   const narrativePhase = getNarrativePhase(currentDay);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
 
+  // 장르별 서사 스타일 가져오기
+  const genreStyle = getNarrativeStyleFromGenres(scenario.genre || []);
+  const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
+    includeDialogue: true,
+    includePacing: true,
+    includeDilemmas: true,
+    includeWritingTechniques: false, // 토큰 절약
+  });
+
   // 회상 시스템 - 주요 결정 포맷팅
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
     options.keyDecisions,
@@ -381,6 +394,8 @@ FLAG ACQUISITION RULES (grant flag when condition is met):
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
+${genreGuide}
+
 ${phaseGuideline}
 ${keyDecisionsSection}`;
 
@@ -426,6 +441,14 @@ const buildFullPrompt = (
   const currentDay = options.currentDay || 1;
   const narrativePhase = getNarrativePhase(currentDay);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
+
+  // 장르별 서사 스타일 (전체 포함)
+  const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
+    includeDialogue: true,
+    includePacing: true,
+    includeDilemmas: true,
+    includeWritingTechniques: true,
+  });
 
   // 회상 시스템 - 주요 결정 포맷팅 (풀 모드에서는 5개까지)
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
@@ -537,13 +560,15 @@ const buildFullPrompt = (
 
 위의 직전 상황 결과를 바탕으로, 다음 이야기를 전개해주세요.
 
+${genreGuide}
+
 ${phaseGuideline}
 ${keyDecisionsSection}`;
 
   return {
     systemPrompt,
     userPrompt,
-    estimatedTokens: 2000,
+    estimatedTokens: 2500,
   };
 };
 
@@ -600,6 +625,14 @@ export const buildInitialDilemmaPrompt = (
   // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다.
   const npcs = characters.filter((char) => char.characterName !== '(플레이어)');
 
+  // 장르별 서사 스타일
+  const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
+    includeDialogue: true,
+    includePacing: true,
+    includeDilemmas: true,
+    includeWritingTechniques: true,
+  });
+
   // 캐릭터 정보 구성 (Character Bible 형식)
   const characterBible = npcs
     .map((char) => {
@@ -629,6 +662,8 @@ export const buildInitialDilemmaPrompt = (
     .replace('{{SURVIVOR_COUNT}}', scenario.characters.length.toString());
 
   return `${initialPrompt}
+
+${genreGuide}
 
 ### INITIAL DILEMMA GENERATION TASK ###
 Generate the very first dilemma for Day 1 of this scenario. This should establish the immediate crisis and force the player to make their first critical decision.
