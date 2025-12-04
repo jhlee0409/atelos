@@ -15,6 +15,7 @@ import { getScenarioData } from '@/mocks';
 import GeminiTest from '@/components/ui/gemini-test';
 import AIScenarioGenerator from '@/components/admin/AIScenarioGenerator';
 import ScenarioList from '@/components/admin/ScenarioList';
+import ScenarioWizard from '@/components/admin/ScenarioWizard';
 import {
   fetchScenario,
   createScenario,
@@ -132,10 +133,12 @@ function ScenarioEditor() {
   const [isNewScenario, setIsNewScenario] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingScenario, setIsLoadingScenario] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   // 시나리오 선택 핸들러
   const handleSelectScenario = useCallback(async (scenarioId: string) => {
     setIsLoadingScenario(true);
+    setShowWizard(false);
     try {
       const response = await fetchScenario(scenarioId);
       setScenario(response.scenario);
@@ -149,12 +152,26 @@ function ScenarioEditor() {
     }
   }, []);
 
-  // 새 시나리오 생성 핸들러
+  // 새 시나리오 생성 핸들러 - 위저드 열기
   const handleCreateNew = useCallback(() => {
-    setScenario(createEmptyScenario());
+    setShowWizard(true);
+  }, []);
+
+  // 위저드 완료 핸들러
+  const handleWizardComplete = useCallback((generatedScenario: Partial<ScenarioData>) => {
+    setScenario((prev) => ({
+      ...prev,
+      ...generatedScenario,
+    }));
     setIsNewScenario(true);
+    setShowWizard(false);
     setErrors([]);
-    toast.info('새 시나리오를 작성하세요.');
+    toast.success('시나리오가 생성되었습니다. 세부 내용을 수정하고 저장하세요.');
+  }, []);
+
+  // 위저드 취소 핸들러
+  const handleWizardCancel = useCallback(() => {
+    setShowWizard(false);
   }, []);
 
   // AI 생성 결과를 시나리오에 적용하는 핸들러
@@ -475,15 +492,28 @@ function ScenarioEditor() {
             </div>
           )}
 
-          {/* AI Scenario Generator */}
-          <div className="mb-8">
-            <AIScenarioGenerator
-              context={aiContext}
-              onApply={handleAIApply}
-            />
-          </div>
+          {/* Scenario Wizard - 새 시나리오 생성 시 표시 */}
+          {showWizard && (
+            <div className="mb-8">
+              <ScenarioWizard
+                onComplete={handleWizardComplete}
+                onCancel={handleWizardCancel}
+              />
+            </div>
+          )}
 
-          <div className="space-y-8">
+          {/* 위저드가 닫혀있을 때만 에디터 표시 */}
+          {!showWizard && (
+            <>
+              {/* AI Scenario Generator */}
+              <div className="mb-8">
+                <AIScenarioGenerator
+                  context={aiContext}
+                  onApply={handleAIApply}
+                />
+              </div>
+
+              <div className="space-y-8">
             {/* Section 1: 시나리오 기본 정보 */}
             <BaseContent
               scenario={scenario}
@@ -508,7 +538,9 @@ function ScenarioEditor() {
               setScenario={setScenario}
               errors={errors}
             />
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Sticky Sidebar */}
