@@ -76,8 +76,24 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ['Playfair Display', 'serif'],
-        sans: ['Inter', 'sans-serif'],
+        // Display/Heading - dramatic serif for cinematic feel
+        serif: [
+          'var(--font-cormorant)',
+          'var(--font-noto-serif-kr)',
+          'Georgia',
+          'serif',
+        ],
+        // Body/UI - clean sans-serif for readability
+        sans: [
+          'Pretendard Variable',
+          'Pretendard',
+          'var(--font-noto-sans-kr)',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'system-ui',
+          'Roboto',
+          'sans-serif',
+        ],
       },
       borderRadius: {
         lg: 'var(--radius)',
