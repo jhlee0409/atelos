@@ -104,9 +104,9 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       })),
       hiddenRelationships,
     },
-    log:
-      `[Day 1] ${scenario.synopsis}` ||
-      '게임이 시작되었습니다. 첫 번째 선택을 내려주세요.',
+    log: scenario.synopsis
+      ? `[Day 1] ${scenario.synopsis}`
+      : '게임이 시작되었습니다. 첫 번째 선택을 내려주세요.',
     chatHistory: [], // 새 게임 시 채팅 기록 초기화
     dilemma: {
       prompt: '... 로딩 중 ...',
