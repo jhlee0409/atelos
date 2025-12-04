@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Bell, User, Drama, Sunrise, MessageCircle } from 'lucide-react';
+import { Bell, User, Drama, Sunrise, MessageCircle, Quote } from 'lucide-react';
 import React from 'react';
 
 /**
@@ -16,51 +16,38 @@ const sanitizeContent = (content: string): string => {
 };
 
 /**
- * 이스케이프된 줄바꿈을 실제 줄바꿈으로 변환
- */
-const normalizeLineBreaks = (content: string): string => {
-  return content
-    .replace(/\\n/g, '\n') // 이스케이프된 \n을 실제 줄바꿈으로
-    .replace(/\r\n/g, '\n') // Windows 줄바꿈 정규화
-    .replace(/\n{3,}/g, '\n\n'); // 3개 이상 줄바꿈은 2개로
-};
-
-/**
  * 마크다운 인라인 요소를 React 요소로 변환
  * 지원: **bold**, *italic*, ***bold italic***
  */
-const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[] => {
+const renderInlineMarkdown = (
+  text: string,
+  keyPrefix: string,
+): React.ReactNode[] => {
   const result: React.ReactNode[] = [];
   let key = 0;
 
-  // 마크다운 패턴: ***bold italic***, **bold**, *italic*
   const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*)/g;
   let lastIndex = 0;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
-    // 매치 전 일반 텍스트
     if (match.index > lastIndex) {
       result.push(text.slice(lastIndex, match.index));
     }
 
-    // 매치된 마크다운 처리
     if (match[2]) {
-      // ***bold italic***
       result.push(
         <strong key={`${keyPrefix}-${key++}`} className="font-bold italic">
           {match[2]}
         </strong>,
       );
     } else if (match[3]) {
-      // **bold**
       result.push(
         <strong key={`${keyPrefix}-${key++}`} className="font-bold">
           {match[3]}
         </strong>,
       );
     } else if (match[4]) {
-      // *italic*
       result.push(
         <em key={`${keyPrefix}-${key++}`} className="italic opacity-90">
           {match[4]}
@@ -71,7 +58,6 @@ const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[
     lastIndex = regex.lastIndex;
   }
 
-  // 남은 텍스트
   if (lastIndex < text.length) {
     result.push(text.slice(lastIndex));
   }
@@ -79,53 +65,12 @@ const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[
   return result.length > 0 ? result : [text];
 };
 
-/**
- * 문단 단위로 분리하여 렌더링
- * 대화형 소설처럼 각 문단이 시각적으로 구분되도록 처리
- */
-const renderParagraphs = (content: string): React.ReactNode[] => {
-  const sanitized = sanitizeContent(content);
-  const normalized = normalizeLineBreaks(sanitized);
-
-  // 빈 줄(두 개 이상의 줄바꿈) 또는 단일 줄바꿈으로 문단 분리
-  const paragraphs = normalized
-    .split(/\n+/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-
-  if (paragraphs.length === 0) {
-    return [normalized];
-  }
-
-  return paragraphs.map((paragraph, index) => {
-    // 대사인지 확인 (따옴표로 시작하거나 **로 시작하는 대사)
-    const isDialogue =
-      paragraph.startsWith('"') ||
-      paragraph.startsWith('"') ||
-      paragraph.startsWith('「') ||
-      paragraph.startsWith('**"') ||
-      paragraph.startsWith('**"');
-
-    return (
-      <p
-        key={index}
-        className={cn(
-          'mb-2 last:mb-0',
-          isDialogue && 'pl-2 border-l-2 border-white/20',
-        )}
-      >
-        {renderInlineMarkdown(paragraph, `p${index}`)}
-      </p>
-    );
-  });
-};
-
 export const ChatMessage = ({
   message,
   isLatest = false,
 }: {
   message: {
-    type: 'system' | 'player' | 'ai';
+    type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-narration';
     content: string;
     timestamp: number;
   };
@@ -134,7 +79,6 @@ export const ChatMessage = ({
   const getMessageStyle = () => {
     switch (message.type) {
       case 'system':
-        // Day 변경 메시지인지 확인
         const isDayChange =
           message.content.includes('Day') && message.content.includes('시작');
 
@@ -145,6 +89,7 @@ export const ChatMessage = ({
               'bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur-sm text-white px-6 py-3 rounded-full border border-purple-500/30 shadow-lg',
             icon: Sunrise,
             label: '',
+            showLabel: false,
           };
         } else {
           return {
@@ -153,23 +98,46 @@ export const ChatMessage = ({
               'bg-gray-800/60 backdrop-blur-sm text-gray-300 px-4 py-2 rounded-lg text-sm border border-gray-600/30',
             icon: Bell,
             label: '',
+            showLabel: false,
           };
         }
       case 'player':
         return {
           container: 'flex justify-end mb-4',
           bubble:
-            'bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-3 rounded-2xl rounded-br-none max-w-md shadow-lg relative',
+            'bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-3 rounded-2xl rounded-br-none max-w-md shadow-lg',
           icon: User,
           label: '나의 선택',
+          showLabel: true,
         };
       case 'ai':
         return {
           container: 'flex justify-start mb-4',
           bubble:
-            'bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-none max-w-lg shadow-lg relative',
+            'bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-none max-w-lg shadow-lg',
           icon: Drama,
           label: '상황 변화',
+          showLabel: true,
+        };
+      case 'ai-dialogue':
+        // 대화 말풍선 - 더 밝은 색상, 인용 아이콘
+        return {
+          container: 'flex justify-start mb-2',
+          bubble:
+            'bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-none max-w-lg shadow-md border-l-4 border-indigo-300',
+          icon: Quote,
+          label: '',
+          showLabel: false,
+        };
+      case 'ai-narration':
+        // 서술 말풍선 - 어두운 색상, 간결한 스타일
+        return {
+          container: 'flex justify-start mb-2',
+          bubble:
+            'bg-gray-700/80 text-gray-100 px-4 py-2 rounded-xl rounded-bl-none max-w-lg shadow-sm',
+          icon: Drama,
+          label: '',
+          showLabel: false,
         };
       default:
         return {
@@ -177,6 +145,7 @@ export const ChatMessage = ({
           bubble: 'bg-gray-600/50 text-gray-300 px-4 py-2 rounded-lg max-w-md',
           icon: MessageCircle,
           label: '',
+          showLabel: false,
         };
     }
   };
@@ -184,11 +153,12 @@ export const ChatMessage = ({
   const style = getMessageStyle();
   const animationClass = isLatest ? 'animate-fade-in' : '';
   const IconComponent = style.icon;
+  const sanitizedContent = sanitizeContent(message.content);
 
   return (
     <div className={cn(style.container, animationClass)}>
       <div className={style.bubble}>
-        {message.type !== 'system' && (
+        {style.showLabel && (
           <div className="mb-2 flex items-center text-xs font-semibold opacity-80">
             <IconComponent className="mr-1 h-3 w-3" />
             {style.label}
@@ -198,10 +168,17 @@ export const ChatMessage = ({
           {message.type === 'system' ? (
             <div className="flex items-center">
               <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
-              <span>{renderInlineMarkdown(message.content, 'sys')}</span>
+              <span>{renderInlineMarkdown(sanitizedContent, 'sys')}</span>
+            </div>
+          ) : message.type === 'ai-dialogue' ? (
+            <div className="flex items-start gap-2">
+              <Quote className="mt-0.5 h-4 w-4 flex-shrink-0 opacity-60" />
+              <span className="italic">
+                {renderInlineMarkdown(sanitizedContent, 'dlg')}
+              </span>
             </div>
           ) : (
-            <div className="space-y-1">{renderParagraphs(message.content)}</div>
+            <span>{renderInlineMarkdown(sanitizedContent, 'msg')}</span>
           )}
         </div>
       </div>
