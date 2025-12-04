@@ -16,11 +16,20 @@ const sanitizeContent = (content: string): string => {
 };
 
 /**
- * 마크다운을 React 요소로 변환
+ * 이스케이프된 줄바꿈을 실제 줄바꿈으로 변환
+ */
+const normalizeLineBreaks = (content: string): string => {
+  return content
+    .replace(/\\n/g, '\n') // 이스케이프된 \n을 실제 줄바꿈으로
+    .replace(/\r\n/g, '\n') // Windows 줄바꿈 정규화
+    .replace(/\n{3,}/g, '\n\n'); // 3개 이상 줄바꿈은 2개로
+};
+
+/**
+ * 마크다운 인라인 요소를 React 요소로 변환
  * 지원: **bold**, *italic*, ***bold italic***
  */
-const renderMarkdown = (content: string): React.ReactNode[] => {
-  const sanitized = sanitizeContent(content);
+const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[] => {
   const result: React.ReactNode[] = [];
   let key = 0;
 
@@ -29,31 +38,31 @@ const renderMarkdown = (content: string): React.ReactNode[] => {
   let lastIndex = 0;
   let match;
 
-  while ((match = regex.exec(sanitized)) !== null) {
+  while ((match = regex.exec(text)) !== null) {
     // 매치 전 일반 텍스트
     if (match.index > lastIndex) {
-      result.push(sanitized.slice(lastIndex, match.index));
+      result.push(text.slice(lastIndex, match.index));
     }
 
     // 매치된 마크다운 처리
     if (match[2]) {
       // ***bold italic***
       result.push(
-        <strong key={key++} className="font-bold italic">
+        <strong key={`${keyPrefix}-${key++}`} className="font-bold italic">
           {match[2]}
         </strong>,
       );
     } else if (match[3]) {
       // **bold**
       result.push(
-        <strong key={key++} className="font-bold">
+        <strong key={`${keyPrefix}-${key++}`} className="font-bold">
           {match[3]}
         </strong>,
       );
     } else if (match[4]) {
       // *italic*
       result.push(
-        <em key={key++} className="italic">
+        <em key={`${keyPrefix}-${key++}`} className="italic opacity-90">
           {match[4]}
         </em>,
       );
@@ -63,11 +72,52 @@ const renderMarkdown = (content: string): React.ReactNode[] => {
   }
 
   // 남은 텍스트
-  if (lastIndex < sanitized.length) {
-    result.push(sanitized.slice(lastIndex));
+  if (lastIndex < text.length) {
+    result.push(text.slice(lastIndex));
   }
 
-  return result.length > 0 ? result : [sanitized];
+  return result.length > 0 ? result : [text];
+};
+
+/**
+ * 문단 단위로 분리하여 렌더링
+ * 대화형 소설처럼 각 문단이 시각적으로 구분되도록 처리
+ */
+const renderParagraphs = (content: string): React.ReactNode[] => {
+  const sanitized = sanitizeContent(content);
+  const normalized = normalizeLineBreaks(sanitized);
+
+  // 빈 줄(두 개 이상의 줄바꿈) 또는 단일 줄바꿈으로 문단 분리
+  const paragraphs = normalized
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  if (paragraphs.length === 0) {
+    return [normalized];
+  }
+
+  return paragraphs.map((paragraph, index) => {
+    // 대사인지 확인 (따옴표로 시작하거나 **로 시작하는 대사)
+    const isDialogue =
+      paragraph.startsWith('"') ||
+      paragraph.startsWith('"') ||
+      paragraph.startsWith('「') ||
+      paragraph.startsWith('**"') ||
+      paragraph.startsWith('**"');
+
+    return (
+      <p
+        key={index}
+        className={cn(
+          'mb-2 last:mb-0',
+          isDialogue && 'pl-2 border-l-2 border-white/20',
+        )}
+      >
+        {renderInlineMarkdown(paragraph, `p${index}`)}
+      </p>
+    );
+  });
 };
 
 export const ChatMessage = ({
@@ -117,7 +167,7 @@ export const ChatMessage = ({
         return {
           container: 'flex justify-start mb-4',
           bubble:
-            'bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-none max-w-md shadow-lg relative',
+            'bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-3 rounded-2xl rounded-bl-none max-w-lg shadow-lg relative',
           icon: Drama,
           label: '상황 변화',
         };
@@ -139,16 +189,20 @@ export const ChatMessage = ({
     <div className={cn(style.container, animationClass)}>
       <div className={style.bubble}>
         {message.type !== 'system' && (
-          <div className="mb-1 flex items-center text-xs font-semibold opacity-80">
+          <div className="mb-2 flex items-center text-xs font-semibold opacity-80">
             <IconComponent className="mr-1 h-3 w-3" />
             {style.label}
           </div>
         )}
-        <div className="flex items-center whitespace-pre-wrap leading-relaxed">
-          {message.type === 'system' && (
-            <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
+        <div className="leading-relaxed">
+          {message.type === 'system' ? (
+            <div className="flex items-center">
+              <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span>{renderInlineMarkdown(message.content, 'sys')}</span>
+            </div>
+          ) : (
+            <div className="space-y-1">{renderParagraphs(message.content)}</div>
           )}
-          <span>{renderMarkdown(message.content)}</span>
         </div>
       </div>
     </div>

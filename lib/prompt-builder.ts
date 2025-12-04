@@ -640,9 +640,18 @@ Requirements:
 4. Write in immersive Korean narrative (no system terminology exposed)
 5. Create two meaningful choices with clear consequences
 
+CRITICAL FORMATTING RULES:
+- **스탯 수치 절대 노출 금지**: "cityChaos", "60" 같은 내부 수치나 변수명을 서사에 쓰지 마세요
+- **줄바꿈 필수**: 각 캐릭터 대사 전후에 \\n 줄바꿈을 넣으세요
+- **마크다운 사용**: 중요한 대사는 **굵게**, 감정은 *기울임*으로 강조
+- **대화 구분**: 장면 묘사와 캐릭터 대사를 줄바꿈으로 명확히 구분하세요
+
+예시 형식:
+"혼란스러운 도시의 아침이었다.\\n\\n**\\"우리가 여기서 버틸 수 있을까?\\"** 강철민이 냉소적으로 말했다.\\n\\n한서아가 고개를 저었다. *그녀의 눈빛에는 희망이 서려 있었다.*"
+
 Output ONLY this JSON structure:
 {
-  "prompt": "Korean narrative describing the situation and dilemma",
+  "prompt": "Korean narrative with proper line breaks (use \\\\n)",
   "choice_a": "First choice option in Korean",
   "choice_b": "Second choice option in Korean"
 }
@@ -651,5 +660,6 @@ Critical Rules:
 - NO text outside the JSON structure
 - NO + symbols before numbers (use 5, -3 format only)
 - ALL content in Korean for immersive experience
-- NO exposure of system IDs, flags, or technical terms`;
+- NO exposure of system IDs, flags, stats numbers, or technical terms
+- USE \\n for line breaks between paragraphs and dialogues`;
 };
