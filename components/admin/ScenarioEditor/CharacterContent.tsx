@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import Image from 'next/image';
-import { fileToBase64 } from '@/lib/utils';
+import { generateCharacterImage } from '@/lib/image-generator';
 
 type Props = {
   scenario: ScenarioData;
@@ -429,8 +429,42 @@ const CharacterCard = ({
   updateCharacter,
 }: CharacterCardProps) => {
   const [isImageError, setIsImageError] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  // AI로 캐릭터 이미지 생성
+  const handleGenerateCharacterImage = async () => {
+    if (!character.characterName) {
+      setGenerateError('캐릭터 이름을 먼저 입력해주세요.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerateError(null);
+    setIsImageError(false);
+
+    try {
+      const result = await generateCharacterImage({
+        characterName: character.characterName,
+        roleName: character.roleName || '',
+        backstory: character.backstory || '',
+        scenarioTitle: scenario.title || '',
+        scenarioGenre: scenario.genre || [],
+      });
+
+      if (result.success && result.imageUrl) {
+        updateCharacter(index, 'imageUrl', result.imageUrl);
+      } else {
+        setGenerateError(result.error || '이미지 생성에 실패했습니다.');
+      }
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : '이미지 생성 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   return (
     <Card
       key={index}
@@ -544,64 +578,36 @@ const CharacterCard = ({
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-800">
-              역할군 이미지
+              캐릭터 이미지
             </label>
             <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  value={character.imageUrl}
-                  onChange={(e) =>
-                    updateCharacter(index, 'imageUrl', e.target.value)
-                  }
-                  className="flex-1 border-socratic-grey bg-white text-sm focus:border-kairos-gold focus:ring-kairos-gold/20"
-                  placeholder="이미지 URL 입력"
-                  disabled={!character.isEditing}
-                />
-                {character.isEditing && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                    disabled={isUploading}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/jpeg,image/png';
-                      input.onchange = async (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          setIsUploading(true);
-                          setUploadError(null);
-                          setIsImageError(false);
-                          try {
-                            const base64Url = await fileToBase64(file, 1024);
-                            updateCharacter(index, 'imageUrl', base64Url);
-                          } catch (error) {
-                            setUploadError(
-                              error instanceof Error
-                                ? error.message
-                                : '이미지 업로드에 실패했습니다.',
-                            );
-                          } finally {
-                            setIsUploading(false);
-                          }
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
-                    {isUploading ? '...' : '파일'}
-                  </Button>
-                )}
-              </div>
+              {character.isEditing && (
+                <Button
+                  type="button"
+                  onClick={handleGenerateCharacterImage}
+                  disabled={isGenerating}
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-3 w-3" />
+                      AI로 이미지 생성
+                    </>
+                  )}
+                </Button>
+              )}
               {character.imageUrl && !isImageError && (
                 <Image
                   src={character.imageUrl || '/placeholder.svg'}
                   alt="캐릭터 이미지"
-                  className="h-16 w-16 rounded border object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
+                  className="h-20 w-20 rounded border object-cover"
+                  onError={() => {
                     setIsImageError(true);
                   }}
                   width={100}
@@ -613,11 +619,11 @@ const CharacterCard = ({
                   이미지를 찾을 수 없습니다
                 </p>
               )}
-              {uploadError && (
-                <p className="text-sm text-red-500">{uploadError}</p>
+              {generateError && (
+                <p className="text-sm text-red-500">{generateError}</p>
               )}
               <p className="mt-1 text-xs text-socratic-grey">
-                최대 1MB, JPG/PNG 형식
+                캐릭터 정보를 기반으로 AI가 이미지를 생성합니다.
               </p>
             </div>
           </div>

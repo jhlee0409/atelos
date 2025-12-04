@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
 import type { ScenarioData } from '@/types';
-import { SetStateAction, useState, useRef } from 'react';
+import { SetStateAction, useState } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
 import Image from 'next/image';
-import { cn, fileToBase64 } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { generatePosterImage } from '@/lib/image-generator';
 
 type Props = {
   scenario: ScenarioData;
@@ -22,10 +23,45 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
   const [newGenre, setNewGenre] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImageError, setIsImageError] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  // AI로 포스터 이미지 생성
+  const handleGeneratePoster = async () => {
+    if (!scenario.title) {
+      setGenerateError('시나리오 제목을 먼저 입력해주세요.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerateError(null);
+    setIsImageError(false);
+
+    try {
+      const result = await generatePosterImage({
+        title: scenario.title,
+        genre: scenario.genre,
+        synopsis: scenario.synopsis,
+        keywords: scenario.coreKeywords,
+      });
+
+      if (result.success && result.imageUrl) {
+        setScenario((prev) => ({
+          ...prev,
+          posterImageUrl: result.imageUrl!,
+        }));
+      } else {
+        setGenerateError(result.error || '이미지 생성에 실패했습니다.');
+      }
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : '이미지 생성 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   // Tag management
   const addTag = (type: 'genre' | 'coreKeywords', value: string) => {
@@ -107,68 +143,37 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
             시나리오 포스터 이미지 <span className="text-red-500">*</span>
           </label>
           <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                value={scenario.posterImageUrl}
-                onChange={(e) =>
-                  setScenario((prev) => ({
-                    ...prev,
-                    posterImageUrl: e.target.value,
-                  }))
-                }
-                className={`flex-1 border-socratic-grey bg-parchment-white focus:border-kairos-gold focus:ring-kairos-gold/20 ${
-                  errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
-                    ? 'border-red-500'
-                    : ''
-                }`}
-                placeholder="이미지 URL을 입력하거나 파일을 선택하세요"
-              />
+            <div className="flex flex-col gap-3">
               <Button
                 type="button"
-                variant="outline"
-                className="border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                onClick={handleGeneratePoster}
+                disabled={isGenerating}
+                className={`w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 ${
+                  errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
+                    ? 'ring-2 ring-red-500'
+                    : ''
+                }`}
               >
-                {isUploading ? '업로드 중...' : '파일 선택'}
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    AI가 이미지를 생성하는 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    AI로 포스터 이미지 생성
+                  </>
+                )}
               </Button>
+              <p className="text-xs text-socratic-grey">
+                시나리오 제목, 장르, 시놉시스, 키워드를 기반으로 AI가 포스터 이미지를 생성합니다.
+              </p>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setIsUploading(true);
-                  setUploadError(null);
-                  setIsImageError(false);
-                  try {
-                    const base64Url = await fileToBase64(file, 2048);
-                    setScenario((prev) => ({
-                      ...prev,
-                      posterImageUrl: base64Url,
-                    }));
-                  } catch (error) {
-                    setUploadError(
-                      error instanceof Error
-                        ? error.message
-                        : '이미지 업로드에 실패했습니다.',
-                    );
-                  } finally {
-                    setIsUploading(false);
-                    // 같은 파일 재선택 가능하도록 초기화
-                    e.target.value = '';
-                  }
-                }
-              }}
-            />
-            <p className="text-xs text-socratic-grey">
-              권장 비율 2:3, 최대 2MB, JPG/PNG 형식
-            </p>
-            {uploadError && (
-              <p className="mt-1 text-xs text-red-500">{uploadError}</p>
+            {generateError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-600">{generateError}</p>
+              </div>
             )}
           </div>
           {scenario.posterImageUrl && (
