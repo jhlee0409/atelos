@@ -44,17 +44,21 @@ export default function StickySidebar({
           </CardHeader>
           <CardContent>
             <div className="flex overflow-hidden rounded-lg border border-socratic-grey">
-              {(['작업 중', '테스트 중', '활성'] as const).map((status) => (
+              {([
+                { value: 'in_progress', label: '작업 중' },
+                { value: 'testing', label: '테스트 중' },
+                { value: 'active', label: '활성' },
+              ] as const).map(({ value, label }) => (
                 <button
-                  key={status}
-                  onClick={() => setScenario((prev) => ({ ...prev, status }))}
+                  key={value}
+                  onClick={() => setScenario((prev) => ({ ...prev, status: value }))}
                   className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-                    scenario.status === status
+                    scenario.status === value
                       ? 'bg-kairos-gold text-telos-black'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {status}
+                  {label}
                 </button>
               ))}
             </div>
@@ -62,7 +66,7 @@ export default function StickySidebar({
               <p>
                 현재 상태:{' '}
                 <span className="font-medium text-gray-800">
-                  {scenario.status}
+                  {scenario.status === 'in_progress' ? '작업 중' : scenario.status === 'testing' ? '테스트 중' : '활성'}
                 </span>
               </p>
               <p className="mt-1 text-xs">마지막 수정: 2024년 12월 22일</p>
