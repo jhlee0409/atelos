@@ -5,11 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2, ImageOff } from 'lucide-react';
 import type { ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { generatePosterImage } from '@/lib/image-generator';
 
@@ -182,31 +181,57 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
               </div>
             )}
           </div>
-          {scenario.posterImageUrl && (
-            <div className="mt-3 rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">
-              <p
-                className={cn(
-                  'text-sm text-kairos-gold',
-                  isImageError && 'text-red-500',
+          {/* 이미지 미리보기 영역 */}
+          <div className="mt-3">
+            {scenario.posterImageUrl ? (
+              <div className="rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">
+                <p
+                  className={cn(
+                    'text-sm text-kairos-gold',
+                    isImageError && 'text-red-500',
+                  )}
+                >
+                  {!isImageError
+                    ? '✓ 이미지 설정됨 (저장 버튼을 눌러 DB에 저장하세요)'
+                    : '✗ 이미지를 불러올 수 없습니다'}
+                </p>
+                {!isImageError && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={scenario.posterImageUrl}
+                    alt="포스터 미리보기"
+                    className="mt-2 h-48 w-32 rounded border object-cover"
+                    onError={() => setIsImageError(true)}
+                  />
                 )}
-              >
-                {scenario.posterImageUrl && !isImageError
-                  ? '✓ 이미지 설정됨'
-                  : '✗ 이미지를 찾을 수 없습니다'}
-              </p>
-              <Image
-                src={scenario.posterImageUrl || '/placeholder-logo.png'}
-                alt="포스터 미리보기"
-                className="mt-2 h-36 w-24 rounded border object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  setIsImageError(true);
-                }}
-                width={200}
-                height={200}
-              />
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className={cn(
+                "rounded-lg border-2 border-dashed p-6 text-center",
+                errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-300 bg-gray-50"
+              )}>
+                <ImageOff className={cn(
+                  "mx-auto h-12 w-12",
+                  errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
+                    ? "text-red-400"
+                    : "text-gray-400"
+                )} />
+                <p className={cn(
+                  "mt-2 text-sm font-medium",
+                  errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
+                    ? "text-red-600"
+                    : "text-gray-600"
+                )}>
+                  포스터 이미지가 생성되지 않았습니다
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  위 버튼을 클릭하여 AI로 포스터를 생성해주세요
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

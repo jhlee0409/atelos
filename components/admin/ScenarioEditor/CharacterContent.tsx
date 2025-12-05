@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2, UserCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,6 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
-import Image from 'next/image';
 import { generateCharacterImage } from '@/lib/image-generator';
 
 type Props = {
@@ -608,22 +607,33 @@ const CharacterCard = ({
                   )}
                 </Button>
               )}
-              {character.imageUrl && !isImageError && (
-                <Image
-                  src={character.imageUrl || '/placeholder.svg'}
-                  alt="캐릭터 이미지"
-                  className="h-20 w-20 rounded border object-cover"
-                  onError={() => {
-                    setIsImageError(true);
-                  }}
-                  width={100}
-                  height={100}
-                />
-              )}
-              {isImageError && (
-                <p className="text-sm text-red-500">
-                  이미지를 찾을 수 없습니다
-                </p>
+              {/* 캐릭터 이미지 미리보기 */}
+              {character.imageUrl ? (
+                !isImageError ? (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={character.imageUrl}
+                      alt={`${character.characterName || '캐릭터'} 이미지`}
+                      className="h-24 w-24 rounded-lg border object-cover shadow-sm"
+                      onError={() => setIsImageError(true)}
+                    />
+                    <p className="mt-1 text-xs text-green-600">
+                      ✓ 이미지 설정됨
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-red-500">
+                    이미지를 불러올 수 없습니다
+                  </p>
+                )
+              ) : (
+                <div className="mt-2 flex h-24 w-24 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                  <UserCircle className="h-8 w-8 text-gray-400" />
+                  <p className="mt-1 text-center text-xs text-gray-500">
+                    미생성
+                  </p>
+                </div>
               )}
               {generateError && (
                 <p className="text-sm text-red-500">{generateError}</p>
