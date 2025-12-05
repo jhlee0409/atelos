@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { ScenarioData } from '@/types';
 import {
-  getAllScenariosAdmin,
-  getScenarioAdmin,
-  createScenarioAdmin,
-  updateScenarioAdmin,
-  deleteScenarioAdmin,
-  ScenarioSummary,
+  getAllScenarios,
+  createScenario,
+  updateScenario,
+  deleteScenario,
 } from '@/lib/firebase-scenarios-admin';
 
 // GET: 모든 시나리오 리스트 가져오기
 export async function GET() {
   try {
-    const summaries = await getAllScenariosAdmin();
+    const summaries = await getAllScenarios();
 
     return NextResponse.json({
       success: true,
@@ -40,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await createScenarioAdmin(scenario);
+    await createScenario(scenario);
 
     console.log(`✅ [Scenarios API] 시나리오 생성: ${scenario.scenarioId}`);
 
@@ -79,7 +77,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await updateScenarioAdmin(scenario);
+    await updateScenario(scenario);
 
     console.log(`✅ [Scenarios API] 시나리오 업데이트: ${scenario.scenarioId}`);
 
@@ -110,7 +108,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deleteScenarioAdmin(scenarioId);
+    await deleteScenario(scenarioId);
 
     console.log(`✅ [Scenarios API] 시나리오 삭제: ${scenarioId}`);
 

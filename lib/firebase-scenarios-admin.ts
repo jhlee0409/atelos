@@ -27,8 +27,8 @@ function timestampToISOString(timestamp: FirebaseFirestore.Timestamp | undefined
   return timestamp?.toDate().toISOString();
 }
 
-// 모든 시나리오 목록 가져오기 (Admin SDK - 보안 규칙 우회)
-export async function getAllScenariosAdmin(): Promise<ScenarioSummary[]> {
+// 모든 시나리오 목록 가져오기
+export async function getAllScenarios(): Promise<ScenarioSummary[]> {
   try {
     const { db } = getFirebaseAdmin();
     const scenariosRef = db.collection(SCENARIOS_COLLECTION);
@@ -67,8 +67,8 @@ export async function getAllScenariosAdmin(): Promise<ScenarioSummary[]> {
   }
 }
 
-// 활성화된 시나리오만 가져오기 (Admin SDK - 로비용)
-export async function getActiveScenariosAdmin(): Promise<ScenarioSummary[]> {
+// 활성화된 시나리오만 가져오기 (로비용)
+export async function getActiveScenarios(): Promise<ScenarioSummary[]> {
   try {
     const { db } = getFirebaseAdmin();
     const scenariosRef = db.collection(SCENARIOS_COLLECTION);
@@ -100,8 +100,8 @@ export async function getActiveScenariosAdmin(): Promise<ScenarioSummary[]> {
   }
 }
 
-// 특정 시나리오 가져오기 (Admin SDK)
-export async function getScenarioAdmin(scenarioId: string): Promise<ScenarioData | null> {
+// 특정 시나리오 가져오기
+export async function getScenario(scenarioId: string): Promise<ScenarioData | null> {
   try {
     const { db } = getFirebaseAdmin();
     const docRef = db.collection(SCENARIOS_COLLECTION).doc(scenarioId);
@@ -123,8 +123,8 @@ export async function getScenarioAdmin(scenarioId: string): Promise<ScenarioData
   }
 }
 
-// 시나리오 생성 (Admin SDK)
-export async function createScenarioAdmin(scenario: ScenarioData): Promise<string> {
+// 시나리오 생성
+export async function createScenario(scenario: ScenarioData): Promise<string> {
   try {
     const { db } = getFirebaseAdmin();
     const docRef = db.collection(SCENARIOS_COLLECTION).doc(scenario.scenarioId);
@@ -149,8 +149,8 @@ export async function createScenarioAdmin(scenario: ScenarioData): Promise<strin
   }
 }
 
-// 시나리오 업데이트 (Admin SDK)
-export async function updateScenarioAdmin(scenario: ScenarioData): Promise<string> {
+// 시나리오 업데이트
+export async function updateScenario(scenario: ScenarioData): Promise<string> {
   try {
     const { db } = getFirebaseAdmin();
     const docRef = db.collection(SCENARIOS_COLLECTION).doc(scenario.scenarioId);
@@ -173,8 +173,8 @@ export async function updateScenarioAdmin(scenario: ScenarioData): Promise<strin
   }
 }
 
-// 시나리오 삭제 (Admin SDK)
-export async function deleteScenarioAdmin(scenarioId: string): Promise<void> {
+// 시나리오 삭제
+export async function deleteScenario(scenarioId: string): Promise<void> {
   try {
     const { db } = getFirebaseAdmin();
     const docRef = db.collection(SCENARIOS_COLLECTION).doc(scenarioId);
@@ -186,8 +186,8 @@ export async function deleteScenarioAdmin(scenarioId: string): Promise<void> {
   }
 }
 
-// 시나리오 존재 여부 확인 (Admin SDK)
-export async function scenarioExistsAdmin(scenarioId: string): Promise<boolean> {
+// 시나리오 존재 여부 확인
+export async function scenarioExists(scenarioId: string): Promise<boolean> {
   try {
     const { db } = getFirebaseAdmin();
     const docRef = db.collection(SCENARIOS_COLLECTION).doc(scenarioId);

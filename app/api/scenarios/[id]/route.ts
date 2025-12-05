@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScenarioAdmin } from '@/lib/firebase-scenarios-admin';
+import { getScenario } from '@/lib/firebase-scenarios-admin';
 
 // GET: 특정 시나리오 가져오기 (공개 API - 게임용)
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const scenario = await getScenarioAdmin(id);
+    const scenario = await getScenario(id);
 
     if (!scenario) {
       return NextResponse.json(
