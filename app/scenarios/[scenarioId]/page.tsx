@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
-import { getScenarioData } from '@/mocks/index';
+import { getScenario } from '@/lib/firebase-scenarios';
 import ScenarioDetailClient from './ScenarioDetailClient';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ScenarioPage({
   params,
@@ -8,7 +10,7 @@ export default async function ScenarioPage({
   params: Promise<{ scenarioId: string }>;
 }) {
   const { scenarioId } = await params;
-  const scenario = getScenarioData(scenarioId);
+  const scenario = await getScenario(scenarioId);
 
   if (!scenario) {
     notFound();
