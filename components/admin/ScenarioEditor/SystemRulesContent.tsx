@@ -209,9 +209,8 @@ export default function SystemRulesContent({ scenario, setScenario }: Props) {
     setScenario((prev) => ({
       ...prev,
       traitPool: {
-        ...prev.traitPool,
-        buffs: type === 'positive' ? [...prev.traitPool.buffs, newTrait] : prev.traitPool.buffs,
-        debuffs: type === 'negative' ? [...prev.traitPool.debuffs, newTrait] : prev.traitPool.debuffs,
+        buffs: type === 'positive' ? [...(prev.traitPool?.buffs || []), newTrait] : (prev.traitPool?.buffs || []),
+        debuffs: type === 'negative' ? [...(prev.traitPool?.debuffs || []), newTrait] : (prev.traitPool?.debuffs || []),
       },
     }));
   };
@@ -225,17 +224,16 @@ export default function SystemRulesContent({ scenario, setScenario }: Props) {
     setScenario((prev) => ({
       ...prev,
       traitPool: {
-        ...prev.traitPool,
         buffs: type === 'positive'
-          ? prev.traitPool.buffs.map((trait, i) =>
+          ? (prev.traitPool?.buffs || []).map((trait, i) =>
               i === index ? { ...trait, [field]: value } : trait
             )
-          : prev.traitPool.buffs,
+          : (prev.traitPool?.buffs || []),
         debuffs: type === 'negative'
-          ? prev.traitPool.debuffs.map((trait, i) =>
+          ? (prev.traitPool?.debuffs || []).map((trait, i) =>
               i === index ? { ...trait, [field]: value } : trait
             )
-          : prev.traitPool.debuffs,
+          : (prev.traitPool?.debuffs || []),
       },
     }));
   };
@@ -244,20 +242,24 @@ export default function SystemRulesContent({ scenario, setScenario }: Props) {
     setScenario((prev) => ({
       ...prev,
       traitPool: {
-        ...prev.traitPool,
         buffs: type === 'positive'
-          ? prev.traitPool.buffs.filter((_, i) => i !== index)
-          : prev.traitPool.buffs,
+          ? (prev.traitPool?.buffs || []).filter((_, i) => i !== index)
+          : (prev.traitPool?.buffs || []),
         debuffs: type === 'negative'
-          ? prev.traitPool.debuffs.filter((_, i) => i !== index)
-          : prev.traitPool.debuffs,
+          ? (prev.traitPool?.debuffs || []).filter((_, i) => i !== index)
+          : (prev.traitPool?.debuffs || []),
       },
     }));
   };
 
   const saveTrait = (type: 'positive' | 'negative', index: number) => {
-    const traits = type === 'positive' ? scenario.traitPool.buffs : scenario.traitPool.debuffs;
+    const traits = type === 'positive' ? (scenario.traitPool?.buffs || []) : (scenario.traitPool?.debuffs || []);
     const trait = traits[index];
+
+    if (!trait) {
+      alert('특성을 찾을 수 없습니다.');
+      return;
+    }
 
     // ID 검증
     if (!trait.traitId.trim() || trait.traitId.startsWith('trait_')) {
@@ -280,17 +282,16 @@ export default function SystemRulesContent({ scenario, setScenario }: Props) {
     setScenario((prev) => ({
       ...prev,
       traitPool: {
-        ...prev.traitPool,
         buffs: type === 'positive'
-          ? prev.traitPool.buffs.map((t, i) =>
+          ? (prev.traitPool?.buffs || []).map((t, i) =>
               i === index ? { ...t, isEditing: false } : t
             )
-          : prev.traitPool.buffs,
+          : (prev.traitPool?.buffs || []),
         debuffs: type === 'negative'
-          ? prev.traitPool.debuffs.map((t, i) =>
+          ? (prev.traitPool?.debuffs || []).map((t, i) =>
               i === index ? { ...t, isEditing: false } : t
             )
-          : prev.traitPool.debuffs,
+          : (prev.traitPool?.debuffs || []),
       },
     }));
   };
@@ -299,17 +300,16 @@ export default function SystemRulesContent({ scenario, setScenario }: Props) {
     setScenario((prev) => ({
       ...prev,
       traitPool: {
-        ...prev.traitPool,
         buffs: type === 'positive'
-          ? prev.traitPool.buffs.map((t, i) =>
+          ? (prev.traitPool?.buffs || []).map((t, i) =>
               i === index ? { ...t, isEditing: true } : t
             )
-          : prev.traitPool.buffs,
+          : (prev.traitPool?.buffs || []),
         debuffs: type === 'negative'
-          ? prev.traitPool.debuffs.map((t, i) =>
+          ? (prev.traitPool?.debuffs || []).map((t, i) =>
               i === index ? { ...t, isEditing: true } : t
             )
-          : prev.traitPool.debuffs,
+          : (prev.traitPool?.debuffs || []),
       },
     }));
   };

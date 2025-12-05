@@ -24,9 +24,34 @@ export default function ScenarioDetailClient({
 
   const handleStartStory = () => {
     const { characters, traitPool } = scenario;
-    const allTraits = [...traitPool.buffs, ...traitPool.debuffs];
+
+    // traitPool이 없거나 빈 경우 기본 특성 생성
+    const buffs = traitPool?.buffs || [];
+    const debuffs = traitPool?.debuffs || [];
+    const allTraits = [...buffs, ...debuffs];
+
+    // 특성이 없는 경우 기본 특성 제공
+    const defaultTrait: Trait = {
+      traitId: 'default',
+      traitName: 'survivor',
+      displayName: '생존자',
+      type: 'positive',
+      weightType: 'default',
+      displayText: '극한의 상황에서도 포기하지 않는 의지를 가졌다.',
+      systemInstruction: '생존 본능이 강하며 위기 상황에서 침착함을 유지한다.',
+      iconUrl: '',
+    };
 
     const newCastedCharacters = characters.map((char) => {
+      // 특성 풀이 비어있으면 기본 특성 사용
+      if (allTraits.length === 0) {
+        return {
+          ...char,
+          assignedTrait: defaultTrait,
+          currentTrait: defaultTrait,
+        };
+      }
+
       const possibleTraits = allTraits.filter((trait) =>
         char.weightedTraitTypes.includes(trait.weightType),
       );

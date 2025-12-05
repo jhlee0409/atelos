@@ -71,12 +71,29 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
   );
 
   // 초기 캐릭터 특성 할당
+  const buffs = scenario.traitPool?.buffs || [];
+  const debuffs = scenario.traitPool?.debuffs || [];
+  const allTraits = [...buffs, ...debuffs];
+
+  // 특성이 없는 경우 기본 특성 제공
+  const defaultTrait = {
+    traitId: 'default',
+    traitName: 'survivor',
+    displayName: '생존자',
+    type: 'positive' as const,
+    weightType: 'default',
+    displayText: '극한의 상황에서도 포기하지 않는 의지를 가졌다.',
+    systemInstruction: '생존 본능이 강하며 위기 상황에서 침착함을 유지한다.',
+    iconUrl: '',
+  };
+
   const charactersWithTraits = scenario.characters.map((char) => {
     if (!char.currentTrait) {
-      const allTraits = [
-        ...scenario.traitPool.buffs,
-        ...scenario.traitPool.debuffs,
-      ];
+      // 특성 풀이 비어있으면 기본 특성 사용
+      if (allTraits.length === 0) {
+        return { ...char, currentTrait: defaultTrait };
+      }
+
       const possibleTraits = allTraits.filter((trait) =>
         char.weightedTraitTypes.includes(trait.weightType),
       );

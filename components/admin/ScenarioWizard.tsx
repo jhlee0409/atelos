@@ -222,6 +222,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
       playerGoal: synopsisResult.playerGoal,
       genre: synopsisResult.genre,
       coreKeywords: synopsisResult.coreKeywords,
+      posterImageUrl: '', // 기본값 - 에디터에서 설정 가능
       characters: characters.map((char) => ({
         roleId: char.roleId,
         roleName: char.roleName,
@@ -231,6 +232,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         weightedTraitTypes: char.suggestedTraits || [],
         currentTrait: null,
       })),
+      initialRelationships: [], // 기본값 - 에디터에서 관계 설정 가능
       scenarioStats: stats.map((stat) => ({
         id: stat.id,
         name: stat.name,
@@ -241,6 +243,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         initialValue: stat.initialValue || 50,
         range: [stat.min || 0, stat.max || 100] as [number, number],
       })),
+      traitPool: { buffs: [], debuffs: [] }, // 기본값 - 에디터에서 특성 추가 가능
       flagDictionary: flags.map((flag) => ({
         flagName: flag.flagName,
         description: flag.description || '',
@@ -255,6 +258,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         isGoalSuccess: ending.isGoalSuccess || false,
         systemConditions: [],
       })),
+      endCondition: { type: 'time_limit', value: 7, unit: 'days' }, // 기본값 - 7일 제한
       status: 'in_progress',
     };
 

@@ -146,8 +146,8 @@ export default function StickySidebar({
               <div className="flex justify-between">
                 <span className="text-socratic-grey">특성 풀</span>
                 <span className="font-medium text-gray-800">
-                  {scenario.traitPool.buffs.length +
-                    scenario.traitPool.debuffs.length}
+                  {(scenario.traitPool?.buffs?.length || 0) +
+                    (scenario.traitPool?.debuffs?.length || 0)}
                   개
                 </span>
               </div>
