@@ -1,9 +1,19 @@
 import Link from 'next/link';
 import ScenarioCard from '@/components/lobby/ScenarioCard';
-import { getAllActiveScenarios } from '@/mocks/index';
+import { getActiveScenarios } from '@/lib/firebase-scenarios';
 
-export default function LobbyPage() {
-  const activeScenarios = getAllActiveScenarios();
+export const dynamic = 'force-dynamic';
+
+export default async function LobbyPage() {
+  let activeScenarios: Awaited<ReturnType<typeof getActiveScenarios>> = [];
+  let error: string | null = null;
+
+  try {
+    activeScenarios = await getActiveScenarios();
+  } catch (e) {
+    console.error('❌ [Lobby] 시나리오 로드 실패:', e);
+    error = '시나리오를 불러오는데 실패했습니다.';
+  }
 
   return (
     <div className="min-h-screen bg-telos-black text-zinc-100">
@@ -34,7 +44,11 @@ export default function LobbyPage() {
           </p>
         </header>
 
-        {activeScenarios.length > 0 ? (
+        {error ? (
+          <div className="flex h-64 items-center justify-center border border-red-800 bg-red-900/10">
+            <p className="text-xl text-red-400">{error}</p>
+          </div>
+        ) : activeScenarios.length > 0 ? (
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {activeScenarios.map((scenario) => (
               <Link

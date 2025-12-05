@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import type { ScenarioData } from '@/types';
+import type { ScenarioSummary } from '@/lib/firebase-scenarios';
 
 interface ScenarioCardProps {
-  scenario: ScenarioData;
+  scenario: ScenarioSummary;
 }
 
 export default function ScenarioCard({ scenario }: ScenarioCardProps) {
@@ -15,7 +15,7 @@ export default function ScenarioCard({ scenario }: ScenarioCardProps) {
     <div className="group cursor-pointer overflow-hidden border border-zinc-800 bg-zinc-900/20 transition-all duration-300 hover:border-red-900/50 hover:bg-zinc-900/50">
       <div className="relative h-80 w-full overflow-hidden">
         <Image
-          src={imgSrc}
+          src={imgSrc || '/placeholder.jpg'}
           alt={`${scenario.title} Poster`}
           layout="fill"
           objectFit="cover"
@@ -31,7 +31,7 @@ export default function ScenarioCard({ scenario }: ScenarioCardProps) {
       </div>
       <div className="border-t border-zinc-800/50 p-4">
         <div className="flex flex-wrap gap-2">
-          {scenario.coreKeywords.map((keyword) => (
+          {scenario.coreKeywords?.map((keyword) => (
             <span
               key={keyword}
               className="border border-red-900/30 bg-red-950/20 px-2 py-1 text-xs font-semibold text-red-400"
