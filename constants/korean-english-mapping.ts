@@ -1,9 +1,14 @@
 // ===== 시나리오 스탯 매핑 =====
 export const STAT_MAPPING = {
   // 영어 ID -> 한글 표시명
+  // ZERO_HOUR 시나리오
   cityChaos: '도시 혼란도',
   communityCohesion: '공동체 응집력',
   survivalFoundation: '생존 기반',
+  // ECLIPSE_FIVE_DAYS 시나리오
+  oxygenLevel: '산소 잔량',
+  hullIntegrity: '함체 내구도',
+  crewSanity: '정신력',
   // 다른 시나리오에서 사용할 수 있는 공통 스탯들
   health: '체력',
   morale: '사기',
@@ -20,6 +25,10 @@ export const STAT_POLARITY = {
   // positive: 높을수록 좋음 (초록색으로 표시)
   communityCohesion: 'positive',
   survivalFoundation: 'positive',
+  // ECLIPSE_FIVE_DAYS 시나리오
+  oxygenLevel: 'positive',
+  hullIntegrity: 'positive',
+  crewSanity: 'positive',
   // 다른 시나리오용 공통 스탯들
   health: 'positive',
   morale: 'positive',
