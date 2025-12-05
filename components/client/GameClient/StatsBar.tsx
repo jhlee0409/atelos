@@ -4,7 +4,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { StatDisplay } from './StatDisplay';
 import { RouteIndicator } from './RouteIndicator';
 import { CharacterArcPanel } from './CharacterArcPanel';
-import { getKoreanStatName } from '@/constants/korean-english-mapping';
 
 export const StatsBar = ({
   scenario,
@@ -45,11 +44,12 @@ export const StatsBar = ({
             {scenario.scenarioStats.map((stat) => (
               <StatDisplay
                 key={stat.id}
-                name={getKoreanStatName(stat.id)}
+                name={stat.name}
                 value={getStatValue(stat.id)}
                 min={stat.min}
                 max={stat.max}
                 statId={stat.id}
+                polarity={stat.polarity}
               />
             ))}
             <CharacterArcPanel
@@ -66,11 +66,12 @@ export const StatsBar = ({
               {scenario.scenarioStats.map((stat) => (
                 <StatDisplay
                   key={stat.id}
-                  name={getKoreanStatName(stat.id)}
+                  name={stat.name}
                   value={getStatValue(stat.id)}
                   min={stat.min}
                   max={stat.max}
                   statId={stat.id}
+                  polarity={stat.polarity}
                   isCompact={true}
                 />
               ))}
