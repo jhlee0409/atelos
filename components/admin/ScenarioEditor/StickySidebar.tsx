@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Save, AlertCircle } from 'lucide-react';
+import { Save, AlertCircle, Loader2 } from 'lucide-react';
 import { ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ type Props = {
   handleSaveAndActivate: () => void;
   handleTempSave: () => void;
   errors: string[];
+  isSaving?: boolean;
 };
 
 export default function StickySidebar({
@@ -28,6 +29,7 @@ export default function StickySidebar({
   handleSaveAndActivate,
   handleTempSave,
   errors,
+  isSaving = false,
 }: Props) {
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   return (
@@ -42,17 +44,21 @@ export default function StickySidebar({
           </CardHeader>
           <CardContent>
             <div className="flex overflow-hidden rounded-lg border border-socratic-grey">
-              {(['작업 중', '테스트 중', '활성'] as const).map((status) => (
+              {([
+                { value: 'in_progress', label: '작업 중' },
+                { value: 'testing', label: '테스트 중' },
+                { value: 'active', label: '활성' },
+              ] as const).map(({ value, label }) => (
                 <button
-                  key={status}
-                  onClick={() => setScenario((prev) => ({ ...prev, status }))}
+                  key={value}
+                  onClick={() => setScenario((prev) => ({ ...prev, status: value }))}
                   className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-                    scenario.status === status
+                    scenario.status === value
                       ? 'bg-kairos-gold text-telos-black'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {status}
+                  {label}
                 </button>
               ))}
             </div>
@@ -60,7 +66,7 @@ export default function StickySidebar({
               <p>
                 현재 상태:{' '}
                 <span className="font-medium text-gray-800">
-                  {scenario.status}
+                  {scenario.status === 'in_progress' ? '작업 중' : scenario.status === 'testing' ? '테스트 중' : '활성'}
                 </span>
               </p>
               <p className="mt-1 text-xs">마지막 수정: 2024년 12월 22일</p>
@@ -74,17 +80,23 @@ export default function StickySidebar({
             onClick={handleSaveAndActivate}
             className="w-full bg-kairos-gold font-medium text-telos-black hover:bg-kairos-gold/90"
             size="lg"
+            disabled={isSaving}
           >
-            <Save className="mr-2 h-4 w-4" />
-            저장 및 활성화
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? '저장 중...' : '저장 및 활성화'}
           </Button>
           <Button
             onClick={handleTempSave}
             variant="outline"
             className="w-full border-kairos-gold text-kairos-gold hover:bg-kairos-gold hover:text-telos-black"
             size="lg"
+            disabled={isSaving}
           >
-            임시 저장
+            {isSaving ? '저장 중...' : '임시 저장'}
           </Button>
         </div>
 

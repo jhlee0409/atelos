@@ -1,0 +1,721 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Loader2,
+  Wand2,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  Lightbulb,
+  Users,
+  BarChart3,
+  Flag,
+  Trophy,
+  Sparkles,
+  RotateCcw,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  generateSynopsis,
+  TONE_OPTIONS,
+  LENGTH_OPTIONS,
+  type SynopsisResult,
+  type SynopsisGenerateRequest,
+} from '@/lib/synopsis-generator';
+import {
+  generateWithAI,
+  type CharacterResult,
+  type StatResult,
+  type FlagResult,
+  type EndingResult,
+} from '@/lib/ai-scenario-generator';
+import type { ScenarioData } from '@/types';
+
+// 단계 정의
+type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'endings' | 'complete';
+
+const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
+  { key: 'idea', label: '아이디어', icon: Lightbulb },
+  { key: 'synopsis', label: '시놉시스', icon: Sparkles },
+  { key: 'characters', label: '캐릭터', icon: Users },
+  { key: 'system', label: '시스템', icon: BarChart3 },
+  { key: 'endings', label: '엔딩', icon: Trophy },
+  { key: 'complete', label: '완료', icon: Check },
+];
+
+interface ScenarioWizardProps {
+  onComplete: (scenario: Partial<ScenarioData>) => void;
+  onCancel: () => void;
+}
+
+export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
+  // 현재 단계
+  const [currentStep, setCurrentStep] = useState<WizardStep>('idea');
+
+  // 입력 상태
+  const [idea, setIdea] = useState('');
+  const [tone, setTone] = useState<SynopsisGenerateRequest['tone']>('dramatic');
+  const [setting, setSetting] = useState('');
+  const [targetLength, setTargetLength] = useState<SynopsisGenerateRequest['targetLength']>('medium');
+
+  // 생성된 데이터
+  const [synopsisResult, setSynopsisResult] = useState<SynopsisResult | null>(null);
+  const [characters, setCharacters] = useState<CharacterResult[]>([]);
+  const [stats, setStats] = useState<StatResult[]>([]);
+  const [flags, setFlags] = useState<FlagResult[]>([]);
+  const [endings, setEndings] = useState<EndingResult[]>([]);
+
+  // 로딩 상태
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 시놉시스 생성
+  const handleGenerateSynopsis = useCallback(async () => {
+    if (!idea.trim()) {
+      setError('아이디어를 입력해주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateSynopsis({
+        idea,
+        tone,
+        setting: setting || undefined,
+        targetLength,
+      });
+      setSynopsisResult(response.data);
+      setCurrentStep('synopsis');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '시놉시스 생성에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [idea, tone, setting, targetLength]);
+
+  // 캐릭터 생성
+  const handleGenerateCharacters = useCallback(async () => {
+    if (!synopsisResult) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateWithAI<{ characters: CharacterResult[] }>(
+        'characters',
+        `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n배경: ${synopsisResult.setting.place}, ${synopsisResult.setting.time}\n갈등: ${synopsisResult.conflictType}`,
+        {
+          genre: synopsisResult.genre,
+          title: synopsisResult.title,
+          synopsis: synopsisResult.synopsis,
+        },
+      );
+      setCharacters(response.data.characters || []);
+      setCurrentStep('characters');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '캐릭터 생성에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [synopsisResult]);
+
+  // 시스템(스탯/플래그) 생성
+  const handleGenerateSystem = useCallback(async () => {
+    if (!synopsisResult) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 스탯과 플래그를 병렬로 생성
+      const [statsResponse, flagsResponse] = await Promise.all([
+        generateWithAI<{ stats: StatResult[] }>(
+          'stats',
+          `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n테마: ${synopsisResult.suggestedThemes.join(', ')}\n갈등: ${synopsisResult.conflictType}`,
+          {
+            genre: synopsisResult.genre,
+            title: synopsisResult.title,
+            synopsis: synopsisResult.synopsis,
+            existingCharacters: characters.map((c) => c.characterName),
+          },
+        ),
+        generateWithAI<{ flags: FlagResult[] }>(
+          'flags',
+          `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n서사적 훅: ${synopsisResult.narrativeHooks.join(', ')}`,
+          {
+            genre: synopsisResult.genre,
+            title: synopsisResult.title,
+            synopsis: synopsisResult.synopsis,
+            existingCharacters: characters.map((c) => c.characterName),
+          },
+        ),
+      ]);
+
+      setStats(statsResponse.data.stats || []);
+      setFlags(flagsResponse.data.flags || []);
+      setCurrentStep('system');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '시스템 생성에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [synopsisResult, characters]);
+
+  // 엔딩 생성
+  const handleGenerateEndings = useCallback(async () => {
+    if (!synopsisResult) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateWithAI<{ endings: EndingResult[] }>(
+        'endings',
+        `시나리오: ${synopsisResult.title}\n목표: ${synopsisResult.playerGoal}\n갈등: ${synopsisResult.conflictType}\n스탯: ${stats.map((s) => s.name).join(', ')}\n플래그: ${flags.map((f) => f.flagName).join(', ')}`,
+        {
+          genre: synopsisResult.genre,
+          title: synopsisResult.title,
+          synopsis: synopsisResult.synopsis,
+          existingStats: stats.map((s) => s.name),
+          existingFlags: flags.map((f) => f.flagName),
+        },
+      );
+      setEndings(response.data.endings || []);
+      setCurrentStep('endings');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '엔딩 생성에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [synopsisResult, stats, flags]);
+
+  // 완료 및 적용
+  const handleComplete = useCallback(() => {
+    if (!synopsisResult) return;
+
+    const scenario: Partial<ScenarioData> = {
+      scenarioId: synopsisResult.scenarioId,
+      title: synopsisResult.title,
+      synopsis: synopsisResult.synopsis,
+      playerGoal: synopsisResult.playerGoal,
+      genre: synopsisResult.genre,
+      coreKeywords: synopsisResult.coreKeywords,
+      characters: characters.map((char) => ({
+        roleId: char.roleId,
+        roleName: char.roleName,
+        characterName: char.characterName,
+        backstory: char.backstory || '',
+        imageUrl: '',
+        weightedTraitTypes: char.suggestedTraits || [],
+        currentTrait: null,
+      })),
+      scenarioStats: stats.map((stat) => ({
+        id: stat.id,
+        name: stat.name,
+        description: stat.description || '',
+        min: stat.min || 0,
+        max: stat.max || 100,
+        current: stat.initialValue || 50,
+        initialValue: stat.initialValue || 50,
+        range: [stat.min || 0, stat.max || 100] as [number, number],
+      })),
+      flagDictionary: flags.map((flag) => ({
+        flagName: flag.flagName,
+        description: flag.description || '',
+        type: flag.type || 'boolean',
+        initial: flag.type === 'count' ? 0 : false,
+        triggerCondition: flag.triggerCondition || '',
+      })),
+      endingArchetypes: endings.map((ending) => ({
+        endingId: ending.endingId,
+        title: ending.title,
+        description: ending.description || '',
+        isGoalSuccess: ending.isGoalSuccess || false,
+        systemConditions: [],
+      })),
+      status: 'in_progress',
+    };
+
+    onComplete(scenario);
+  }, [synopsisResult, characters, stats, flags, endings, onComplete]);
+
+  // 단계 이동
+  const goToStep = (step: WizardStep) => {
+    setCurrentStep(step);
+    setError(null);
+  };
+
+  // 현재 단계 인덱스
+  const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep);
+
+  // 단계별 내용 렌더링
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 'idea':
+        return (
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="idea">시나리오 아이디어</Label>
+              <Textarea
+                id="idea"
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                placeholder="예: 좀비 아포칼립스에서 생존자 그룹을 이끌고 안전 지대를 찾아 떠나는 7일간의 여정"
+                className="min-h-[120px]"
+              />
+              <p className="text-xs text-zinc-500">
+                시나리오의 핵심 컨셉을 자유롭게 설명해주세요. AI가 이를 바탕으로 상세한 시놉시스를 생성합니다.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>분위기/톤</Label>
+                <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TONE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex flex-col">
+                          <span>{opt.label}</span>
+                          <span className="text-xs text-zinc-500">{opt.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>시놉시스 길이</Label>
+                <Select
+                  value={targetLength}
+                  onValueChange={(v) => setTargetLength(v as typeof targetLength)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LENGTH_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label} ({opt.description})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="setting">배경 설정 (선택)</Label>
+              <Input
+                id="setting"
+                value={setting}
+                onChange={(e) => setSetting(e.target.value)}
+                placeholder="예: 2024년 대한민국 서울, 근미래 우주 정거장"
+              />
+            </div>
+
+            <Button
+              onClick={handleGenerateSynopsis}
+              disabled={isLoading || !idea.trim()}
+              className="w-full"
+              size="lg"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  시놉시스 생성 중...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  시놉시스 생성하기
+                </>
+              )}
+            </Button>
+          </div>
+        );
+
+      case 'synopsis':
+        return synopsisResult ? (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">{synopsisResult.title}</h3>
+                <p className="text-xs text-zinc-500">ID: {synopsisResult.scenarioId}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {synopsisResult.genre.map((g, i) => (
+                  <Badge key={i} variant="secondary">{g}</Badge>
+                ))}
+              </div>
+
+              <div className="p-4 bg-zinc-800/50 rounded-lg">
+                <p className="text-sm leading-relaxed">{synopsisResult.synopsis}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-zinc-500">목표:</span>
+                  <p className="mt-1">{synopsisResult.playerGoal}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-500">갈등:</span>
+                  <p className="mt-1">{synopsisResult.conflictType}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                {synopsisResult.coreKeywords.map((kw, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
+                ))}
+              </div>
+
+              <div className="p-3 bg-zinc-900/50 rounded-lg text-sm">
+                <p className="text-zinc-500 mb-2">서사적 훅:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {synopsisResult.narrativeHooks.map((hook, i) => (
+                    <li key={i}>{hook}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('idea')}
+                className="flex-1"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 생성
+              </Button>
+              <Button
+                onClick={handleGenerateCharacters}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-2" />
+                )}
+                캐릭터 생성
+              </Button>
+            </div>
+          </div>
+        ) : null;
+
+      case 'characters':
+        return (
+          <div className="space-y-6">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {characters.map((char, idx) => (
+                <Card key={idx} className="bg-zinc-800/30">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium">{char.characterName}</h4>
+                        <p className="text-xs text-zinc-500">{char.roleName} ({char.roleId})</p>
+                      </div>
+                      {char.suggestedTraits && (
+                        <div className="flex gap-1">
+                          {char.suggestedTraits.slice(0, 2).map((t, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">{t}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-400">{char.backstory}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('synopsis')}
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                이전
+              </Button>
+              <Button
+                onClick={handleGenerateSystem}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-2" />
+                )}
+                스탯/플래그 생성
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'system':
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  스탯 ({stats.length}개)
+                </h4>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {stats.map((stat, idx) => (
+                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                      <div className="font-medium">{stat.name}</div>
+                      <div className="text-xs text-zinc-500">{stat.id} ({stat.min}-{stat.max})</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Flag className="w-4 h-4" />
+                  플래그 ({flags.length}개)
+                </h4>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {flags.map((flag, idx) => (
+                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                      <div className="font-medium text-xs">{flag.flagName}</div>
+                      <div className="text-xs text-zinc-500">{flag.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('characters')}
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                이전
+              </Button>
+              <Button
+                onClick={handleGenerateEndings}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-2" />
+                )}
+                엔딩 생성
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'endings':
+        return (
+          <div className="space-y-6">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {endings.map((ending, idx) => (
+                <Card key={idx} className={cn(
+                  "bg-zinc-800/30",
+                  ending.isGoalSuccess ? "border-green-900/50" : "border-red-900/50"
+                )}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-medium">{ending.title}</h4>
+                      <Badge variant={ending.isGoalSuccess ? "default" : "destructive"}>
+                        {ending.isGoalSuccess ? '성공' : '실패'}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-400">{ending.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('system')}
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                이전
+              </Button>
+              <Button
+                onClick={() => setCurrentStep('complete')}
+                className="flex-1"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                완료
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'complete':
+        return (
+          <div className="space-y-6 text-center">
+            <div className="w-16 h-16 mx-auto bg-green-600/20 rounded-full flex items-center justify-center">
+              <Check className="w-8 h-8 text-green-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">시나리오 생성 완료!</h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                "{synopsisResult?.title}" 시나리오가 준비되었습니다.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 text-center text-sm">
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{characters.length}</div>
+                <div className="text-xs text-zinc-500">캐릭터</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{stats.length}</div>
+                <div className="text-xs text-zinc-500">스탯</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{flags.length}</div>
+                <div className="text-xs text-zinc-500">플래그</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{endings.length}</div>
+                <div className="text-xs text-zinc-500">엔딩</div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('idea')}
+                className="flex-1"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                처음부터
+              </Button>
+              <Button
+                onClick={handleComplete}
+                className="flex-1"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                시나리오에 적용
+              </Button>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Card className="bg-zinc-900/50 border-zinc-800">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Wand2 className="w-5 h-5 text-yellow-500" />
+              시나리오 생성 위저드
+            </CardTitle>
+            <CardDescription>
+              단계별로 시나리오를 자동 생성합니다
+            </CardDescription>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            취소
+          </Button>
+        </div>
+
+        {/* 진행 단계 표시 */}
+        <div className="flex items-center justify-between mt-4 px-2">
+          {STEPS.map((step, idx) => {
+            const Icon = step.icon;
+            const isActive = step.key === currentStep;
+            const isCompleted = idx < currentStepIndex;
+
+            return (
+              <React.Fragment key={step.key}>
+                <button
+                  onClick={() => isCompleted && goToStep(step.key)}
+                  disabled={!isCompleted}
+                  className={cn(
+                    'flex flex-col items-center gap-1 transition-all',
+                    isActive && 'text-white',
+                    isCompleted && 'text-green-500 cursor-pointer',
+                    !isActive && !isCompleted && 'text-zinc-600',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                      isActive && 'bg-zinc-700',
+                      isCompleted && 'bg-green-600/20',
+                      !isActive && !isCompleted && 'bg-zinc-800',
+                    )}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Icon className="w-4 h-4" />
+                    )}
+                  </div>
+                  <span className="text-xs">{step.label}</span>
+                </button>
+                {idx < STEPS.length - 1 && (
+                  <div
+                    className={cn(
+                      'flex-1 h-0.5 mx-1',
+                      idx < currentStepIndex ? 'bg-green-600' : 'bg-zinc-800',
+                    )}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/20 border border-red-900 rounded-lg text-sm text-red-400">
+            {error}
+          </div>
+        )}
+        {renderStepContent()}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default ScenarioWizard;
