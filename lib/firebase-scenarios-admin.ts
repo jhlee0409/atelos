@@ -67,6 +67,39 @@ export async function getAllScenariosAdmin(): Promise<ScenarioSummary[]> {
   }
 }
 
+// 활성화된 시나리오만 가져오기 (Admin SDK - 로비용)
+export async function getActiveScenariosAdmin(): Promise<ScenarioSummary[]> {
+  try {
+    const { db } = getFirebaseAdmin();
+    const scenariosRef = db.collection(SCENARIOS_COLLECTION);
+    const snapshot = await scenariosRef.where('status', '==', 'active').get();
+
+    const summaries: ScenarioSummary[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data();
+      summaries.push({
+        scenarioId: data.scenarioId,
+        title: data.title,
+        genre: data.genre || [],
+        coreKeywords: data.coreKeywords || [],
+        posterImageUrl: data.posterImageUrl || '',
+        synopsis: data.synopsis || '',
+        playerGoal: data.playerGoal || '',
+        status: data.status,
+        characterCount: data.characters?.length || 0,
+        createdAt: timestampToISOString(data.createdAt),
+        updatedAt: timestampToISOString(data.updatedAt),
+      });
+    });
+
+    return summaries;
+  } catch (error) {
+    console.error('❌ [Firebase Admin] 활성 시나리오 조회 실패:', error);
+    throw error;
+  }
+}
+
 // 특정 시나리오 가져오기 (Admin SDK)
 export async function getScenarioAdmin(scenarioId: string): Promise<ScenarioData | null> {
   try {
