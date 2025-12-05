@@ -1,6 +1,7 @@
 // Firebase 클라이언트 설정
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Firebase 설정 - 환경 변수에서만 로드
@@ -32,6 +33,9 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Firestore 인스턴스
 export const db = getFirestore(app);
+
+// Storage 인스턴스
+export const storage = getStorage(app);
 
 // Analytics 인스턴스 (브라우저 환경에서만)
 export const getAnalyticsInstance = async () => {

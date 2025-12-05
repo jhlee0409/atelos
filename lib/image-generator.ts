@@ -4,6 +4,7 @@ export type ImageType = 'poster' | 'character';
 
 export interface PosterImageRequest {
   type: 'poster';
+  scenarioId?: string;
   title: string;
   genre: string[];
   synopsis: string;
@@ -12,6 +13,7 @@ export interface PosterImageRequest {
 
 export interface CharacterImageRequest {
   type: 'character';
+  scenarioId?: string;
   characterName: string;
   roleName: string;
   backstory: string;
@@ -24,14 +26,17 @@ export type GenerateImageRequest = PosterImageRequest | CharacterImageRequest;
 export interface GenerateImageResponse {
   success: boolean;
   imageUrl?: string;
+  storagePath?: string;
   message?: string;
   error?: string;
 }
 
 /**
  * AI를 사용하여 포스터 이미지를 생성합니다.
+ * scenarioId를 전달하면 Firebase Storage에 자동 저장됩니다.
  */
 export async function generatePosterImage(params: {
+  scenarioId?: string;
   title: string;
   genre: string[];
   synopsis: string;
@@ -59,6 +64,7 @@ export async function generatePosterImage(params: {
     return {
       success: true,
       imageUrl: data.imageUrl,
+      storagePath: data.storagePath,
       message: data.message,
     };
   } catch (error) {
@@ -75,8 +81,10 @@ export async function generatePosterImage(params: {
 
 /**
  * AI를 사용하여 캐릭터 이미지를 생성합니다.
+ * scenarioId를 전달하면 Firebase Storage에 자동 저장됩니다.
  */
 export async function generateCharacterImage(params: {
+  scenarioId?: string;
   characterName: string;
   roleName: string;
   backstory: string;
@@ -105,6 +113,7 @@ export async function generateCharacterImage(params: {
     return {
       success: true,
       imageUrl: data.imageUrl,
+      storagePath: data.storagePath,
       message: data.message,
     };
   } catch (error) {
