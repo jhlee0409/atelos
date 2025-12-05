@@ -63,7 +63,8 @@
       "min": 0,
       "max": 100,
       "initialValue": 60,
-      "range": [0, 100]
+      "range": [0, 100],
+      "polarity": "negative"
     },
     {
       "id": "communityCohesion",
@@ -73,7 +74,8 @@
       "min": 0,
       "max": 100,
       "initialValue": 40,
-      "range": [0, 100]
+      "range": [0, 100],
+      "polarity": "positive"
     },
     {
       "id": "survivalFoundation",
@@ -83,7 +85,8 @@
       "min": 0,
       "max": 100,
       "initialValue": 20,
-      "range": [0, 100]
+      "range": [0, 100],
+      "polarity": "positive"
     }
   ],
   "traitPool": {
@@ -91,6 +94,7 @@
       {
         "traitId": "LEADERSHIP",
         "traitName": "leadership",
+        "displayName": "리더십",
         "type": "positive",
         "weightType": "leadership",
         "iconUrl": "/storage/images/traits/leadership.png",
@@ -100,6 +104,7 @@
       {
         "traitId": "RULE_OF_LAW",
         "traitName": "rule_of_law",
+        "displayName": "법치주의",
         "type": "positive",
         "weightType": "principles",
         "iconUrl": "/storage/images/traits/rule_of_law.png",
@@ -109,6 +114,7 @@
       {
         "traitId": "ALTRUISM",
         "traitName": "altruism",
+        "displayName": "이타심",
         "type": "positive",
         "weightType": "altruism",
         "iconUrl": "/storage/images/traits/altruism.png",
@@ -120,6 +126,7 @@
       {
         "traitId": "CYNICISM",
         "traitName": "cynicism",
+        "displayName": "냉소주의",
         "type": "negative",
         "weightType": "distrust",
         "iconUrl": "/storage/images/traits/cynicism.png",
@@ -129,6 +136,7 @@
       {
         "traitId": "DICTATORIAL",
         "traitName": "dictatorial",
+        "displayName": "독재적",
         "type": "negative",
         "weightType": "control",
         "iconUrl": "/storage/images/traits/dictatorial.png",

@@ -27,9 +27,16 @@ import {
   generateFallbackInitialChoices,
   detectUrgency,
 } from '@/lib/game-builder';
-import {
-  getStatIdByKorean,
-} from '@/constants/korean-english-mapping';
+
+// 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
+const LEGACY_STAT_MAPPING: Record<string, string> = {
+  '도시 혼란도': 'cityChaos',
+  '공동체 응집력': 'communityCohesion',
+  '생존 기반': 'survivalFoundation',
+  '산소 잔량': 'oxygenLevel',
+  '함체 내구도': 'hullIntegrity',
+  '정신력': 'crewSanity',
+};
 
 // --- Game Logic v2.0 ---
 
@@ -178,7 +185,7 @@ const updateSaveState = (
     }
 
     // 4. 폴백: 정적 매핑 상수 사용 (레거시 호환)
-    const mappedId = getStatIdByKorean(statName);
+    const mappedId = LEGACY_STAT_MAPPING[statName];
     if (mappedId && scenario.scenarioStats.find((s) => s.id === mappedId)) {
       console.log(`📝 스탯 매핑 (폴백 상수): "${statName}" -> "${mappedId}"`);
       return mappedId;

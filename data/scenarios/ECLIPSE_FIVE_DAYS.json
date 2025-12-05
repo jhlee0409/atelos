@@ -96,7 +96,8 @@
       "range": [
         0,
         100
-      ]
+      ],
+      "polarity": "positive"
     },
     {
       "id": "hullIntegrity",
@@ -109,7 +110,8 @@
       "range": [
         0,
         100
-      ]
+      ],
+      "polarity": "positive"
     },
     {
       "id": "crewSanity",
@@ -122,7 +124,8 @@
       "range": [
         0,
         100
-      ]
+      ],
+      "polarity": "positive"
     }
   ],
   "traitPool": {
@@ -130,6 +133,7 @@
       {
         "traitId": "CALM_UNDER_PRESSURE",
         "traitName": "calm_under_pressure",
+        "displayName": "침착함",
         "type": "positive",
         "weightType": "leadership",
         "iconUrl": "/storage/traits/calm.png",
@@ -141,6 +145,7 @@
       {
         "traitId": "PANIC_DISORDER",
         "traitName": "panic_disorder",
+        "displayName": "공황장애",
         "type": "negative",
         "weightType": "anxiety",
         "iconUrl": "/storage/traits/panic.png",

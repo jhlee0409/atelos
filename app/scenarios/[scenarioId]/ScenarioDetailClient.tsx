@@ -4,10 +4,6 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ScenarioData, Character, Trait } from '@/types';
-import {
-  getKoreanRoleName,
-  getKoreanTraitName,
-} from '@/constants/korean-english-mapping';
 
 interface CastedCharacter extends Character {
   assignedTrait: Trait;
@@ -223,7 +219,7 @@ function CharacterCard({ character }: { character: CastedCharacter }) {
             isPositive ? 'text-zinc-300' : 'text-red-400'
           }`}
         >
-          {getKoreanTraitName(character.assignedTrait.traitName)}
+          {character.assignedTrait.displayName || character.assignedTrait.traitName}
         </h4>
         <p className="mt-1 text-xs leading-relaxed text-zinc-500">
           {character.assignedTrait.displayText}

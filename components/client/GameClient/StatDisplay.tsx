@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { getStatPolarity } from '@/constants/korean-english-mapping';
 
 export const StatDisplay = ({
   name,
@@ -7,6 +6,7 @@ export const StatDisplay = ({
   min,
   max,
   statId,
+  polarity = 'positive',
   isCompact = false,
 }: {
   name: string;
@@ -14,6 +14,7 @@ export const StatDisplay = ({
   min: number;
   max: number;
   statId: string;
+  polarity?: 'positive' | 'negative';
   isCompact?: boolean;
   showAmplification?: boolean; // 호환성 유지용 (사용하지 않음)
 }) => {
@@ -21,8 +22,6 @@ export const StatDisplay = ({
     0,
     Math.min(100, ((value - min) / (max - min)) * 100),
   );
-
-  const polarity = getStatPolarity(statId);
 
   // 극성에 따라 색상 설정
   let stateColor = 'bg-blue-500';

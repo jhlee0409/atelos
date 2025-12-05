@@ -28,12 +28,14 @@ export type ScenarioStat = {
   max: number;
   initialValue?: number;
   range?: [number, number];
+  polarity?: 'positive' | 'negative'; // 높을수록 좋음(positive) / 나쁨(negative)
   isEditing?: boolean;
 };
 
 export type Trait = {
   traitId: string;
   traitName: string;
+  displayName?: string; // 한글 표시명 (예: "리더십")
   type: 'positive' | 'negative';
   weightType: string;
   displayText: string;

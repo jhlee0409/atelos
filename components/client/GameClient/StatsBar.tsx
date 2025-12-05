@@ -49,6 +49,7 @@ export const StatsBar = ({
                 min={stat.min}
                 max={stat.max}
                 statId={stat.id}
+                polarity={stat.polarity}
               />
             ))}
             <CharacterArcPanel
@@ -70,6 +71,7 @@ export const StatsBar = ({
                   min={stat.min}
                   max={stat.max}
                   statId={stat.id}
+                  polarity={stat.polarity}
                   isCompact={true}
                 />
               ))}

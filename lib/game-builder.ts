@@ -1,8 +1,30 @@
 import { ScenarioData, Character } from '@/types';
-import {
-  getKoreanTraitName,
-  getKoreanRoleName,
-} from '@/constants/korean-english-mapping';
+
+// 캐릭터 특성 표시명 가져오기 (시나리오 데이터 우선, 폴백으로 traitName 사용)
+const getTraitDisplayName = (char: Character): string => {
+  return (
+    char.currentTrait?.displayName ||
+    char.currentTrait?.traitName ||
+    char.weightedTraitTypes[0] ||
+    '신중한'
+  );
+};
+
+// 역할명 가져오기 (한글이면 그대로, 영어면 폴백 매핑)
+const ROLE_FALLBACK_MAPPING: Record<string, string> = {
+  leader: '리더',
+  guardian: '수호자',
+  heart: '심장',
+  technician: '기술자',
+};
+
+const getRoleDisplayName = (roleName: string): string => {
+  // 이미 한글이면 그대로 반환
+  if (/[가-힣]/.test(roleName)) {
+    return roleName;
+  }
+  return ROLE_FALLBACK_MAPPING[roleName] || roleName;
+};
 
 // Helper to create the initial state from scenario data
 // 기존의 동기 방식 함수 이름을 변경하여 폴백으로 사용
@@ -37,18 +59,9 @@ export const generateFallbackInitialChoices = (
     const char1 = npcs[0];
     const char2 = npcs[1];
 
-    // 영어 특성명을 한글로 변환
-    const char1TraitId =
-      char1.currentTrait?.traitName ||
-      char1.weightedTraitTypes[0] ||
-      'cautious';
-    const char2TraitId =
-      char2.currentTrait?.traitName ||
-      char2.weightedTraitTypes[0] ||
-      'pragmatic';
-
-    const char1MainTrait = getKoreanTraitName(char1TraitId);
-    const char2MainTrait = getKoreanTraitName(char2TraitId);
+    // 시나리오 데이터에서 특성 표시명 가져오기
+    const char1MainTrait = getTraitDisplayName(char1);
+    const char2MainTrait = getTraitDisplayName(char2);
 
     prompt = `${char1.characterName}은(는) "${char1MainTrait}" 특성을 바탕으로 한 해결책을, ${char2.characterName}은(는) "${char2MainTrait}"적인 관점에서 다른 방법을 제안했다. 두 의견이 팽팽하다. 리더인 나는 어떤 결정을 내려야 할까?`;
     choice_a = `${char1.characterName}의 제안을 받아들여, "${char1MainTrait}"을 우선으로 고려한다.`;
@@ -91,8 +104,8 @@ export const generateFallbackInitialChoices = (
       const char1 = role1Characters[0];
       const char2 = role2Characters[0];
 
-      const char1RoleKorean = getKoreanRoleName(char1.roleName);
-      const char2RoleKorean = getKoreanRoleName(char2.roleName);
+      const char1RoleKorean = getRoleDisplayName(char1.roleName);
+      const char2RoleKorean = getRoleDisplayName(char2.roleName);
 
       prompt = `${char1RoleKorean}인 ${char1.characterName}과(와) ${char2RoleKorean}인 ${char2.characterName}이(가) 공동체의 다음 목표를 두고 다른 의견을 내고 있다. 둘 다 공동체를 위한 마음이지만, 방향이 다르다. 리더로서 나는 어느 길을 택해야 할까?`;
       choice_a = `${char1.characterName}의 의견에 따라, ${char1RoleKorean}의 역할을 우선시한다.`;
