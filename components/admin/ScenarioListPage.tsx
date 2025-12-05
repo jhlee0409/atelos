@@ -29,6 +29,7 @@ import {
   Users,
   ChevronRight,
   Wand2,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -168,7 +169,12 @@ function ScenarioCard({
   );
 }
 
-export function ScenarioListPage() {
+interface ScenarioListPageProps {
+  onLogout?: () => void;
+  userEmail?: string | null;
+}
+
+export function ScenarioListPage({ onLogout, userEmail }: ScenarioListPageProps) {
   const router = useRouter();
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -208,9 +214,27 @@ export function ScenarioListPage() {
     <div className="min-h-screen bg-telos-black dark">
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">시나리오 관리</h1>
-          <p className="text-zinc-500 mt-2">시나리오를 생성하고 관리하세요</p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">시나리오 관리</h1>
+            <p className="text-zinc-500 mt-2">시나리오를 생성하고 관리하세요</p>
+          </div>
+          {onLogout && (
+            <div className="flex items-center gap-4">
+              {userEmail && (
+                <span className="text-sm text-zinc-400">{userEmail}</span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLogout}
+                className="text-zinc-400 hover:text-white"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                로그아웃
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* 액션 버튼 */}
