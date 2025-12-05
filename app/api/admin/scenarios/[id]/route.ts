@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScenario } from '@/lib/firebase-scenarios';
+import { getScenario } from '@/lib/firebase-scenarios-admin';
 
 // GET: 특정 시나리오 가져오기
 export async function GET(

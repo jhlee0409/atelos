@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ScenarioData } from '@/types';
 import {
   getAllScenarios,
-  getScenario,
   createScenario,
   updateScenario,
   deleteScenario,
-  ScenarioSummary,
-} from '@/lib/firebase-scenarios';
+} from '@/lib/firebase-scenarios-admin';
 
 // GET: 모든 시나리오 리스트 가져오기
 export async function GET() {

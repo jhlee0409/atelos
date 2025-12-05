@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActiveScenarios } from '@/lib/firebase-scenarios';
+import { getActiveScenarios } from '@/lib/firebase-scenarios-admin';
 
 // GET: 활성화된 시나리오 목록 가져오기 (공개 API - 로비용)
 export async function GET() {
