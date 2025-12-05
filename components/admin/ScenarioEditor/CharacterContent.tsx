@@ -17,6 +17,8 @@ import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { generateCharacterImage } from '@/lib/image-generator';
+import { updateScenario } from '@/lib/scenario-api';
+import { toast } from 'sonner';
 
 type Props = {
   scenario: ScenarioData;
@@ -429,7 +431,9 @@ const CharacterCard = ({
 }: CharacterCardProps) => {
   const [isImageError, setIsImageError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null); // 저장 대기 중인 이미지 URL
 
   // AI로 캐릭터 이미지 생성
   const handleGenerateCharacterImage = async () => {
@@ -458,7 +462,9 @@ const CharacterCard = ({
       });
 
       if (result.success && result.imageUrl) {
-        updateCharacter(index, 'imageUrl', result.imageUrl);
+        // 미리보기용으로 pending 상태에 저장 (아직 DB에 저장 안함)
+        setPendingImageUrl(result.imageUrl);
+        toast.success('캐릭터 이미지가 생성되었습니다. 미리보기를 확인 후 저장해주세요.');
       } else {
         setGenerateError(result.error || '이미지 생성에 실패했습니다.');
       }
@@ -469,6 +475,43 @@ const CharacterCard = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // 생성된 이미지 저장
+  const handleSaveGeneratedImage = async () => {
+    if (!pendingImageUrl) return;
+
+    setIsSavingImage(true);
+    try {
+      // 로컬 상태 업데이트
+      updateCharacter(index, 'imageUrl', pendingImageUrl);
+
+      // 전체 시나리오를 Firestore에 저장
+      const updatedCharacters = [...scenario.characters];
+      updatedCharacters[index] = {
+        ...updatedCharacters[index],
+        imageUrl: pendingImageUrl,
+      };
+      const updatedScenario = {
+        ...scenario,
+        characters: updatedCharacters,
+      };
+
+      await updateScenario(updatedScenario);
+      setPendingImageUrl(null);
+      toast.success('캐릭터 이미지가 저장되었습니다.');
+    } catch (error) {
+      console.error('❌ [CharacterContent] 이미지 저장 실패:', error);
+      toast.error('이미지 저장에 실패했습니다.');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
+  // 생성된 이미지 취소 (다시 생성)
+  const handleDiscardGeneratedImage = () => {
+    setPendingImageUrl(null);
+    toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
   return (
     <Card
@@ -607,8 +650,49 @@ const CharacterCard = ({
                   )}
                 </Button>
               )}
-              {/* 캐릭터 이미지 미리보기 */}
-              {character.imageUrl ? (
+              {/* 새로 생성된 이미지 (저장 대기 중) */}
+              {pendingImageUrl && (
+                <div className="mt-2 rounded-lg border-2 border-green-500 bg-green-50 p-3">
+                  <p className="mb-2 text-xs font-medium text-green-700">
+                    ✨ 새 이미지 생성됨 - 저장하시겠습니까?
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pendingImageUrl}
+                    alt={`${character.characterName || '캐릭터'} 이미지`}
+                    className="h-32 w-32 rounded-lg border object-cover shadow-sm"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      onClick={handleSaveGeneratedImage}
+                      disabled={isSavingImage}
+                      size="sm"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      {isSavingImage ? (
+                        <>
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          저장 중...
+                        </>
+                      ) : (
+                        '저장'
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleDiscardGeneratedImage}
+                      variant="outline"
+                      disabled={isSavingImage}
+                      size="sm"
+                      className="border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 기존 저장된 이미지 */}
+              {!pendingImageUrl && character.imageUrl && (
                 !isImageError ? (
                   <div className="mt-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -619,7 +703,7 @@ const CharacterCard = ({
                       onError={() => setIsImageError(true)}
                     />
                     <p className="mt-1 text-xs text-green-600">
-                      ✓ 이미지 설정됨
+                      ✓ 저장된 이미지
                     </p>
                   </div>
                 ) : (
@@ -627,7 +711,10 @@ const CharacterCard = ({
                     이미지를 불러올 수 없습니다
                   </p>
                 )
-              ) : (
+              )}
+
+              {/* 이미지 없음 */}
+              {!pendingImageUrl && !character.imageUrl && (
                 <div className="mt-2 flex h-24 w-24 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                   <UserCircle className="h-8 w-8 text-gray-400" />
                   <p className="mt-1 text-center text-xs text-gray-500">

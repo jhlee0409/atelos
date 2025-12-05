@@ -11,20 +11,25 @@ import { SetStateAction, useState } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
 import { cn } from '@/lib/utils';
 import { generatePosterImage } from '@/lib/image-generator';
+import { updateScenario } from '@/lib/scenario-api';
+import { toast } from 'sonner';
 
 type Props = {
   scenario: ScenarioData;
   setScenario: (value: SetStateAction<ScenarioData>) => void;
   errors: string[];
+  onSave?: () => Promise<void>; // 이미지 생성 후 자동 저장용
 };
 
-export default function BaseContent({ scenario, setScenario, errors }: Props) {
+export default function BaseContent({ scenario, setScenario, errors, onSave }: Props) {
   const [newGenre, setNewGenre] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
 
   const [isImageError, setIsImageError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null); // 저장 대기 중인 이미지 URL
 
   // AI로 포스터 이미지 생성
   const handleGeneratePoster = async () => {
@@ -53,16 +58,10 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
 
       console.log('🎨 [BaseContent] 이미지 생성 결과:', result);
       if (result.success && result.imageUrl) {
-        console.log('✅ [BaseContent] 이미지 URL 설정:', result.imageUrl);
-        setScenario((prev) => {
-          console.log('📝 [BaseContent] 이전 posterImageUrl:', prev.posterImageUrl);
-          const newScenario = {
-            ...prev,
-            posterImageUrl: result.imageUrl!,
-          };
-          console.log('📝 [BaseContent] 새 posterImageUrl:', newScenario.posterImageUrl);
-          return newScenario;
-        });
+        console.log('✅ [BaseContent] 이미지 URL 생성 완료:', result.imageUrl);
+        // 미리보기용으로 pending 상태에 저장 (아직 DB에 저장 안함)
+        setPendingImageUrl(result.imageUrl);
+        toast.success('이미지가 생성되었습니다. 미리보기를 확인 후 저장해주세요.');
       } else {
         console.error('❌ [BaseContent] 이미지 생성 실패:', result.error);
         setGenerateError(result.error || '이미지 생성에 실패했습니다.');
@@ -74,6 +73,35 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // 생성된 이미지 저장
+  const handleSaveGeneratedImage = async () => {
+    if (!pendingImageUrl) return;
+
+    setIsSavingImage(true);
+    try {
+      const updatedScenario = {
+        ...scenario,
+        posterImageUrl: pendingImageUrl,
+      };
+
+      await updateScenario(updatedScenario);
+      setScenario(updatedScenario);
+      setPendingImageUrl(null);
+      toast.success('포스터 이미지가 저장되었습니다.');
+    } catch (error) {
+      console.error('❌ [BaseContent] 이미지 저장 실패:', error);
+      toast.error('이미지 저장에 실패했습니다.');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
+  // 생성된 이미지 취소 (다시 생성)
+  const handleDiscardGeneratedImage = () => {
+    setPendingImageUrl(null);
+    toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
 
   // Tag management
@@ -191,7 +219,47 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
           </div>
           {/* 이미지 미리보기 영역 */}
           <div className="mt-3">
-            {scenario.posterImageUrl ? (
+            {/* 새로 생성된 이미지 (저장 대기 중) */}
+            {pendingImageUrl && (
+              <div className="rounded-lg border-2 border-green-500 bg-green-50 p-4">
+                <p className="mb-2 text-sm font-medium text-green-700">
+                  ✨ 새 이미지가 생성되었습니다 - 저장하시겠습니까?
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingImageUrl}
+                  alt="생성된 포스터 미리보기"
+                  className="h-64 w-44 rounded border object-cover"
+                />
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    onClick={handleSaveGeneratedImage}
+                    disabled={isSavingImage}
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    {isSavingImage ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      '이 이미지로 저장'
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleDiscardGeneratedImage}
+                    variant="outline"
+                    disabled={isSavingImage}
+                    className="border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    취소 (다시 생성)
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* 기존 저장된 이미지 */}
+            {!pendingImageUrl && scenario.posterImageUrl && (
               <div className="rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">
                 <p
                   className={cn(
@@ -200,7 +268,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                   )}
                 >
                   {!isImageError
-                    ? '✓ 이미지 설정됨 (저장 버튼을 눌러 DB에 저장하세요)'
+                    ? '✓ 저장된 포스터 이미지'
                     : '✗ 이미지를 불러올 수 없습니다'}
                 </p>
                 {!isImageError && (
@@ -213,7 +281,10 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
                   />
                 )}
               </div>
-            ) : (
+            )}
+
+            {/* 이미지 없음 */}
+            {!pendingImageUrl && !scenario.posterImageUrl && (
               <div className={cn(
                 "rounded-lg border-2 border-dashed p-6 text-center",
                 errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)
