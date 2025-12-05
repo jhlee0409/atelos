@@ -1,7 +1,6 @@
 import { ScenarioData, Character } from '@/types';
 import {
   getKoreanTraitName,
-  getKoreanStatName,
   getKoreanRoleName,
 } from '@/constants/korean-english-mapping';
 
@@ -58,7 +57,7 @@ export const generateFallbackInitialChoices = (
   // 2-2. 위험한 스탯이 있을 때: 전문가의 과감한 제안 vs 안전
   else if (criticalStats.length > 0) {
     const criticalStat = criticalStats[0];
-    const criticalStatKoreanName = getKoreanStatName(criticalStat.id);
+    const criticalStatKoreanName = criticalStat.name; // 시나리오 데이터에서 직접 사용
 
     const expertCharacter =
       npcs.find(

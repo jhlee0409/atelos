@@ -29,11 +29,6 @@ import {
 } from '@/lib/game-builder';
 import {
   getStatIdByKorean,
-  getKoreanStatName,
-  getKoreanFlagName,
-  getKoreanRoleName,
-  getKoreanTraitName,
-  getKoreanStatusName,
 } from '@/constants/korean-english-mapping';
 
 // --- Game Logic v2.0 ---
@@ -154,31 +149,24 @@ const updateSaveState = (
     hiddenRelationships_change,
     shouldAdvanceTime,
   } = aiResponse.statChanges;
-  // 한국어 스탯 이름을 영어 ID로 매핑하는 함수 (개선된 버전)
+  // 한국어 스탯 이름을 영어 ID로 매핑하는 함수 (시나리오 데이터 우선)
   const mapStatNameToId = (
     statName: string,
     scenario: ScenarioData,
   ): string => {
-    // 먼저 정확한 ID 매치 시도
+    // 1. 정확한 ID 매치 시도 (이미 영어 ID인 경우)
     if (scenario.scenarioStats.find((s) => s.id === statName)) {
       return statName;
     }
 
-    // 매핑 상수를 사용한 한국어 -> 영어 변환
-    const mappedId = getStatIdByKorean(statName);
-    if (mappedId && scenario.scenarioStats.find((s) => s.id === mappedId)) {
-      console.log(`📝 스탯 매핑 (상수): "${statName}" -> "${mappedId}"`);
-      return mappedId;
-    }
-
-    // 한국어 이름으로 매칭 시도 (기존 로직)
+    // 2. 시나리오 데이터 기반: 한국어 이름으로 매칭 (우선!)
     const statByName = scenario.scenarioStats.find((s) => s.name === statName);
     if (statByName) {
       console.log(`📝 스탯 이름 매핑: "${statName}" -> "${statByName.id}"`);
       return statByName.id;
     }
 
-    // 부분 매칭 시도 (한국어 이름이 포함된 경우)
+    // 3. 부분 매칭 시도 (한국어 이름이 포함된 경우)
     const statByPartialName = scenario.scenarioStats.find(
       (s) => s.name.includes(statName) || statName.includes(s.name),
     );
@@ -187,6 +175,13 @@ const updateSaveState = (
         `📝 스탯 부분 매핑: "${statName}" -> "${statByPartialName.id}"`,
       );
       return statByPartialName.id;
+    }
+
+    // 4. 폴백: 정적 매핑 상수 사용 (레거시 호환)
+    const mappedId = getStatIdByKorean(statName);
+    if (mappedId && scenario.scenarioStats.find((s) => s.id === mappedId)) {
+      console.log(`📝 스탯 매핑 (폴백 상수): "${statName}" -> "${mappedId}"`);
+      return mappedId;
     }
 
     console.warn(
