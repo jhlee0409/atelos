@@ -93,7 +93,7 @@ const compressCharacters = (characters: Character[]): string => {
     .filter(char => char.characterName !== '(플레이어)')
     .slice(0, 5) // 최대 5명만
     .map(char => {
-      const trait = char.currentTrait?.traitName || char.weightedTraitTypes[0] || '';
+      const trait = char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '';
       return `${char.characterName}(${trait})`;
     })
     .join(',');

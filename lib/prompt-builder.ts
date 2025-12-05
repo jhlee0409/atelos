@@ -477,7 +477,7 @@ const buildFullPrompt = (
     .map((char) => {
       // currentTrait를 우선 사용, 없으면 weightedTraitTypes 사용
       const mainTraits = char.currentTrait
-        ? [char.currentTrait.traitName]
+        ? [char.currentTrait.displayName || char.currentTrait.traitName]
         : char.weightedTraitTypes.slice(0, 3);
 
       const traitsDisplay = mainTraits.join(', ');
@@ -637,7 +637,7 @@ export const buildInitialDilemmaPrompt = (
   const characterBible = npcs
     .map((char) => {
       const mainTraits = char.currentTrait
-        ? [char.currentTrait.traitName]
+        ? [char.currentTrait.displayName || char.currentTrait.traitName]
         : char.weightedTraitTypes.slice(0, 3);
       const traitsDisplay = mainTraits.join(', ');
       return `* ${char.characterName}(${char.roleName}): Background[${char.backstory}], Traits[${traitsDisplay}]`;

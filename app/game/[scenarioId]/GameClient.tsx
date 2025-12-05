@@ -101,7 +101,7 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       survivors: charactersWithTraits.map((c) => ({
         name: c.characterName,
         role: c.roleName,
-        traits: c.currentTrait ? [c.currentTrait.traitName] : [],
+        traits: c.currentTrait ? [c.currentTrait.displayName || c.currentTrait.traitName] : [],
         status: 'normal',
       })),
       hiddenRelationships,
