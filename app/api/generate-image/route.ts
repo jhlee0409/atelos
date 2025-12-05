@@ -363,40 +363,45 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [Image Gen] 이미지 생성 성공');
 
-    // scenarioId가 있으면 Firebase Storage에 업로드
-    if (scenarioId) {
-      const fileName = type === 'character' && body.characterName
-        ? body.characterName
-        : undefined;
-
-      const uploadResult = await uploadBase64ImageAdmin(
-        imageBase64,
-        scenarioId,
-        type,
-        fileName
+    // scenarioId가 필수 - Firebase Storage에 업로드
+    if (!scenarioId) {
+      console.error('❌ [Image Gen] scenarioId가 없습니다.');
+      return NextResponse.json(
+        { error: 'scenarioId가 필요합니다. 시나리오 ID를 먼저 입력해주세요.' },
+        { status: 400 },
       );
-
-      if (uploadResult.success && uploadResult.url) {
-        console.log('✅ [Image Gen] Firebase Storage 업로드 성공');
-        return NextResponse.json({
-          success: true,
-          imageUrl: uploadResult.url,
-          storagePath: uploadResult.path,
-          message: textResponse,
-        });
-      } else {
-        console.warn('⚠️ [Image Gen] Storage 업로드 실패, base64 반환');
-      }
     }
 
-    // Storage 저장 실패 또는 scenarioId 없으면 Base64 반환
-    const imageUrl = `data:image/png;base64,${imageBase64}`;
+    const fileName = type === 'character' && body.characterName
+      ? body.characterName
+      : undefined;
 
-    return NextResponse.json({
-      success: true,
-      imageUrl,
-      message: textResponse,
-    });
+    const uploadResult = await uploadBase64ImageAdmin(
+      imageBase64,
+      scenarioId,
+      type,
+      fileName
+    );
+
+    if (uploadResult.success && uploadResult.url) {
+      console.log('✅ [Image Gen] Firebase Storage 업로드 성공:', uploadResult.url);
+      return NextResponse.json({
+        success: true,
+        imageUrl: uploadResult.url,
+        storagePath: uploadResult.path,
+        message: textResponse,
+      });
+    }
+
+    // Storage 업로드 실패 시 에러 반환
+    console.error('❌ [Image Gen] Storage 업로드 실패:', uploadResult.error);
+    return NextResponse.json(
+      {
+        error: uploadResult.error || 'Firebase Storage 업로드에 실패했습니다. 환경변수를 확인해주세요.',
+        details: '이미지는 생성되었지만 Storage에 저장하지 못했습니다.'
+      },
+      { status: 500 },
+    );
   } catch (error) {
     console.error('❌ [Image Gen] 이미지 생성 실패:', error);
 

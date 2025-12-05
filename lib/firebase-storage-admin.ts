@@ -21,13 +21,15 @@ export async function uploadBase64ImageAdmin(
   fileName?: string
 ): Promise<UploadResult> {
   try {
+    console.log(`📤 [Storage Admin] 업로드 시작: ${imageType} for ${scenarioId}`);
+
     const { storage } = getFirebaseAdmin();
 
     if (!storage) {
       console.error('❌ [Storage Admin] Firebase Storage가 초기화되지 않았습니다.');
       return {
         success: false,
-        error: 'Firebase Storage가 초기화되지 않았습니다.',
+        error: 'Firebase Storage가 초기화되지 않았습니다. 환경변수를 확인해주세요.',
       };
     }
 
@@ -38,15 +40,28 @@ export async function uploadBase64ImageAdmin(
 
     // Buffer로 변환
     const imageBuffer = Buffer.from(base64Content, 'base64');
+    console.log(`📤 [Storage Admin] 이미지 크기: ${imageBuffer.length} bytes`);
 
     // 파일명 생성
     const timestamp = Date.now();
     const name = fileName || `${imageType}_${timestamp}`;
     const path = `scenarios/${scenarioId}/${imageType}s/${name}.png`;
 
+    // 버킷 이름 확인
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+    if (!storageBucket) {
+      console.error('❌ [Storage Admin] FIREBASE_STORAGE_BUCKET 환경변수가 설정되지 않았습니다.');
+      return {
+        success: false,
+        error: 'FIREBASE_STORAGE_BUCKET 환경변수가 설정되지 않았습니다.',
+      };
+    }
+
     // 버킷과 파일 참조 가져오기
-    const bucket = storage.bucket();
+    const bucket = storage.bucket(storageBucket);
     const file = bucket.file(path);
+
+    console.log(`📤 [Storage Admin] 버킷: ${storageBucket}, 경로: ${path}`);
 
     // 파일 업로드
     await file.save(imageBuffer, {
@@ -60,9 +75,9 @@ export async function uploadBase64ImageAdmin(
     await file.makePublic();
 
     // 공개 URL 생성
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${path}`;
+    const publicUrl = `https://storage.googleapis.com/${storageBucket}/${path}`;
 
-    console.log(`✅ [Storage Admin] 이미지 업로드 성공: ${path}`);
+    console.log(`✅ [Storage Admin] 이미지 업로드 성공: ${publicUrl}`);
 
     return {
       success: true,
@@ -71,9 +86,11 @@ export async function uploadBase64ImageAdmin(
     };
   } catch (error) {
     console.error('❌ [Storage Admin] 이미지 업로드 실패:', error);
+    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+    console.error('❌ [Storage Admin] 에러 상세:', errorMessage);
     return {
       success: false,
-      error: error instanceof Error ? error.message : '업로드 실패',
+      error: `Storage 업로드 실패: ${errorMessage}`,
     };
   }
 }
