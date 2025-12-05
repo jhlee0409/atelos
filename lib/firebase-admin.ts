@@ -1,4 +1,5 @@
 // Firebase Admin SDK - 서버 전용
+// 참고: 이미지 저장은 Vercel Blob Storage 사용 (lib/blob-storage.ts)
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';

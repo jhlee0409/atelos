@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2, UserCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -16,8 +16,9 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
-import Image from 'next/image';
-import { generateCharacterImage } from '@/lib/image-generator';
+import { generateCharacterImage, uploadImage } from '@/lib/image-generator';
+import { updateScenario } from '@/lib/scenario-api';
+import { toast } from 'sonner';
 
 type Props = {
   scenario: ScenarioData;
@@ -430,7 +431,9 @@ const CharacterCard = ({
 }: CharacterCardProps) => {
   const [isImageError, setIsImageError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [pendingImageBase64, setPendingImageBase64] = useState<string | null>(null); // 저장 대기 중인 base64 이미지
 
   // AI로 캐릭터 이미지 생성
   const handleGenerateCharacterImage = async () => {
@@ -452,8 +455,10 @@ const CharacterCard = ({
         scenarioGenre: scenario.genre || [],
       });
 
-      if (result.success && result.imageUrl) {
-        updateCharacter(index, 'imageUrl', result.imageUrl);
+      if (result.success && result.imageBase64) {
+        // 미리보기용으로 pending 상태에 저장 (아직 Storage에 업로드 안함)
+        setPendingImageBase64(result.imageBase64);
+        toast.success('캐릭터 이미지가 생성되었습니다. 미리보기를 확인 후 저장해주세요.');
       } else {
         setGenerateError(result.error || '이미지 생성에 실패했습니다.');
       }
@@ -464,6 +469,63 @@ const CharacterCard = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // 생성된 이미지 저장 (Storage 업로드 → Firestore 저장)
+  const handleSaveGeneratedImage = async () => {
+    if (!pendingImageBase64) return;
+
+    if (!scenario.scenarioId) {
+      toast.error('시나리오 ID가 필요합니다. 먼저 시나리오 ID를 입력해주세요.');
+      return;
+    }
+
+    setIsSavingImage(true);
+    try {
+      // 1. Vercel Blob Storage에 업로드
+      console.log('📤 [CharacterContent] Storage 업로드 시작...');
+      const uploadResult = await uploadImage({
+        imageBase64: pendingImageBase64,
+        scenarioId: scenario.scenarioId,
+        type: 'character',
+        fileName: character.characterName,
+      });
+
+      if (!uploadResult.success || !uploadResult.imageUrl) {
+        throw new Error(uploadResult.error || 'Storage 업로드에 실패했습니다.');
+      }
+
+      console.log('✅ [CharacterContent] Storage 업로드 완료:', uploadResult.imageUrl);
+
+      // 2. 로컬 상태 업데이트
+      updateCharacter(index, 'imageUrl', uploadResult.imageUrl);
+
+      // 3. Firestore에 저장
+      const updatedCharacters = [...scenario.characters];
+      updatedCharacters[index] = {
+        ...updatedCharacters[index],
+        imageUrl: uploadResult.imageUrl,
+      };
+      const updatedScenario = {
+        ...scenario,
+        characters: updatedCharacters,
+      };
+
+      await updateScenario(updatedScenario);
+      setPendingImageBase64(null);
+      toast.success('캐릭터 이미지가 저장되었습니다.');
+    } catch (error) {
+      console.error('❌ [CharacterContent] 이미지 저장 실패:', error);
+      toast.error(error instanceof Error ? error.message : '이미지 저장에 실패했습니다.');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
+  // 생성된 이미지 취소 (다시 생성)
+  const handleDiscardGeneratedImage = () => {
+    setPendingImageBase64(null);
+    toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
   return (
     <Card
@@ -602,22 +664,77 @@ const CharacterCard = ({
                   )}
                 </Button>
               )}
-              {character.imageUrl && !isImageError && (
-                <Image
-                  src={character.imageUrl || '/placeholder.svg'}
-                  alt="캐릭터 이미지"
-                  className="h-20 w-20 rounded border object-cover"
-                  onError={() => {
-                    setIsImageError(true);
-                  }}
-                  width={100}
-                  height={100}
-                />
+              {/* 새로 생성된 이미지 (저장 대기 중) */}
+              {pendingImageBase64 && (
+                <div className="mt-2 rounded-lg border-2 border-green-500 bg-green-50 p-3">
+                  <p className="mb-2 text-xs font-medium text-green-700">
+                    ✨ 새 이미지 생성됨 - 저장하시겠습니까?
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pendingImageBase64}
+                    alt={`${character.characterName || '캐릭터'} 이미지`}
+                    className="h-32 w-32 rounded-lg border object-cover shadow-sm"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      onClick={handleSaveGeneratedImage}
+                      disabled={isSavingImage}
+                      size="sm"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      {isSavingImage ? (
+                        <>
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          저장 중...
+                        </>
+                      ) : (
+                        '저장'
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleDiscardGeneratedImage}
+                      variant="outline"
+                      disabled={isSavingImage}
+                      size="sm"
+                      className="border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
               )}
-              {isImageError && (
-                <p className="text-sm text-red-500">
-                  이미지를 찾을 수 없습니다
-                </p>
+
+              {/* 기존 저장된 이미지 */}
+              {!pendingImageBase64 && character.imageUrl && (
+                !isImageError ? (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={character.imageUrl}
+                      alt={`${character.characterName || '캐릭터'} 이미지`}
+                      className="h-24 w-24 rounded-lg border object-cover shadow-sm"
+                      onError={() => setIsImageError(true)}
+                    />
+                    <p className="mt-1 text-xs text-green-600">
+                      ✓ 저장된 이미지
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-red-500">
+                    이미지를 불러올 수 없습니다
+                  </p>
+                )
+              )}
+
+              {/* 이미지 없음 */}
+              {!pendingImageBase64 && !character.imageUrl && (
+                <div className="mt-2 flex h-24 w-24 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                  <UserCircle className="h-8 w-8 text-gray-400" />
+                  <p className="mt-1 text-center text-xs text-gray-500">
+                    미생성
+                  </p>
+                </div>
               )}
               {generateError && (
                 <p className="text-sm text-red-500">{generateError}</p>

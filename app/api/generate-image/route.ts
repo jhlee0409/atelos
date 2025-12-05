@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { uploadBase64Image } from '@/lib/firebase-storage';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -26,7 +25,7 @@ export type ImageType = 'poster' | 'character';
 
 interface GenerateImageRequestBody {
   type: ImageType;
-  scenarioId?: string; // Firebase Storage 저장용
+  scenarioId?: string; // Vercel Blob Storage 저장용
   // 포스터용 필드
   title?: string;
   genre?: string[];
@@ -363,38 +362,10 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [Image Gen] 이미지 생성 성공');
 
-    // scenarioId가 있으면 Firebase Storage에 업로드
-    if (scenarioId) {
-      const fileName = type === 'character' && body.characterName
-        ? body.characterName
-        : undefined;
-
-      const uploadResult = await uploadBase64Image(
-        imageBase64,
-        scenarioId,
-        type,
-        fileName
-      );
-
-      if (uploadResult.success && uploadResult.url) {
-        console.log('✅ [Image Gen] Firebase Storage 업로드 성공');
-        return NextResponse.json({
-          success: true,
-          imageUrl: uploadResult.url,
-          storagePath: uploadResult.path,
-          message: textResponse,
-        });
-      } else {
-        console.warn('⚠️ [Image Gen] Storage 업로드 실패, base64 반환');
-      }
-    }
-
-    // Storage 저장 실패 또는 scenarioId 없으면 Base64 반환
-    const imageUrl = `data:image/png;base64,${imageBase64}`;
-
+    // base64 이미지 데이터를 반환 (업로드는 클라이언트에서 저장 버튼 클릭 시 수행)
     return NextResponse.json({
       success: true,
-      imageUrl,
+      imageBase64: `data:image/png;base64,${imageBase64}`,
       message: textResponse,
     });
   } catch (error) {
