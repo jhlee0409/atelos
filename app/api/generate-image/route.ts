@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { uploadBase64Image } from '@/lib/firebase-storage';
+import { uploadBase64ImageAdmin } from '@/lib/firebase-storage-admin';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -369,7 +369,7 @@ export async function POST(request: NextRequest) {
         ? body.characterName
         : undefined;
 
-      const uploadResult = await uploadBase64Image(
+      const uploadResult = await uploadBase64ImageAdmin(
         imageBase64,
         scenarioId,
         type,

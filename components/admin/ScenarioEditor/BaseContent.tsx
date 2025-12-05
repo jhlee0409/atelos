@@ -34,12 +34,18 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
       return;
     }
 
+    if (!scenario.scenarioId) {
+      setGenerateError('시나리오 ID를 먼저 입력해주세요. (Firebase Storage 저장에 필요)');
+      return;
+    }
+
     setIsGenerating(true);
     setGenerateError(null);
     setIsImageError(false);
 
     try {
       const result = await generatePosterImage({
+        scenarioId: scenario.scenarioId, // Firebase Storage에 저장
         title: scenario.title,
         genre: scenario.genre,
         synopsis: scenario.synopsis,

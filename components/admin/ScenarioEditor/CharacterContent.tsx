@@ -439,12 +439,18 @@ const CharacterCard = ({
       return;
     }
 
+    if (!scenario.scenarioId) {
+      setGenerateError('시나리오 ID를 먼저 입력해주세요. (Firebase Storage 저장에 필요)');
+      return;
+    }
+
     setIsGenerating(true);
     setGenerateError(null);
     setIsImageError(false);
 
     try {
       const result = await generateCharacterImage({
+        scenarioId: scenario.scenarioId, // Firebase Storage에 저장
         characterName: character.characterName,
         roleName: character.roleName || '',
         backstory: character.backstory || '',
