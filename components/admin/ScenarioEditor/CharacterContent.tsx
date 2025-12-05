@@ -16,7 +16,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
-import { generateCharacterImage } from '@/lib/image-generator';
+import { generateCharacterImage, uploadImage } from '@/lib/image-generator';
 import { updateScenario } from '@/lib/scenario-api';
 import { toast } from 'sonner';
 
@@ -433,17 +433,12 @@ const CharacterCard = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null); // 저장 대기 중인 이미지 URL
+  const [pendingImageBase64, setPendingImageBase64] = useState<string | null>(null); // 저장 대기 중인 base64 이미지
 
   // AI로 캐릭터 이미지 생성
   const handleGenerateCharacterImage = async () => {
     if (!character.characterName) {
       setGenerateError('캐릭터 이름을 먼저 입력해주세요.');
-      return;
-    }
-
-    if (!scenario.scenarioId) {
-      setGenerateError('시나리오 ID를 먼저 입력해주세요. (이미지 저장에 필요)');
       return;
     }
 
@@ -453,7 +448,6 @@ const CharacterCard = ({
 
     try {
       const result = await generateCharacterImage({
-        scenarioId: scenario.scenarioId, // Vercel Blob Storage에 저장
         characterName: character.characterName,
         roleName: character.roleName || '',
         backstory: character.backstory || '',
@@ -461,9 +455,9 @@ const CharacterCard = ({
         scenarioGenre: scenario.genre || [],
       });
 
-      if (result.success && result.imageUrl) {
-        // 미리보기용으로 pending 상태에 저장 (아직 DB에 저장 안함)
-        setPendingImageUrl(result.imageUrl);
+      if (result.success && result.imageBase64) {
+        // 미리보기용으로 pending 상태에 저장 (아직 Storage에 업로드 안함)
+        setPendingImageBase64(result.imageBase64);
         toast.success('캐릭터 이미지가 생성되었습니다. 미리보기를 확인 후 저장해주세요.');
       } else {
         setGenerateError(result.error || '이미지 생성에 실패했습니다.');
@@ -477,20 +471,40 @@ const CharacterCard = ({
     }
   };
 
-  // 생성된 이미지 저장
+  // 생성된 이미지 저장 (Storage 업로드 → Firestore 저장)
   const handleSaveGeneratedImage = async () => {
-    if (!pendingImageUrl) return;
+    if (!pendingImageBase64) return;
+
+    if (!scenario.scenarioId) {
+      toast.error('시나리오 ID가 필요합니다. 먼저 시나리오 ID를 입력해주세요.');
+      return;
+    }
 
     setIsSavingImage(true);
     try {
-      // 로컬 상태 업데이트
-      updateCharacter(index, 'imageUrl', pendingImageUrl);
+      // 1. Vercel Blob Storage에 업로드
+      console.log('📤 [CharacterContent] Storage 업로드 시작...');
+      const uploadResult = await uploadImage({
+        imageBase64: pendingImageBase64,
+        scenarioId: scenario.scenarioId,
+        type: 'character',
+        fileName: character.characterName,
+      });
 
-      // 전체 시나리오를 Firestore에 저장
+      if (!uploadResult.success || !uploadResult.imageUrl) {
+        throw new Error(uploadResult.error || 'Storage 업로드에 실패했습니다.');
+      }
+
+      console.log('✅ [CharacterContent] Storage 업로드 완료:', uploadResult.imageUrl);
+
+      // 2. 로컬 상태 업데이트
+      updateCharacter(index, 'imageUrl', uploadResult.imageUrl);
+
+      // 3. Firestore에 저장
       const updatedCharacters = [...scenario.characters];
       updatedCharacters[index] = {
         ...updatedCharacters[index],
-        imageUrl: pendingImageUrl,
+        imageUrl: uploadResult.imageUrl,
       };
       const updatedScenario = {
         ...scenario,
@@ -498,11 +512,11 @@ const CharacterCard = ({
       };
 
       await updateScenario(updatedScenario);
-      setPendingImageUrl(null);
+      setPendingImageBase64(null);
       toast.success('캐릭터 이미지가 저장되었습니다.');
     } catch (error) {
       console.error('❌ [CharacterContent] 이미지 저장 실패:', error);
-      toast.error('이미지 저장에 실패했습니다.');
+      toast.error(error instanceof Error ? error.message : '이미지 저장에 실패했습니다.');
     } finally {
       setIsSavingImage(false);
     }
@@ -510,7 +524,7 @@ const CharacterCard = ({
 
   // 생성된 이미지 취소 (다시 생성)
   const handleDiscardGeneratedImage = () => {
-    setPendingImageUrl(null);
+    setPendingImageBase64(null);
     toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
   return (
@@ -651,14 +665,14 @@ const CharacterCard = ({
                 </Button>
               )}
               {/* 새로 생성된 이미지 (저장 대기 중) */}
-              {pendingImageUrl && (
+              {pendingImageBase64 && (
                 <div className="mt-2 rounded-lg border-2 border-green-500 bg-green-50 p-3">
                   <p className="mb-2 text-xs font-medium text-green-700">
                     ✨ 새 이미지 생성됨 - 저장하시겠습니까?
                   </p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={pendingImageUrl}
+                    src={pendingImageBase64}
                     alt={`${character.characterName || '캐릭터'} 이미지`}
                     className="h-32 w-32 rounded-lg border object-cover shadow-sm"
                   />
@@ -692,7 +706,7 @@ const CharacterCard = ({
               )}
 
               {/* 기존 저장된 이미지 */}
-              {!pendingImageUrl && character.imageUrl && (
+              {!pendingImageBase64 && character.imageUrl && (
                 !isImageError ? (
                   <div className="mt-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -714,7 +728,7 @@ const CharacterCard = ({
               )}
 
               {/* 이미지 없음 */}
-              {!pendingImageUrl && !character.imageUrl && (
+              {!pendingImageBase64 && !character.imageUrl && (
                 <div className="mt-2 flex h-24 w-24 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                   <UserCircle className="h-8 w-8 text-gray-400" />
                   <p className="mt-1 text-center text-xs text-gray-500">

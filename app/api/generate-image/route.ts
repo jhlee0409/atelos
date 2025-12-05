@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { uploadBase64Image } from '@/lib/blob-storage';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -363,45 +362,12 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [Image Gen] 이미지 생성 성공');
 
-    // scenarioId가 필수 - Vercel Blob Storage에 업로드
-    if (!scenarioId) {
-      console.error('❌ [Image Gen] scenarioId가 없습니다.');
-      return NextResponse.json(
-        { error: 'scenarioId가 필요합니다. 시나리오 ID를 먼저 입력해주세요.' },
-        { status: 400 },
-      );
-    }
-
-    const fileName = type === 'character' && body.characterName
-      ? body.characterName
-      : undefined;
-
-    const uploadResult = await uploadBase64Image(
-      imageBase64,
-      scenarioId,
-      type,
-      fileName
-    );
-
-    if (uploadResult.success && uploadResult.url) {
-      console.log('✅ [Image Gen] Vercel Blob Storage 업로드 성공:', uploadResult.url);
-      return NextResponse.json({
-        success: true,
-        imageUrl: uploadResult.url,
-        storagePath: uploadResult.path,
-        message: textResponse,
-      });
-    }
-
-    // Storage 업로드 실패 시 에러 반환
-    console.error('❌ [Image Gen] Storage 업로드 실패:', uploadResult.error);
-    return NextResponse.json(
-      {
-        error: uploadResult.error || 'Vercel Blob Storage 업로드에 실패했습니다. BLOB_READ_WRITE_TOKEN 환경변수를 확인해주세요.',
-        details: '이미지는 생성되었지만 Storage에 저장하지 못했습니다.'
-      },
-      { status: 500 },
-    );
+    // base64 이미지 데이터를 반환 (업로드는 클라이언트에서 저장 버튼 클릭 시 수행)
+    return NextResponse.json({
+      success: true,
+      imageBase64: `data:image/png;base64,${imageBase64}`,
+      message: textResponse,
+    });
   } catch (error) {
     console.error('❌ [Image Gen] 이미지 생성 실패:', error);
 

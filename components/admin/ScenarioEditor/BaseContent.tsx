@@ -10,7 +10,7 @@ import type { ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
 import { cn } from '@/lib/utils';
-import { generatePosterImage } from '@/lib/image-generator';
+import { generatePosterImage, uploadImage } from '@/lib/image-generator';
 import { updateScenario } from '@/lib/scenario-api';
 import { toast } from 'sonner';
 
@@ -29,17 +29,12 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null); // 저장 대기 중인 이미지 URL
+  const [pendingImageBase64, setPendingImageBase64] = useState<string | null>(null); // 저장 대기 중인 base64 이미지
 
   // AI로 포스터 이미지 생성
   const handleGeneratePoster = async () => {
     if (!scenario.title) {
       setGenerateError('시나리오 제목을 먼저 입력해주세요.');
-      return;
-    }
-
-    if (!scenario.scenarioId) {
-      setGenerateError('시나리오 ID를 먼저 입력해주세요. (이미지 저장에 필요)');
       return;
     }
 
@@ -49,7 +44,6 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
 
     try {
       const result = await generatePosterImage({
-        scenarioId: scenario.scenarioId, // Firebase Storage에 저장
         title: scenario.title,
         genre: scenario.genre,
         synopsis: scenario.synopsis,
@@ -57,10 +51,10 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
       });
 
       console.log('🎨 [BaseContent] 이미지 생성 결과:', result);
-      if (result.success && result.imageUrl) {
-        console.log('✅ [BaseContent] 이미지 URL 생성 완료:', result.imageUrl);
-        // 미리보기용으로 pending 상태에 저장 (아직 DB에 저장 안함)
-        setPendingImageUrl(result.imageUrl);
+      if (result.success && result.imageBase64) {
+        console.log('✅ [BaseContent] 이미지 생성 완료 (미리보기용 base64)');
+        // 미리보기용으로 pending 상태에 저장 (아직 Storage에 업로드 안함)
+        setPendingImageBase64(result.imageBase64);
         toast.success('이미지가 생성되었습니다. 미리보기를 확인 후 저장해주세요.');
       } else {
         console.error('❌ [BaseContent] 이미지 생성 실패:', result.error);
@@ -75,24 +69,44 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
     }
   };
 
-  // 생성된 이미지 저장
+  // 생성된 이미지 저장 (Storage 업로드 → Firestore 저장)
   const handleSaveGeneratedImage = async () => {
-    if (!pendingImageUrl) return;
+    if (!pendingImageBase64) return;
+
+    if (!scenario.scenarioId) {
+      toast.error('시나리오 ID가 필요합니다. 먼저 시나리오 ID를 입력해주세요.');
+      return;
+    }
 
     setIsSavingImage(true);
     try {
+      // 1. Vercel Blob Storage에 업로드
+      console.log('📤 [BaseContent] Storage 업로드 시작...');
+      const uploadResult = await uploadImage({
+        imageBase64: pendingImageBase64,
+        scenarioId: scenario.scenarioId,
+        type: 'poster',
+      });
+
+      if (!uploadResult.success || !uploadResult.imageUrl) {
+        throw new Error(uploadResult.error || 'Storage 업로드에 실패했습니다.');
+      }
+
+      console.log('✅ [BaseContent] Storage 업로드 완료:', uploadResult.imageUrl);
+
+      // 2. Firestore에 URL 저장
       const updatedScenario = {
         ...scenario,
-        posterImageUrl: pendingImageUrl,
+        posterImageUrl: uploadResult.imageUrl,
       };
 
       await updateScenario(updatedScenario);
       setScenario(updatedScenario);
-      setPendingImageUrl(null);
+      setPendingImageBase64(null);
       toast.success('포스터 이미지가 저장되었습니다.');
     } catch (error) {
       console.error('❌ [BaseContent] 이미지 저장 실패:', error);
-      toast.error('이미지 저장에 실패했습니다.');
+      toast.error(error instanceof Error ? error.message : '이미지 저장에 실패했습니다.');
     } finally {
       setIsSavingImage(false);
     }
@@ -100,7 +114,7 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
 
   // 생성된 이미지 취소 (다시 생성)
   const handleDiscardGeneratedImage = () => {
-    setPendingImageUrl(null);
+    setPendingImageBase64(null);
     toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
 
@@ -220,14 +234,14 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
           {/* 이미지 미리보기 영역 */}
           <div className="mt-3">
             {/* 새로 생성된 이미지 (저장 대기 중) */}
-            {pendingImageUrl && (
+            {pendingImageBase64 && (
               <div className="rounded-lg border-2 border-green-500 bg-green-50 p-4">
                 <p className="mb-2 text-sm font-medium text-green-700">
                   ✨ 새 이미지가 생성되었습니다 - 저장하시겠습니까?
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={pendingImageUrl}
+                  src={pendingImageBase64}
                   alt="생성된 포스터 미리보기"
                   className="h-64 w-44 rounded border object-cover"
                 />
@@ -259,7 +273,7 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
             )}
 
             {/* 기존 저장된 이미지 */}
-            {!pendingImageUrl && scenario.posterImageUrl && (
+            {!pendingImageBase64 && scenario.posterImageUrl && (
               <div className="rounded-lg border border-kairos-gold/30 bg-kairos-gold/10 p-3">
                 <p
                   className={cn(
@@ -284,7 +298,7 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
             )}
 
             {/* 이미지 없음 */}
-            {!pendingImageUrl && !scenario.posterImageUrl && (
+            {!pendingImageBase64 && !scenario.posterImageUrl && (
               <div className={cn(
                 "rounded-lg border-2 border-dashed p-6 text-center",
                 errors.includes(VALIDATION_IDS.POSTER_IMAGE_URL)

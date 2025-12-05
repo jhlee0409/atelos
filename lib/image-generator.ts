@@ -25,18 +25,25 @@ export type GenerateImageRequest = PosterImageRequest | CharacterImageRequest;
 
 export interface GenerateImageResponse {
   success: boolean;
-  imageUrl?: string;
+  imageBase64?: string; // base64 이미지 데이터 (미리보기용)
+  imageUrl?: string; // 업로드된 이미지 URL
   storagePath?: string;
   message?: string;
   error?: string;
 }
 
+export interface UploadImageResponse {
+  success: boolean;
+  imageUrl?: string;
+  storagePath?: string;
+  error?: string;
+}
+
 /**
  * AI를 사용하여 포스터 이미지를 생성합니다.
- * scenarioId를 전달하면 Vercel Blob Storage에 자동 저장됩니다.
+ * base64 이미지 데이터를 반환합니다 (아직 Storage에 업로드되지 않음)
  */
 export async function generatePosterImage(params: {
-  scenarioId?: string;
   title: string;
   genre: string[];
   synopsis: string;
@@ -63,8 +70,7 @@ export async function generatePosterImage(params: {
 
     return {
       success: true,
-      imageUrl: data.imageUrl,
-      storagePath: data.storagePath,
+      imageBase64: data.imageBase64,
       message: data.message,
     };
   } catch (error) {
@@ -81,10 +87,9 @@ export async function generatePosterImage(params: {
 
 /**
  * AI를 사용하여 캐릭터 이미지를 생성합니다.
- * scenarioId를 전달하면 Vercel Blob Storage에 자동 저장됩니다.
+ * base64 이미지 데이터를 반환합니다 (아직 Storage에 업로드되지 않음)
  */
 export async function generateCharacterImage(params: {
-  scenarioId?: string;
   characterName: string;
   roleName: string;
   backstory: string;
@@ -112,8 +117,7 @@ export async function generateCharacterImage(params: {
 
     return {
       success: true,
-      imageUrl: data.imageUrl,
-      storagePath: data.storagePath,
+      imageBase64: data.imageBase64,
       message: data.message,
     };
   } catch (error) {
@@ -124,6 +128,48 @@ export async function generateCharacterImage(params: {
         error instanceof Error
           ? error.message
           : '이미지 생성 중 오류가 발생했습니다.',
+    };
+  }
+}
+
+/**
+ * base64 이미지를 Vercel Blob Storage에 업로드합니다.
+ */
+export async function uploadImage(params: {
+  imageBase64: string;
+  scenarioId: string;
+  type: 'poster' | 'character';
+  fileName?: string;
+}): Promise<UploadImageResponse> {
+  try {
+    const response = await fetch('/api/upload-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || '이미지 업로드에 실패했습니다.',
+      };
+    }
+
+    return {
+      success: true,
+      imageUrl: data.imageUrl,
+      storagePath: data.storagePath,
+    };
+  } catch (error) {
+    console.error('📤 이미지 업로드 실패:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : '이미지 업로드 중 오류가 발생했습니다.',
     };
   }
 }
