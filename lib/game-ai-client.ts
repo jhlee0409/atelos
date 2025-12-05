@@ -5,7 +5,11 @@ import {
   getDynamicComplexity,
 } from './prompt-builder-optimized';
 import { ChatHistoryManager } from './chat-history-manager';
-import { STAT_MAPPING } from '@/constants/korean-english-mapping';
+import {
+  getScenarioMappingCache,
+  getGenericStatFilterPatterns,
+  initScenarioMappingCache,
+} from './scenario-mapping-utils';
 import type { ScenarioData, PlayerState } from '@/types';
 
 // 언어 혼용 감지 및 정리 함수
@@ -270,61 +274,34 @@ export const validateStatChanges = (
 
 /**
  * 서사 포맷팅 정리 - 스탯 노출 제거 및 대화 줄바꿈 추가
+ * 시나리오 데이터 기반 동적 필터링 지원
  */
-export const cleanNarrativeFormatting = (text: string): string => {
+export const cleanNarrativeFormatting = (text: string, scenario?: ScenarioData): string => {
   let cleaned = text;
 
-  // 동적으로 모든 스탯 ID를 가져와서 패턴 생성
-  const allStatIds = Object.keys(STAT_MAPPING);
-  const statIdsPattern = allStatIds.join('|');
+  // 1. 시나리오 기반 동적 패턴 적용 (캐시 사용)
+  const cache = getScenarioMappingCache();
 
-  // 1. 스탯 수치 노출 제거 (다양한 패턴)
-  // "'시티 카오스' 수치가 60이라니" → 제거
-  // "도시 혼란도(60)" → "도시 혼란"
-  // "communityCohesion이 40이다" → 제거
-  const statPatterns: RegExp[] = [
-    // === 동적 영어 스탯 ID 패턴 (모든 시나리오 커버) ===
-    // 영어 스탯명 + 수치 + 문장 (예: "oxygenLevel 수치가 72이다")
-    new RegExp(`(${statIdsPattern})\\s*수치가?\\s*\\d+[에이]?\\s*(달한다는|달하는|이다|였다|이라니)?[^.]*[.,]?\\s*`, 'gi'),
-    // 영어 스탯명 + 이/가 + 수치 (예: "crewSanity가 60이다")
-    new RegExp(`(${statIdsPattern})[이가은는]\\s*\\d+[에이]?\\s*[^.]*[.,]?\\s*`, 'gi'),
-    // 영어 스탯명 단독 노출 (예: 문장 내 "oxygenLevel")
-    new RegExp(`\\b(${statIdsPattern})\\b`, 'gi'),
+  // 시나리오별 스탯 필터링 패턴
+  const scenarioPatterns: RegExp[] = cache?.statFilterPatterns || [];
 
-    // === 새로운 패턴들 (우선 적용) ===
-    // "생존의 기반()이 20밖에" → "생존 기반이" (빈 괄호 + 숫자 제거)
+  // 일반 패턴 (시나리오 무관)
+  const genericPatterns = getGenericStatFilterPatterns();
+
+  // 추가 한국어 패턴 (공통)
+  const koreanPatterns: RegExp[] = [
+    // "생존의 기반()이 20밖에" → 제거
     /([가-힣]+의?\s*[가-힣]+)\s*\(\)\s*[이가]\s*\d+\s*(밖에|이상|이하|정도)?/gi,
-    // "공동체의 결속력()도 40으로" → "" (문장 전체 제거)
+    // "공동체의 결속력()도 40으로" → 제거
     /[가-힣]+의?\s*[가-힣]+\s*\(\)\s*[도이가]\s*\d+[으로에]?\s*[가-힣]*/gi,
-    // "생존의 기반(20)이" → "상황이"
+    // "생존의 기반(20)이" → 제거
     /[가-힣]+의?\s*[가-힣]+\s*\(\d+\)\s*[이가도]/gi,
-    // 빈 괄호만 있는 경우 제거 "()"
-    /\(\)/g,
-    // "XX이/가 XX밖에/정도" 패턴 제거 (스탯 관련)
-    /(생존|결속|응집|혼란|사기|신뢰|산소|함체|정신력?|내구)[의\s]*[가-힣]*\s*[이가]\s*\d+\s*(밖에|이상|이하|정도|로|으로)?[^.]*[.,]?\s*/gi,
-
-    // === camelCase 영어 ID 일반 패턴 (미등록 스탯도 캐치) ===
-    // camelCase 영어 단어 + 수치 (예: "newStatName 수치가 50이다")
-    /\b[a-z][a-zA-Z]*[A-Z][a-zA-Z]*\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/g,
-    // camelCase 영어 단어 + 이/가 + 수치
-    /\b[a-z][a-zA-Z]*[A-Z][a-zA-Z]*[이가은는]\s*\d+[에이]?\s*[^.]*[.,]?\s*/g,
-    // camelCase 영어 단어 단독 (서사 내 영어 ID 노출 방지)
-    /\b[a-z][a-zA-Z]*[A-Z][a-zA-Z]*\b/g,
-
-    // === 영어 스탯명 한국어 음역 (따옴표 포함) ===
-    /[''][a-zA-Z\s]+['']\s*수치가?\s*\d+[에이]?\s*[^.]*[.,]?\s*/gi,
-
-    // === 한국어 스탯명 + 괄호 숫자 패턴 ===
-    /[가-힣]+\s*(잔량|내구도?|응집력?|결속력?|혼란도?|기반|정신력?)\s*\(?\s*\d+\s*\)?/gi,
-
-    // === 일반적인 "수치가 XX" 패턴 ===
-    /[가-힣A-Za-z'']+\s*수치가?\s*\d+[에이]?[가이]?\s*(달한다는|달하는|이다|였다|이라니|라니)?[^.]*\./gi,
-
-    // === "XX%", "XX점" 같은 수치 노출 ===
-    /\d+\s*(%|퍼센트|점)\s*(밖에|정도|이다|였다)?/gi,
   ];
 
-  for (const pattern of statPatterns) {
+  // 모든 패턴 합치기 (시나리오 패턴 우선)
+  const allPatterns = [...scenarioPatterns, ...genericPatterns, ...koreanPatterns];
+
+  for (const pattern of allPatterns) {
     cleaned = cleaned.replace(pattern, '');
   }
 
@@ -558,6 +535,9 @@ export const generateGameResponse = async (
     const startTime = Date.now();
     console.log('🎮 게임 AI 응답 생성 시작...');
     console.log('🎯 액션:', playerAction.actionId);
+
+    // 시나리오 매핑 캐시 초기화 (스탯 ID 필터링용)
+    initScenarioMappingCache(scenario);
 
     // 현재 플레이어 상태 구성
     const currentPlayerState: PlayerState = {
