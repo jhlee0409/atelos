@@ -798,7 +798,7 @@ const CharacterCard = ({
                       >
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                          <span>{trait.traitName}</span>
+                          <span>{trait.displayName || trait.traitName}</span>
                           <span className="text-xs text-socratic-grey">
                             ({trait.weightType})
                           </span>
@@ -815,7 +815,7 @@ const CharacterCard = ({
                       >
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                          <span>{trait.traitName}</span>
+                          <span>{trait.displayName || trait.traitName}</span>
                           <span className="text-xs text-socratic-grey">
                             ({trait.weightType})
                           </span>
@@ -847,7 +847,7 @@ const CharacterCard = ({
                       <span
                         className={`mr-1 h-2 w-2 rounded-full ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
                       ></span>
-                      {trait?.traitName || weightType}
+                      {trait?.displayName || trait?.traitName || weightType}
                       {character.isEditing && (
                         <button
                           onClick={() => {

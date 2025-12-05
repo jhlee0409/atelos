@@ -409,7 +409,7 @@ export function AIScenarioGenerator({
                 {buffs.map((trait, idx) => (
                   <ExpandableResultCard
                     key={idx}
-                    title={`${trait.traitName} (${trait.traitId})`}
+                    title={`${trait.displayName || trait.traitName} (${trait.traitId})`}
                     description={trait.description}
                     selected={selectedIndices.has(idx)}
                     onToggle={() => toggleSelection(idx)}
@@ -425,7 +425,7 @@ export function AIScenarioGenerator({
                 {debuffs.map((trait, idx) => (
                   <ExpandableResultCard
                     key={idx}
-                    title={`${trait.traitName} (${trait.traitId})`}
+                    title={`${trait.displayName || trait.traitName} (${trait.traitId})`}
                     description={trait.description}
                     selected={selectedIndices.has(buffs.length + idx)}
                     onToggle={() => toggleSelection(buffs.length + idx)}

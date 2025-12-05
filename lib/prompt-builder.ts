@@ -288,7 +288,7 @@ const buildLitePrompt = (
   const characterInfo = scenario.characters
     .map((char) => {
       const mainTrait =
-        char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
+        char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
       const backstory = char.backstory.substring(0, 30) + '...'; // 간략화
       return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
     })
