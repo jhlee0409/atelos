@@ -439,7 +439,7 @@ const CharacterCard = ({
     }
 
     if (!scenario.scenarioId) {
-      setGenerateError('시나리오 ID를 먼저 입력해주세요. (Firebase Storage 저장에 필요)');
+      setGenerateError('시나리오 ID를 먼저 입력해주세요. (이미지 저장에 필요)');
       return;
     }
 
@@ -449,7 +449,7 @@ const CharacterCard = ({
 
     try {
       const result = await generateCharacterImage({
-        scenarioId: scenario.scenarioId, // Firebase Storage에 저장
+        scenarioId: scenario.scenarioId, // Vercel Blob Storage에 저장
         characterName: character.characterName,
         roleName: character.roleName || '',
         backstory: character.backstory || '',

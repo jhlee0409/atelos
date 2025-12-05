@@ -33,7 +33,7 @@ export interface GenerateImageResponse {
 
 /**
  * AI를 사용하여 포스터 이미지를 생성합니다.
- * scenarioId를 전달하면 Firebase Storage에 자동 저장됩니다.
+ * scenarioId를 전달하면 Vercel Blob Storage에 자동 저장됩니다.
  */
 export async function generatePosterImage(params: {
   scenarioId?: string;
@@ -81,7 +81,7 @@ export async function generatePosterImage(params: {
 
 /**
  * AI를 사용하여 캐릭터 이미지를 생성합니다.
- * scenarioId를 전달하면 Firebase Storage에 자동 저장됩니다.
+ * scenarioId를 전달하면 Vercel Blob Storage에 자동 저장됩니다.
  */
 export async function generateCharacterImage(params: {
   scenarioId?: string;

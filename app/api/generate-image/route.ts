@@ -26,7 +26,7 @@ export type ImageType = 'poster' | 'character';
 
 interface GenerateImageRequestBody {
   type: ImageType;
-  scenarioId?: string; // Firebase Storage 저장용
+  scenarioId?: string; // Vercel Blob Storage 저장용
   // 포스터용 필드
   title?: string;
   genre?: string[];
@@ -363,7 +363,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [Image Gen] 이미지 생성 성공');
 
-    // scenarioId가 필수 - Firebase Storage에 업로드
+    // scenarioId가 필수 - Vercel Blob Storage에 업로드
     if (!scenarioId) {
       console.error('❌ [Image Gen] scenarioId가 없습니다.');
       return NextResponse.json(

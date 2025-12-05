@@ -34,7 +34,7 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
     }
 
     if (!scenario.scenarioId) {
-      setGenerateError('시나리오 ID를 먼저 입력해주세요. (Firebase Storage 저장에 필요)');
+      setGenerateError('시나리오 ID를 먼저 입력해주세요. (이미지 저장에 필요)');
       return;
     }
 
@@ -51,12 +51,20 @@ export default function BaseContent({ scenario, setScenario, errors }: Props) {
         keywords: scenario.coreKeywords,
       });
 
+      console.log('🎨 [BaseContent] 이미지 생성 결과:', result);
       if (result.success && result.imageUrl) {
-        setScenario((prev) => ({
-          ...prev,
-          posterImageUrl: result.imageUrl!,
-        }));
+        console.log('✅ [BaseContent] 이미지 URL 설정:', result.imageUrl);
+        setScenario((prev) => {
+          console.log('📝 [BaseContent] 이전 posterImageUrl:', prev.posterImageUrl);
+          const newScenario = {
+            ...prev,
+            posterImageUrl: result.imageUrl!,
+          };
+          console.log('📝 [BaseContent] 새 posterImageUrl:', newScenario.posterImageUrl);
+          return newScenario;
+        });
       } else {
+        console.error('❌ [BaseContent] 이미지 생성 실패:', result.error);
         setGenerateError(result.error || '이미지 생성에 실패했습니다.');
       }
     } catch (error) {

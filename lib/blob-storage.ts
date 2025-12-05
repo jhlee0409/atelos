@@ -113,11 +113,3 @@ export function isVercelBlobUrl(url: string): boolean {
   return url.includes('.public.blob.vercel-storage.com') ||
          url.includes('.blob.vercel-storage.com');
 }
-
-/**
- * URL이 Firebase Storage URL인지 확인 (레거시 지원)
- */
-export function isFirebaseStorageUrl(url: string): boolean {
-  return url.includes('storage.googleapis.com') ||
-         url.includes('firebasestorage.googleapis.com');
-}
