@@ -1,0 +1,282 @@
+{
+  "scenarioId": "ECLIPSE_FIVE_DAYS",
+  "title": "이클립스 호: 최후의 5일",
+  "genre": [
+    "SF",
+    "서바이벌",
+    "심리 스릴러",
+    "디스토피아"
+  ],
+  "coreKeywords": [
+    "#우주",
+    "#산소부족",
+    "#트롤리딜레마",
+    "#밀실공포"
+  ],
+  "posterImageUrl": "/assets/images/eclipse/poster_main.png",
+  "synopsis": "서기 2145년, 화성 귀환 화물선 '이클립스 호'가 소행성 충돌로 치명적인 손상을 입었다. 남은 산소는 단 5일 치(72%), 하지만 구조선이 도착하려면 7일이 걸린다. 선장인 당신은 3명의 승무원 중 누군가를 동면(사실상의 죽음)시켜 산소를 아낄지, 아니면 위험을 감수하고 시스템을 고칠지 선택해야 한다. 당신의 계산기는 '희생'을 정답이라고 가리키고 있다.",
+  "playerGoal": "7일 후 구조선이 도착할 때까지 산소와 선체를 유지하고, 희생을 최소화하여 지구로 귀환한다.",
+  "characters": [
+    {
+      "roleId": "CAPTAIN",
+      "roleName": "선장",
+      "characterName": "엘라 라슨 (플레이어)",
+      "backstory": "이클립스 호의 선장. 과거 지구의 환경 재앙에서 가족을 구하지 못한 트라우마가 있다. 이번만큼은 전원 생존을 꿈꾸지만, 현실은 냉혹하다.",
+      "imageUrl": "/assets/images/eclipse/ella.png",
+      "weightedTraitTypes": [
+        "leadership",
+        "judgment",
+        "responsibility"
+      ],
+      "currentTrait": null
+    },
+    {
+      "roleId": "ENGINEER",
+      "roleName": "기관사",
+      "characterName": "카이 첸",
+      "backstory": "함선 수리에 필수적인 천재 기관사. 하지만 멘탈이 약해 압박감을 견디지 못하고 있다. 그가 무너지면 함선도 끝이다.",
+      "imageUrl": "/assets/images/eclipse/kai.png",
+      "weightedTraitTypes": [
+        "repair",
+        "anxiety",
+        "realism"
+      ],
+      "currentTrait": null
+    },
+    {
+      "roleId": "NAVIGATOR",
+      "roleName": "항해사",
+      "characterName": "소피아 로드리게스",
+      "backstory": "낙천적인 분위기 메이커. 기술적 기여도는 낮지만, 절망적인 상황에서 동료들의 정신줄을 잡고 있는 존재다.",
+      "imageUrl": "/assets/images/eclipse/sophia.png",
+      "weightedTraitTypes": [
+        "optimism",
+        "empathy",
+        "denial"
+      ],
+      "currentTrait": null
+    },
+    {
+      "roleId": "MEDICAL_OFFICER",
+      "roleName": "의무관",
+      "characterName": "마커스 존슨",
+      "backstory": "생명 존중을 최우선으로 하는 의사. '동면 투표'를 살인 행위라며 강력히 반대한다. 선장의 도덕성을 시험하는 인물.",
+      "imageUrl": "/assets/images/eclipse/marcus.png",
+      "weightedTraitTypes": [
+        "ethics",
+        "stubbornness",
+        "care"
+      ],
+      "currentTrait": null
+    }
+  ],
+  "initialRelationships": [
+    {
+      "id": "카이-마커스",
+      "personA": "카이 첸",
+      "personB": "마커스 존슨",
+      "value": -30,
+      "reason": "생존 우선주의(카이) vs 윤리 우선주의(마커스) 충돌"
+    }
+  ],
+  "endCondition": {
+    "type": "time_limit",
+    "value": 7,
+    "unit": "days"
+  },
+  "scenarioStats": [
+    {
+      "id": "oxygenLevel",
+      "name": "산소 잔량",
+      "description": "생존 타이머. 4인 기준 매일 14% 소모. 0이 되면 질식사.",
+      "current": 72,
+      "min": 0,
+      "max": 100,
+      "initialValue": 72,
+      "range": [
+        0,
+        100
+      ]
+    },
+    {
+      "id": "hullIntegrity",
+      "name": "함체 내구도",
+      "description": "함선의 물리적 체력. 0이 되면 공중 분해.",
+      "current": 40,
+      "min": 0,
+      "max": 100,
+      "initialValue": 40,
+      "range": [
+        0,
+        100
+      ]
+    },
+    {
+      "id": "crewSanity",
+      "name": "정신력",
+      "description": "공포를 견디는 힘. 낮으면 명령 불복종 및 돌발 행동 발생.",
+      "current": 60,
+      "min": 0,
+      "max": 100,
+      "initialValue": 60,
+      "range": [
+        0,
+        100
+      ]
+    }
+  ],
+  "traitPool": {
+    "buffs": [
+      {
+        "traitId": "CALM_UNDER_PRESSURE",
+        "traitName": "calm_under_pressure",
+        "type": "positive",
+        "weightType": "leadership",
+        "iconUrl": "/storage/traits/calm.png",
+        "displayText": "선장의 침착함이 공포에 질린 승무원들을 진정시킨다.",
+        "systemInstruction": "위기 상황(내구도 30 이하)에서 '명령' 성공률 +20%"
+      }
+    ],
+    "debuffs": [
+      {
+        "traitId": "PANIC_DISORDER",
+        "traitName": "panic_disorder",
+        "type": "negative",
+        "weightType": "anxiety",
+        "iconUrl": "/storage/traits/panic.png",
+        "displayText": "카이의 손이 떨려 정밀한 수리가 불가능하다.",
+        "systemInstruction": "정신력이 40 미만일 때 '수리' 행동 효율 -50%"
+      }
+    ]
+  },
+  "flagDictionary": [
+    {
+      "flagName": "FLAG_CRYOSLEEP_ACTIVATED",
+      "description": "누군가를 강제로 동면시켰다. 산소 소모량은 줄지만 남은 이들의 정신력이 크게 하락한다.",
+      "triggerCondition": "동면 투표 이벤트 실행 시",
+      "route": "희생",
+      "availableDay": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "flagName": "FLAG_COMMS_RESTORED",
+      "description": "장거리 통신 수리에 성공하여 구조선 도착 시간을 1일 단축시켰다.",
+      "triggerCondition": "소피아와 협력하여 '통신 모듈 수리' 성공 시",
+      "route": "생존",
+      "availableDay": [
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "flagName": "FLAG_MUTINY_SUPPRESSED",
+      "description": "선장에 대한 반란 시도를 무력으로 진압했다.",
+      "triggerCondition": "신뢰도 바닥 시 발생하는 '반란' 이벤트에서 승리",
+      "route": "파멸",
+      "availableDay": [
+        5,
+        6
+      ]
+    }
+  ],
+  "goalCluster": {
+    "id": "SURVIVE_OR_DIE",
+    "title": "생존 방정식",
+    "description": "산소는 줄어들고 구조선은 멀다. 당신의 방정식에 '동료'는 변수인가, 상인가?",
+    "connectedEndings": [
+      "ENDING_BEST",
+      "ENDING_SURVIVAL",
+      "ENDING_SACRIFICE",
+      "ENDING_BAD_GUY",
+      "ENDING_GAME_OVER"
+    ]
+  },
+  "endingArchetypes": [
+    {
+      "endingId": "ENDING_BEST",
+      "title": "기적의 방정식",
+      "route": "대성공",
+      "description": "믿을 수 없는 일이 벌어졌다. 통신 수리로 구조 시간을 앞당기고, 정밀한 자원 관리로 단 한 명의 희생자도 없이 전원 생존했다. 당신은 이클립스 호의 영웅이다.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "oxygenLevel",
+          "value": 1,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "required_stat",
+          "statId": "hullIntegrity",
+          "value": 30,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "survivor_count",
+          "value": 4,
+          "comparison": "equal"
+        }
+      ],
+      "isGoalSuccess": true
+    },
+    {
+      "endingId": "ENDING_SURVIVAL",
+      "title": "차가운 귀환",
+      "route": "성공",
+      "description": "지구에 도착했지만, 옆자리는 비어있다. 동면기 속에서 잠든 동료(또는 시신)들과 함께 당신은 생존했다. 필요한 희생이었다고 스스로를 위로하지만, 악몽은 끝나지 않을 것이다.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "oxygenLevel",
+          "value": 1,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "survivor_count",
+          "value": 2,
+          "comparison": "greater_equal"
+        }
+      ],
+      "isGoalSuccess": true
+    },
+    {
+      "endingId": "ENDING_SACRIFICE",
+      "title": "별이 된 선장",
+      "route": "희생",
+      "description": "마지막 순간, 산소가 부족하자 당신은 스스로 에어록 밖으로 나가는 길을 택했다. 남은 승무원들은 눈물을 흘리며 지구로 귀환한다. 당신의 이름은 우주 역사에 영원히 기억될 것이다.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "hullIntegrity",
+          "value": 50,
+          "comparison": "greater_equal"
+        },
+        {
+          "type": "is_player_dead",
+          "value": true,
+          "comparison": "equal"
+        }
+      ],
+      "isGoalSuccess": true
+    },
+    {
+      "endingId": "ENDING_GAME_OVER",
+      "title": "심연의 침묵",
+      "route": "실패",
+      "description": "산소 고갈, 혹은 선체 폭발. 원인은 중요하지 않다. 이클립스 호는 차가운 우주의 관이 되어 영원히 떠돌게 되었다. 구조선이 도착했을 때 발견한 것은 얼어붙은 침묵뿐이었다.",
+      "systemConditions": [
+        {
+          "type": "required_stat",
+          "statId": "oxygenLevel",
+          "value": 0,
+          "comparison": "less_equal"
+        }
+      ],
+      "isGoalSuccess": false
+    }
+  ],
+  "status": "ready"
+}
