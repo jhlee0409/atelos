@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import ScenarioCard from '@/components/lobby/ScenarioCard';
-import { getActiveScenarios } from '@/lib/firebase-scenarios';
+import { getActiveScenarios } from '@/lib/firebase-scenarios-admin';
 
 export const dynamic = 'force-dynamic';
 

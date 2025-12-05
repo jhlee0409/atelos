@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getScenario } from '@/lib/firebase-scenarios';
+import { getScenario } from '@/lib/firebase-scenarios-admin';
 import ScenarioDetailClient from './ScenarioDetailClient';
 
 export const dynamic = 'force-dynamic';
