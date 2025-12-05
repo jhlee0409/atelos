@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { uploadBase64ImageAdmin } from '@/lib/firebase-storage-admin';
+import { uploadBase64Image } from '@/lib/blob-storage';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
       ? body.characterName
       : undefined;
 
-    const uploadResult = await uploadBase64ImageAdmin(
+    const uploadResult = await uploadBase64Image(
       imageBase64,
       scenarioId,
       type,
@@ -384,7 +384,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (uploadResult.success && uploadResult.url) {
-      console.log('✅ [Image Gen] Firebase Storage 업로드 성공:', uploadResult.url);
+      console.log('✅ [Image Gen] Vercel Blob Storage 업로드 성공:', uploadResult.url);
       return NextResponse.json({
         success: true,
         imageUrl: uploadResult.url,
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
     console.error('❌ [Image Gen] Storage 업로드 실패:', uploadResult.error);
     return NextResponse.json(
       {
-        error: uploadResult.error || 'Firebase Storage 업로드에 실패했습니다. 환경변수를 확인해주세요.',
+        error: uploadResult.error || 'Vercel Blob Storage 업로드에 실패했습니다. BLOB_READ_WRITE_TOKEN 환경변수를 확인해주세요.',
         details: '이미지는 생성되었지만 Storage에 저장하지 못했습니다.'
       },
       { status: 500 },
