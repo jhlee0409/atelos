@@ -750,8 +750,8 @@ const CharacterCard = ({
           <label className="mb-2 block text-sm font-medium text-gray-800">
             가중치 특성 유형
           </label>
-          {scenario.traitPool.buffs.length === 0 &&
-          scenario.traitPool.debuffs.length === 0 ? (
+          {(scenario.traitPool?.buffs?.length || 0) === 0 &&
+          (scenario.traitPool?.debuffs?.length || 0) === 0 ? (
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
               <p className="text-sm text-yellow-800">
                 먼저 아래 "시나리오 시스템 규칙" 섹션에서 특성 풀을
@@ -765,8 +765,8 @@ const CharacterCard = ({
                   disabled={!character.isEditing}
                   onValueChange={(value) => {
                     const allTraits = [
-                      ...scenario.traitPool.buffs,
-                      ...scenario.traitPool.debuffs,
+                      ...(scenario.traitPool?.buffs || []),
+                      ...(scenario.traitPool?.debuffs || []),
                     ];
                     const selectedTrait = allTraits.find(
                       (trait) => trait.weightType === value,
@@ -791,14 +791,14 @@ const CharacterCard = ({
                     <div className="bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
                       긍정 특성 (BUFF)
                     </div>
-                    {scenario.traitPool.buffs.map((trait, traitIndex) => (
+                    {(scenario.traitPool?.buffs || []).map((trait, traitIndex) => (
                       <SelectItem
                         key={`buff-${traitIndex}`}
                         value={trait.weightType}
                       >
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                          <span>{trait.traitName}</span>
+                          <span>{trait.displayName || trait.traitName}</span>
                           <span className="text-xs text-socratic-grey">
                             ({trait.weightType})
                           </span>
@@ -808,14 +808,14 @@ const CharacterCard = ({
                     <div className="mt-1 bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
                       부정 특성 (DEBUFF)
                     </div>
-                    {scenario.traitPool.debuffs.map((trait, traitIndex) => (
+                    {(scenario.traitPool?.debuffs || []).map((trait, traitIndex) => (
                       <SelectItem
                         key={`debuff-${traitIndex}`}
                         value={trait.weightType}
                       >
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                          <span>{trait.traitName}</span>
+                          <span>{trait.displayName || trait.traitName}</span>
                           <span className="text-xs text-socratic-grey">
                             ({trait.weightType})
                           </span>
@@ -829,13 +829,13 @@ const CharacterCard = ({
               <div className="flex flex-wrap gap-2">
                 {character.weightedTraitTypes.map((weightType, wtIndex) => {
                   const allTraits = [
-                    ...scenario.traitPool.buffs,
-                    ...scenario.traitPool.debuffs,
+                    ...(scenario.traitPool?.buffs || []),
+                    ...(scenario.traitPool?.debuffs || []),
                   ];
                   const trait = allTraits.find(
                     (t) => t.weightType === weightType,
                   );
-                  const isPositive = scenario.traitPool.buffs.some(
+                  const isPositive = (scenario.traitPool?.buffs || []).some(
                     (t) => t.weightType === weightType,
                   );
 
@@ -847,7 +847,7 @@ const CharacterCard = ({
                       <span
                         className={`mr-1 h-2 w-2 rounded-full ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
                       ></span>
-                      {trait?.traitName || weightType}
+                      {trait?.displayName || trait?.traitName || weightType}
                       {character.isEditing && (
                         <button
                           onClick={() => {

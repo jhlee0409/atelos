@@ -288,7 +288,7 @@ const buildLitePrompt = (
   const characterInfo = scenario.characters
     .map((char) => {
       const mainTrait =
-        char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
+        char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
       const backstory = char.backstory.substring(0, 30) + '...'; // 간략화
       return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
     })
@@ -477,7 +477,7 @@ const buildFullPrompt = (
     .map((char) => {
       // currentTrait를 우선 사용, 없으면 weightedTraitTypes 사용
       const mainTraits = char.currentTrait
-        ? [char.currentTrait.traitName]
+        ? [char.currentTrait.displayName || char.currentTrait.traitName]
         : char.weightedTraitTypes.slice(0, 3);
 
       const traitsDisplay = mainTraits.join(', ');
@@ -637,7 +637,7 @@ export const buildInitialDilemmaPrompt = (
   const characterBible = npcs
     .map((char) => {
       const mainTraits = char.currentTrait
-        ? [char.currentTrait.traitName]
+        ? [char.currentTrait.displayName || char.currentTrait.traitName]
         : char.weightedTraitTypes.slice(0, 3);
       const traitsDisplay = mainTraits.join(', ');
       return `* ${char.characterName}(${char.roleName}): Background[${char.backstory}], Traits[${traitsDisplay}]`;

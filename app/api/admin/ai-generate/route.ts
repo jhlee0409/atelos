@@ -166,21 +166,24 @@ polarity: positive는 높을수록 좋음, negative는 낮을수록 좋음
 {
   "buffs": [
     {
-      "traitId": "traitId (camelCase 영문)",
-      "traitName": "특성 이름 (한글)",
+      "traitId": "traitId (camelCase 영문, 예: leadership)",
+      "traitName": "시스템 이름 (영문 snake_case, 예: natural_leader)",
+      "displayName": "표시 이름 (한글, 예: 타고난 리더)",
       "description": "특성 설명 (한글, 50자 이내)",
       "effect": "게임 내 효과 설명 (한글)"
     }
   ],
   "debuffs": [
     {
-      "traitId": "traitId (camelCase 영문)",
-      "traitName": "특성 이름 (한글)",
+      "traitId": "traitId (camelCase 영문, 예: trauma)",
+      "traitName": "시스템 이름 (영문 snake_case, 예: deep_trauma)",
+      "displayName": "표시 이름 (한글, 예: 깊은 트라우마)",
       "description": "특성 설명 (한글, 50자 이내)",
       "effect": "게임 내 효과 설명 (한글)"
     }
   ]
-}`,
+}
+중요: traitName은 영문 시스템 식별자, displayName은 사용자에게 보여줄 한글 이름입니다.`,
       userPrompt: `다음 시나리오에 적합한 캐릭터 특성을 제안해주세요:\n${input}${baseContext}\n버프 3-4개, 디버프 3-4개를 제안해주세요.`,
     },
 

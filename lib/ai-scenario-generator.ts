@@ -68,6 +68,7 @@ export interface EndingResult {
 export interface TraitResult {
   traitId: string;
   traitName: string;
+  displayName: string; // 한글 표시명
   description: string;
   effect: string;
 }
