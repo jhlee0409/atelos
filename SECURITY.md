@@ -4,7 +4,7 @@
 
 **Severity**: Critical
 **Published**: December 3, 2025
-**Status**: ⚠️ ACTION REQUIRED
+**Status**: ✅ PATCHED
 
 ### Summary
 
@@ -14,8 +14,8 @@ A critical-severity vulnerability in React Server Components (CVE-2025-55182) af
 
 | Package | Current Version | Status | Required Version |
 |---------|-----------------|--------|------------------|
-| Next.js | 15.2.4 | ❌ AFFECTED | 15.2.6+ |
-| React | 19.1.0 | ❌ AFFECTED | 19.1.2+ |
+| Next.js | 15.2.6 | ✅ PATCHED | 15.2.6+ |
+| React | 19.2.1 | ✅ PATCHED | 19.1.2+ |
 
 ### Impact
 
