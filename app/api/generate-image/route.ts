@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { optimizeBase64Image } from '@/lib/image-optimizer';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -360,12 +361,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ [Image Gen] 이미지 생성 성공');
+    console.log('✅ [Image Gen] 이미지 생성 성공, 최적화 시작...');
 
-    // base64 이미지 데이터를 반환 (업로드는 클라이언트에서 저장 버튼 클릭 시 수행)
+    // 이미지 최적화 (리사이징 + WebP 변환)
+    const optimizeResult = await optimizeBase64Image(
+      `data:image/png;base64,${imageBase64}`,
+      type
+    );
+
+    if (!optimizeResult.success || !optimizeResult.base64) {
+      console.error('❌ [Image Gen] 이미지 최적화 실패:', optimizeResult.error);
+      // 최적화 실패 시 원본 반환
+      return NextResponse.json({
+        success: true,
+        imageBase64: `data:image/png;base64,${imageBase64}`,
+        message: textResponse,
+      });
+    }
+
+    console.log(`✅ [Image Gen] 이미지 최적화 완료 - ${(optimizeResult.originalSize! / 1024 / 1024).toFixed(2)}MB → ${(optimizeResult.optimizedSize! / 1024).toFixed(1)}KB`);
+
+    // 최적화된 이미지 반환
     return NextResponse.json({
       success: true,
-      imageBase64: `data:image/png;base64,${imageBase64}`,
+      imageBase64: optimizeResult.base64,
       message: textResponse,
     });
   } catch (error) {
