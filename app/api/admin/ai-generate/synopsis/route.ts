@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  GoogleGenerativeAI,
+  SchemaType,
+  type Schema,
+} from '@google/generative-ai';
 
 const getApiKey = (): string => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -42,18 +46,78 @@ export interface SynopsisResult {
   narrativeHooks: string[];
 }
 
-const TONE_DESCRIPTIONS: Record<string, string> = {
-  dark: '어둡고 절망적인 분위기, 생존과 도덕적 딜레마 강조',
-  hopeful: '희망적이고 성장 서사 중심, 역경을 이겨내는 이야기',
-  thriller: '긴장감 넘치는 서스펜스, 예측 불가능한 전개',
-  dramatic: '감정적 깊이와 인물 간 갈등 중심',
-  comedic: '유머러스하면서도 풍자적인 요소 포함',
+// 시놉시스용 JSON 스키마 (Gemini responseSchema)
+const SYNOPSIS_SCHEMA: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    title: { type: SchemaType.STRING, description: '시나리오 제목 (한글)' },
+    scenarioId: { type: SchemaType.STRING, description: '영문 대문자 ID' },
+    synopsis: { type: SchemaType.STRING, description: '시놉시스 (200-600자)' },
+    playerGoal: { type: SchemaType.STRING, description: '플레이어 목표' },
+    genre: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: '장르 목록',
+    },
+    coreKeywords: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: '핵심 키워드 (#으로 시작)',
+    },
+    setting: {
+      type: SchemaType.OBJECT,
+      properties: {
+        time: { type: SchemaType.STRING, description: '시간적 배경' },
+        place: { type: SchemaType.STRING, description: '공간적 배경' },
+        atmosphere: { type: SchemaType.STRING, description: '분위기' },
+      },
+      required: ['time', 'place', 'atmosphere'],
+    },
+    suggestedThemes: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: '탐구할 주제들',
+    },
+    conflictType: { type: SchemaType.STRING, description: '핵심 갈등 유형' },
+    narrativeHooks: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: '서사적 훅',
+    },
+  },
+  required: [
+    'title',
+    'scenarioId',
+    'synopsis',
+    'playerGoal',
+    'genre',
+    'coreKeywords',
+    'setting',
+    'suggestedThemes',
+    'conflictType',
+    'narrativeHooks',
+  ],
 };
 
-const LENGTH_GUIDANCE: Record<string, string> = {
-  short: '100-200자의 간결한 시놉시스',
-  medium: '200-400자의 적당한 시놉시스',
-  long: '400-600자의 상세한 시놉시스',
+const TONE_DESCRIPTIONS: Record<string, { name: string; description: string }> = {
+  dark: { name: '다크', description: '어둡고 절망적인 분위기, 생존과 도덕적 딜레마 강조' },
+  hopeful: { name: '희망적', description: '희망적이고 성장 서사 중심, 역경을 이겨내는 이야기' },
+  thriller: { name: '스릴러', description: '긴장감 넘치는 서스펜스, 예측 불가능한 전개' },
+  dramatic: { name: '드라마틱', description: '감정적 깊이와 인물 간 갈등 중심' },
+  comedic: { name: '코믹', description: '유머러스하면서도 풍자적인 요소 포함' },
+  mysterious: { name: '미스터리', description: '수수께끼와 반전, 진실을 파헤치는 서사' },
+  romantic: { name: '로맨틱', description: '감정선과 관계 변화 중심의 이야기' },
+  action: { name: '액션', description: '빠른 전개와 긴박한 상황, 역동적인 서사' },
+  melancholic: { name: '멜랑콜릭', description: '쓸쓸하고 애틋한 분위기, 상실과 그리움' },
+  satirical: { name: '풍자적', description: '사회 비평과 아이러니, 날카로운 시선' },
+  epic: { name: '서사시적', description: '웅장한 스케일, 영웅적 여정과 대의' },
+  intimate: { name: '내밀한', description: '개인적이고 섬세한 감정, 일상의 깊이' },
+};
+
+const LENGTH_GUIDANCE: Record<string, { chars: string; description: string }> = {
+  short: { chars: '100-200자', description: '핵심만 간결하게' },
+  medium: { chars: '200-400자', description: '적당한 디테일 포함' },
+  long: { chars: '400-600자', description: '상세한 배경과 갈등 포함' },
 };
 
 export async function POST(request: NextRequest) {
@@ -68,61 +132,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const toneDescription = TONE_DESCRIPTIONS[tone] || TONE_DESCRIPTIONS.dramatic;
-    const lengthGuidance = LENGTH_GUIDANCE[targetLength] || LENGTH_GUIDANCE.medium;
+    const toneInfo = TONE_DESCRIPTIONS[tone] || TONE_DESCRIPTIONS.dramatic;
+    const lengthInfo = LENGTH_GUIDANCE[targetLength] || LENGTH_GUIDANCE.medium;
 
-    const systemPrompt = `당신은 인터랙티브 내러티브 게임 시나리오 전문 작가입니다.
-사용자의 아이디어를 바탕으로 매력적인 시나리오 시놉시스를 생성합니다.
+    // XML 구조화된 시스템 프롬프트
+    const systemPrompt = `<role>인터랙티브 내러티브 게임 시나리오 전문 작가</role>
 
-핵심 원칙:
-1. 플레이어가 주인공이 되어 선택하는 인터랙티브 스토리
-2. 명확한 목표와 시간 제한이 있는 구조 (보통 7일)
-3. 도덕적 딜레마와 의미 있는 선택지 포함
-4. 다양한 엔딩으로 이어질 수 있는 분기점
+<task>사용자의 아이디어를 바탕으로 매력적인 시나리오 시놉시스를 생성합니다.</task>
 
-톤: ${toneDescription}
-길이: ${lengthGuidance}
+<core_principles>
+  <principle>플레이어가 주인공이 되어 선택하는 인터랙티브 스토리</principle>
+  <principle>명확한 목표와 시간 제한이 있는 구조 (보통 7일)</principle>
+  <principle>도덕적 딜레마와 의미 있는 선택지 포함</principle>
+  <principle>다양한 엔딩으로 이어질 수 있는 분기점</principle>
+</core_principles>
 
-응답은 반드시 다음 JSON 형식으로:
+<tone name="${toneInfo.name}">${toneInfo.description}</tone>
+<length chars="${lengthInfo.chars}">${lengthInfo.description}</length>
+
+<output_guidelines>
+  <guideline>title: 한글, 창의적이고 인상적인 제목 (부제 포함 가능)</guideline>
+  <guideline>scenarioId: 영문 대문자와 언더스코어 (예: ZERO_HOUR, LAST_STAND)</guideline>
+  <guideline>synopsis: ${lengthInfo.chars}의 시놉시스</guideline>
+  <guideline>playerGoal: 한 문장으로 명확하게</guideline>
+  <guideline>genre: 3-5개</guideline>
+  <guideline>coreKeywords: 반드시 #으로 시작 (5-7개)</guideline>
+  <guideline>setting: 시간적/공간적 배경과 분위기</guideline>
+  <guideline>suggestedThemes: 3-4개 탐구 주제</guideline>
+  <guideline>conflictType: 핵심 갈등 (예: 인간 vs 환경)</guideline>
+  <guideline>narrativeHooks: 3개의 서사적 훅</guideline>
+</output_guidelines>
+
+<genre_examples>포스트아포칼립스, SF, 판타지, 호러, 미스터리, 스릴러, 심리, 서바이벌, 사회비평, 디스토피아, 로맨스, 역사, 현대, 액션</genre_examples>
+
+<example>
 {
-  "title": "시나리오 제목 (한글, 창의적이고 인상적인 제목, 부제 포함 가능)",
-  "scenarioId": "SCENARIO_ID (영문 대문자와 언더스코어, 예: ZERO_HOUR, LAST_STAND)",
-  "synopsis": "시나리오 시놉시스 (한글, ${lengthGuidance})",
-  "playerGoal": "플레이어의 핵심 목표 (한글, 한 문장으로 명확하게)",
-  "genre": ["장르1", "장르2", "장르3"],
-  "coreKeywords": ["#키워드1", "#키워드2", "#키워드3", "#키워드4", "#키워드5"],
+  "title": "제로 아워: 마지막 7일",
+  "scenarioId": "ZERO_HOUR",
+  "synopsis": "좀비 바이러스가 창궐한 대한민국. 당신은 고립된 아파트 단지에서 30명의 생존자를 이끄는 지도자다. 외부 구조대가 7일 후 도착한다는 소식을 들었지만, 자원은 부족하고 외부 생존자 집단이 단지를 노리고 있다. 모두를 살릴 수 없는 상황에서, 당신은 어떤 선택을 할 것인가?",
+  "playerGoal": "7일간 생존자들을 이끌고 안전하게 구조대를 기다린다",
+  "genre": ["포스트아포칼립스", "서바이벌", "심리", "스릴러"],
+  "coreKeywords": ["#좀비", "#생존", "#선택", "#희생", "#리더십"],
   "setting": {
-    "time": "시간적 배경 (예: 2024년 대한민국, 근미래, 중세 판타지 세계)",
-    "place": "공간적 배경 (예: 폐쇄된 도시, 고립된 마을, 우주 정거장)",
-    "atmosphere": "전반적인 분위기 (예: 긴박한, 절망적인, 신비로운)"
+    "time": "2024년 대한민국, 좀비 아포칼립스 발생 2주 후",
+    "place": "서울 외곽의 고립된 아파트 단지",
+    "atmosphere": "긴박하고 절망적인, 그러나 희망의 실낱같은 빛이 있는"
   },
-  "suggestedThemes": ["이 시나리오가 탐구할 주제 3-4개"],
-  "conflictType": "핵심 갈등 유형 (예: 인간 vs 환경, 개인 vs 사회, 생존 vs 도덕)",
-  "narrativeHooks": ["플레이어를 끌어당길 서사적 훅 3개 (예: 숨겨진 비밀, 시간 제한, 배신의 가능성)"]
+  "suggestedThemes": ["생존과 인간성의 균형", "리더십의 무게", "희생의 의미", "공동체의 가치"],
+  "conflictType": "생존 vs 도덕",
+  "narrativeHooks": ["7일이라는 시간 제한", "자원 부족으로 인한 선택의 딜레마", "외부 집단의 위협"]
 }
+</example>`;
 
-키워드는 반드시 #으로 시작해야 합니다.
-장르 예시: 포스트아포칼립스, SF, 판타지, 호러, 미스터리, 스릴러, 심리, 서바이벌, 사회비평, 디스토피아`;
+    // XML 구조화된 유저 프롬프트
+    const userPrompt = `<request>다음 아이디어로 인터랙티브 게임 시나리오 시놉시스를 생성해주세요.</request>
 
-    const userPrompt = `다음 아이디어로 인터랙티브 게임 시나리오 시놉시스를 생성해주세요:
+<input_idea>${idea}</input_idea>
+${setting ? `<setting_hint>${setting}</setting_hint>` : ''}
 
-아이디어: ${idea}
-${setting ? `배경 설정: ${setting}` : ''}
-
-플레이어가 주인공이 되어 선택하고 결과를 맞이하는 매력적인 시나리오를 만들어주세요.`;
+<instruction>플레이어가 주인공이 되어 선택하고 결과를 맞이하는 매력적인 시나리오를 만들어주세요.</instruction>`;
 
     const client = getGeminiClient();
     const model = client.getGenerativeModel({
       model: 'gemini-2.5-flash-lite',
       generationConfig: {
-        temperature: 0.8, // 창의성을 위해 약간 높게
-        maxOutputTokens: 2000,
+        temperature: 0.85, // 창의적 시놉시스 생성을 위해 높게
+        maxOutputTokens: 3000, // 상세한 시놉시스를 위해 증가
         responseMimeType: 'application/json',
+        responseSchema: SYNOPSIS_SCHEMA, // JSON 스키마로 구조 보장
       },
       systemInstruction: systemPrompt,
     });
 
-    console.log(`🤖 [Synopsis Generate] 아이디어: ${idea.substring(0, 50)}...`);
+    console.log(`🤖 [Synopsis Generate] 톤: ${tone}, 길이: ${targetLength}`);
+    console.log(`📝 [Synopsis Generate] 아이디어: ${idea.substring(0, 50)}...`);
 
     const result = await model.generateContent(userPrompt);
     const response = await result.response;
@@ -130,7 +213,7 @@ ${setting ? `배경 설정: ${setting}` : ''}
 
     console.log(`✅ [Synopsis Generate] 응답 성공: ${text.length}자`);
 
-    // JSON 파싱
+    // responseSchema가 있으면 파싱이 보장되지만, 안전하게 처리
     let parsed: SynopsisResult;
     try {
       parsed = JSON.parse(text);

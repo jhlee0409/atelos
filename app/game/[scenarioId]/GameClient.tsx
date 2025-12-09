@@ -8,6 +8,7 @@ import {
   generateInitialDilemma,
   cleanAndValidateAIResponse,
   createPlayerAction,
+  resetSessionStats,
 } from '@/lib/game-ai-client';
 import type {
   ScenarioData,
@@ -148,6 +149,41 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
 
 // Mock AI API function removed - now using real Gemini API
 
+/**
+ * 캐릭터 이름 쌍을 파싱하는 헬퍼 함수
+ * "A-B" 형식의 문자열에서 두 캐릭터 이름을 추출합니다.
+ * 캐릭터 이름에 하이픈이 포함될 수 있으므로, 알려진 캐릭터 이름과 매칭하여 파싱합니다.
+ */
+const parseCharacterPair = (
+  pairStr: string,
+  knownCharacterNames: string[],
+): { personA: string; personB: string } | null => {
+  // 먼저 알려진 캐릭터 이름으로 매칭 시도
+  for (const nameA of knownCharacterNames) {
+    if (pairStr.startsWith(nameA + '-')) {
+      const remaining = pairStr.slice(nameA.length + 1);
+      // 나머지 부분도 알려진 캐릭터 이름인지 확인
+      if (knownCharacterNames.includes(remaining)) {
+        return { personA: nameA, personB: remaining };
+      }
+      // 나머지 부분이 알려진 이름이 아니어도 비어있지 않으면 사용
+      if (remaining.length > 0) {
+        return { personA: nameA, personB: remaining };
+      }
+    }
+  }
+
+  // 알려진 이름으로 매칭 실패 시, 기본 하이픈 분할 (첫 번째 하이픈 기준)
+  const firstDashIndex = pairStr.indexOf('-');
+  if (firstDashIndex === -1) return null;
+
+  const personA = pairStr.slice(0, firstDashIndex).trim();
+  const personB = pairStr.slice(firstDashIndex + 1).trim();
+
+  if (!personA || !personB) return null;
+  return { personA, personB };
+};
+
 // State updater function v2.0
 const updateSaveState = (
   currentSaveState: SaveState,
@@ -173,6 +209,10 @@ const updateSaveState = (
     hiddenRelationships_change,
     shouldAdvanceTime,
   } = aiResponse.statChanges;
+
+  // 시나리오에서 알려진 캐릭터 이름 목록 생성 (관계 파싱에 사용)
+  const knownCharacterNames = scenario.characters.map((c) => c.characterName);
+
   // 한국어 스탯 이름을 영어 ID로 매핑하는 함수 (시나리오 데이터 우선)
   const mapStatNameToId = (
     statName: string,
@@ -234,13 +274,13 @@ const updateSaveState = (
 
         let amplificationFactor: number;
 
-        // 스탯이 위험하거나 최대치에 가까울 때는 부드럽게 증폭
+        // 스탯이 위험하거나 최대치에 가까울 때는 최소한의 증폭
         if (percentage <= 25 || percentage >= 75) {
-          amplificationFactor = 1.5;
+          amplificationFactor = 1.2;
         }
-        // 스탯이 안정적인 중간 구간일 때는 크게 증폭하여 긴장감 조성
+        // 스탯이 안정적인 중간 구간일 때는 적당히 증폭하여 긴장감 조성
         else {
-          amplificationFactor = 3.0;
+          amplificationFactor = 2.0;
         }
 
         const originalChange = scenarioStats[originalKey];
@@ -368,11 +408,16 @@ const updateSaveState = (
       } else if (typeof change === 'object' && change !== null) {
         // 객체 형식 처리
         if ('pair' in change && change.pair) {
-          // "A-B" 형식 처리
-          const [nameA, nameB] = change.pair.split('-');
-          personA = normalizeName(nameA?.trim() || '');
-          personB = normalizeName(nameB?.trim() || '');
-          value = change.change || 0;
+          // "A-B" 형식 처리 - 캐릭터 이름에 하이픈이 포함될 수 있으므로 스마트 파싱 사용
+          const parsed = parseCharacterPair(change.pair, knownCharacterNames);
+          if (parsed) {
+            personA = normalizeName(parsed.personA);
+            personB = normalizeName(parsed.personB);
+            value = change.change || 0;
+          } else {
+            console.warn('⚠️ 관계 쌍 파싱 실패:', change.pair);
+            return;
+          }
         } else if ('personA' in change && 'personB' in change) {
           // 개별 필드 형식 처리
           personA = normalizeName(change.personA || '');
@@ -400,7 +445,9 @@ const updateSaveState = (
         if (newSaveState.community.hiddenRelationships[key] === undefined) {
           newSaveState.community.hiddenRelationships[key] = 0;
         }
-        newSaveState.community.hiddenRelationships[key] += value;
+        // 관계값 변경 후 -100 ~ 100 범위로 clamp
+        const newRelationValue = newSaveState.community.hiddenRelationships[key] + value;
+        newSaveState.community.hiddenRelationships[key] = Math.max(-100, Math.min(100, newRelationValue));
         console.log(
           `🤝 관계도 변경: ${key} | 변화: ${value} | 현재: ${newSaveState.community.hiddenRelationships[key]}`,
         );
@@ -463,12 +510,12 @@ const updateSaveState = (
 
     // 시간 진행 조건:
     // 1. 최소 턴 수를 충족하고 (MIN_TURNS_PER_DAY)
-    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (4턴 이상)
+    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (3턴 이상)
     const enoughTurns = currentTurnsInDay >= MIN_TURNS_PER_DAY;
     const shouldProgress =
       shouldAdvanceTime === true ||
       hasSignificantEvent ||
-      currentTurnsInDay >= 4; // 4턴 후에는 자동으로 시간 진행
+      currentTurnsInDay >= 3; // 3턴 후에는 자동으로 시간 진행
 
     if (enoughTurns && shouldProgress) {
       if (newSaveState.context.currentDay !== undefined) {
@@ -540,13 +587,19 @@ const updateSaveState = (
           value: number = 0;
 
         if (typeof change === 'string') {
-          // 패턴 1: "이름-이름:숫자" (표준 형식)
-          const standardMatch = change.match(/^([^-]+)-([^:]+):\s*(-?\d+)/);
-          if (standardMatch) {
-            personA = standardMatch[1].trim();
-            personB = standardMatch[2].trim();
-            value = parseInt(standardMatch[3], 10);
-          } else {
+          // 패턴 1: "이름쌍:숫자" (표준 형식) - 콜론 뒤에 숫자가 오는 경우
+          const valueMatch = change.match(/^(.+):\s*(-?\d+)$/);
+          if (valueMatch) {
+            const namePart = valueMatch[1].trim();
+            const parsed = parseCharacterPair(namePart, knownCharacterNames);
+            if (parsed) {
+              personA = parsed.personA;
+              personB = parsed.personB;
+              value = parseInt(valueMatch[2], 10);
+            }
+          }
+
+          if (!personA || !personB) {
             // 패턴 2: "이름:설명" 또는 "이름-이름:설명" 형식
             const descMatch = change.match(/^([^:]+):\s*(.+)$/);
             if (descMatch) {
@@ -555,9 +608,15 @@ const updateSaveState = (
 
               // 이름 부분에 대시가 있으면 두 사람 간의 관계
               if (namePart.includes('-')) {
-                const [nameA, nameB] = namePart.split('-');
-                personA = nameA.trim();
-                personB = nameB.trim();
+                const parsed = parseCharacterPair(namePart, knownCharacterNames);
+                if (parsed) {
+                  personA = parsed.personA;
+                  personB = parsed.personB;
+                } else {
+                  // 파싱 실패 시 단일 이름으로 간주
+                  personA = '(플레이어)';
+                  personB = namePart;
+                }
               } else {
                 // 단일 이름이면 플레이어와의 관계
                 personA = '(플레이어)';
@@ -583,10 +642,12 @@ const updateSaveState = (
           }
         } else if (typeof change === 'object' && change !== null) {
           if ('pair' in change && change.pair) {
-            const [a, b] = change.pair.split('-');
-            personA = a?.trim() || '';
-            personB = b?.trim() || '';
-            value = change.change || 0;
+            const parsed = parseCharacterPair(change.pair, knownCharacterNames);
+            if (parsed) {
+              personA = parsed.personA;
+              personB = parsed.personB;
+              value = change.change || 0;
+            }
           } else if ('personA' in change && 'personB' in change) {
             personA = change.personA || '';
             personB = change.personB || '';
@@ -715,6 +776,11 @@ export default function GameClient({ scenario }: GameClientProps) {
     const generateAndSetDilemma = async () => {
       dilemmaGenerationInProgress.current = true; // 생성 시작 플래그 설정
       console.log('🤖 AI 초기 딜레마 생성을 시작합니다...');
+
+      // 새 게임 시작 시 세션 통계 리셋 (이전 게임의 토큰 사용량, API 호출 횟수 등 초기화)
+      resetSessionStats();
+      console.log('📊 세션 통계 초기화 완료');
+
       setIsInitialDilemmaLoading(true);
       setError(null);
       try {
@@ -993,10 +1059,12 @@ export default function GameClient({ scenario }: GameClientProps) {
       const currentDay = updatedSaveState.context.currentDay || 1;
 
       // Day 5 이후에만 엔딩 조건 체크
+      const survivorCount = updatedSaveState.community.survivors.length;
       if (currentDay >= 5) {
         ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
+          survivorCount,
         );
 
         if (ending) {
@@ -1013,7 +1081,7 @@ export default function GameClient({ scenario }: GameClientProps) {
       // 시간제한 엔딩 조건 확인 (Day 7 완료 후 강제 엔딩)
       if (!ending && scenario.endCondition.type === 'time_limit') {
         const timeLimit = scenario.endCondition.value || 0;
-        const currentDay = updatedSaveState.context.currentDay || 0;
+        // currentDay는 이미 위에서 선언됨 (line 1059)
         const currentHours =
           updatedSaveState.context.remainingHours || Infinity;
 
@@ -1031,6 +1099,7 @@ export default function GameClient({ scenario }: GameClientProps) {
           ending = checkEndingConditions(
             currentPlayerState,
             scenario.endingArchetypes,
+            survivorCount,
           );
 
           // 여전히 엔딩이 없으면 시간 관련 엔딩 찾기

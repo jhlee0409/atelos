@@ -78,8 +78,8 @@ const config: Config = {
       fontFamily: {
         // Display/Heading - dramatic serif for cinematic feel
         serif: [
-          'var(--font-cormorant)',
-          'var(--font-noto-serif-kr)',
+          '"Cormorant Garamond"',
+          '"Noto Serif KR"',
           'Georgia',
           'serif',
         ],
@@ -87,7 +87,7 @@ const config: Config = {
         sans: [
           'Pretendard Variable',
           'Pretendard',
-          'var(--font-noto-sans-kr)',
+          '"Noto Sans KR"',
           '-apple-system',
           'BlinkMacSystemFont',
           'system-ui',
