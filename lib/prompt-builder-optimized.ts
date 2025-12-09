@@ -46,6 +46,8 @@ CURRENT STATE:
 - Flags: {{FLAGS}}
 - Characters: {{CHARS}}
 
+VALID STAT IDs (use ONLY these in scenarioStats): {{STAT_IDS}}
+
 OUTPUT:
 {
   "log": "Korean story (100-150 words, use \\n for paragraphs)",
@@ -68,6 +70,7 @@ TIME: shouldAdvanceTime=false (default), true ONLY for major day-ending events.`
 // 초경량 프롬프트 (150-200 토큰) - JSON 형식 명시
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.
 Stats: {{STATS}}
+VALID STAT IDs: {{STAT_IDS}}
 
 You MUST respond with ONLY this JSON (no other text):
 {
@@ -78,14 +81,14 @@ You MUST respond with ONLY this JSON (no other text):
     "choice_b": "선택지B (~한다로 끝남)"
   },
   "statChanges": {
-    "scenarioStats": {"cityChaos": 5},
+    "scenarioStats": {"USE_STAT_IDS_ABOVE": 5},
     "flags_acquired": [],
     "survivorStatus": [],
     "hiddenRelationships_change": []
   }
 }
 
-Rules: Korean only. Choices must end with ~한다/~이다. Include stat changes.`;
+Rules: Korean only. Choices must end with ~한다/~이다. Use ONLY stat IDs from VALID STAT IDs above.`;
 
 // 캐릭터 정보 압축
 const compressCharacters = (characters: Character[]): string => {
@@ -99,14 +102,28 @@ const compressCharacters = (characters: Character[]): string => {
     .join(',');
 };
 
-// 스탯 정보 압축
-const compressStats = (stats: { [key: string]: number }): string => {
-  // 주요 스탯만 포함
-  const coreStats = ['cityChaos', 'communityCohesion', 'survivalFoundation'];
+// 스탯 정보 압축 - 시나리오의 모든 스탯을 동적으로 포함
+const compressStats = (
+  stats: { [key: string]: number },
+  scenarioStats?: { id: string; name: string }[],
+): string => {
+  if (scenarioStats && scenarioStats.length > 0) {
+    // 시나리오에 정의된 모든 스탯 포함
+    return scenarioStats
+      .map((stat) => `${stat.id}:${stats[stat.id] ?? 0}`)
+      .join(',');
+  }
+  // 폴백: 모든 스탯 포함
   return Object.entries(stats)
-    .filter(([key]) => coreStats.includes(key))
     .map(([k, v]) => `${k}:${v}`)
     .join(',');
+};
+
+// AI가 사용해야 할 스탯 ID 목록 생성
+const buildStatIdList = (scenarioStats: { id: string; name: string }[]): string => {
+  return scenarioStats
+    .map((stat) => `"${stat.id}"(${stat.name})`)
+    .join(', ');
 };
 
 // 플래그 정보 압축
@@ -171,9 +188,11 @@ export const buildOptimizedGamePromptV2 = (
 
   // 초경량 모드
   if (ultraLite) {
+    const statIdList = buildStatIdList(scenario.scenarioStats);
     const systemPrompt = ULTRA_LITE_TEMPLATE
       .replace('{{DAY}}', currentDay.toString())
-      .replace('{{STATS}}', compressStats(playerState.stats));
+      .replace('{{STATS}}', compressStats(playerState.stats, scenario.scenarioStats))
+      .replace('{{STAT_IDS}}', statIdList);
 
     const userPrompt = `Action: ${playerAction.actionDescription}`;
 
@@ -186,8 +205,9 @@ export const buildOptimizedGamePromptV2 = (
 
   // 압축된 표준 모드
   const compressedChars = compressCharacters(scenario.characters);
-  const compressedStats = compressStats(playerState.stats);
+  const compressedStats = compressStats(playerState.stats, scenario.scenarioStats);
   const compressedFlags = compressFlags(playerState.flags);
+  const statIdList = buildStatIdList(scenario.scenarioStats);
 
   // 장르별 스타일 (압축 버전)
   const genreText = scenario.genre?.join(', ') || '드라마';
@@ -220,6 +240,7 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
     .replace('{{STATS}}', compressedStats)
     .replace('{{FLAGS}}', compressedFlags)
     .replace('{{CHARS}}', compressedChars)
+    .replace('{{STAT_IDS}}', statIdList)
     + flagRules;
 
   // 서사 단계 힌트

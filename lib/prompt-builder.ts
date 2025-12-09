@@ -504,6 +504,11 @@ const buildFullPrompt = (
     )
     .join('\n');
 
+  // AI가 사용해야 할 정확한 스탯 ID 목록 생성
+  const statIdList = scenario.scenarioStats
+    .map((stat) => `- "${stat.id}": ${stat.name}`)
+    .join('\n');
+
   // UniversalMasterSystemPrompt 템플릿 활용 (완전한 영어 템플릿 변수)
   const systemPrompt = UniversalMasterSystemPrompt.prompt
     .replace('{{SCENARIO_TITLE}}', scenario.title)
@@ -516,18 +521,8 @@ const buildFullPrompt = (
     .replace('{{CHARACTER_BIBLE}}', characterBible)
     .replace('{{SCENARIO_STATS_DESC}}', scenarioStatsDesc)
     .replace('{{CURRENT_DAY}}', currentDay.toString())
-    .replace(
-      '{{CITY_CHAOS}}',
-      playerState.stats['cityChaos']?.toString() || '70',
-    )
-    .replace(
-      '{{COMMUNITY_COHESION}}',
-      playerState.stats['communityCohesion']?.toString() || '50',
-    )
-    .replace(
-      '{{SURVIVAL_FOUNDATION}}',
-      playerState.stats['survivalFoundation']?.toString() || '10',
-    )
+    .replace('{{CURRENT_STATS}}', currentStats)
+    .replace('{{STAT_ID_LIST}}', statIdList)
     .replace('{{ACTIVE_FLAGS}}', currentFlags || 'None')
     .replace('{{SURVIVOR_COUNT}}', scenario.characters.length.toString());
 
