@@ -116,7 +116,11 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
             min: { type: SchemaType.INTEGER },
             max: { type: SchemaType.INTEGER },
             initialValue: { type: SchemaType.INTEGER },
-            polarity: { type: SchemaType.STRING, description: 'positive 또는 negative' },
+            polarity: {
+              type: SchemaType.STRING,
+              description: 'positive 또는 negative',
+              enum: ['positive', 'negative'],
+            },
           },
           required: ['id', 'name', 'description', 'min', 'max', 'initialValue', 'polarity'],
         },
@@ -134,7 +138,11 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
           type: SchemaType.OBJECT,
           properties: {
             flagName: { type: SchemaType.STRING, description: 'FLAG_ 접두사 대문자 ID' },
-            type: { type: SchemaType.STRING, description: 'boolean 또는 count' },
+            type: {
+              type: SchemaType.STRING,
+              description: 'boolean 또는 count',
+              enum: ['boolean', 'count'],
+            },
             description: { type: SchemaType.STRING, description: '플래그 설명' },
             triggerCondition: { type: SchemaType.STRING, description: '발동 조건' },
           },
@@ -166,7 +174,10 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
                     type: SchemaType.OBJECT,
                     properties: {
                       statId: { type: SchemaType.STRING },
-                      comparison: { type: SchemaType.STRING },
+                      comparison: {
+                        type: SchemaType.STRING,
+                        enum: ['>=', '<=', '==', '>', '<', '!='],
+                      },
                       value: { type: SchemaType.INTEGER },
                     },
                     required: ['statId', 'comparison', 'value'],
@@ -209,11 +220,11 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
         items: {
           type: SchemaType.OBJECT,
           properties: {
-            traitId: { type: SchemaType.STRING },
-            traitName: { type: SchemaType.STRING },
-            displayName: { type: SchemaType.STRING },
-            description: { type: SchemaType.STRING },
-            effect: { type: SchemaType.STRING },
+            traitId: { type: SchemaType.STRING, description: 'camelCase ID' },
+            traitName: { type: SchemaType.STRING, description: 'snake_case 시스템명' },
+            displayName: { type: SchemaType.STRING, description: '한글 표시명' },
+            description: { type: SchemaType.STRING, description: '특성 설명' },
+            effect: { type: SchemaType.STRING, description: '게임 내 효과' },
           },
           required: ['traitId', 'traitName', 'displayName', 'description', 'effect'],
         },
@@ -386,7 +397,38 @@ ${baseContext}`,
   <guideline>모든 캐릭터 쌍에 대해 양방향 관계를 정의</guideline>
   <guideline>갈등, 로맨스, 멘토-멘티, 라이벌 등 다양한 역학 포함</guideline>
   <guideline>reason은 50자 이내로 간결하게</guideline>
-</guidelines>`,
+</guidelines>
+
+<example>
+{
+  "relationships": [
+    {
+      "personA": "박준영",
+      "personB": "김서연",
+      "value": 75,
+      "reason": "오랜 동료로서 서로를 신뢰하며 의지함"
+    },
+    {
+      "personA": "김서연",
+      "personB": "박준영",
+      "value": 85,
+      "reason": "리더십을 존경하며 깊은 신뢰를 보냄"
+    },
+    {
+      "personA": "박준영",
+      "personB": "이민호",
+      "value": -30,
+      "reason": "과거 갈등으로 인한 불신이 남아있음"
+    },
+    {
+      "personA": "이민호",
+      "personB": "박준영",
+      "value": -45,
+      "reason": "리더 자리를 노리며 경쟁심을 느낌"
+    }
+  ]
+}
+</example>`,
       userPrompt: `<request>다음 캐릭터들 간의 초기 관계를 생성해주세요.</request>
 
 <characters>${input}</characters>
@@ -416,7 +458,50 @@ ${baseContext}
   <stat id="trust" polarity="positive">신뢰도 - 그룹 내 결속력</stat>
   <stat id="chaos" polarity="negative">혼란도 - 불안정성 수준</stat>
   <stat id="threat" polarity="negative">위협 수준 - 외부 위험</stat>
-</common_stats>`,
+</common_stats>
+
+<example>
+{
+  "stats": [
+    {
+      "id": "morale",
+      "name": "사기",
+      "description": "생존자 그룹의 전반적인 정신 상태와 의지",
+      "min": 0,
+      "max": 100,
+      "initialValue": 50,
+      "polarity": "positive"
+    },
+    {
+      "id": "resources",
+      "name": "자원",
+      "description": "식량, 의약품, 연료 등 생존에 필요한 물자",
+      "min": 0,
+      "max": 100,
+      "initialValue": 40,
+      "polarity": "positive"
+    },
+    {
+      "id": "cityChaos",
+      "name": "도시 혼란도",
+      "description": "외부 환경의 위험 수준과 불안정성",
+      "min": 0,
+      "max": 100,
+      "initialValue": 60,
+      "polarity": "negative"
+    },
+    {
+      "id": "groupCohesion",
+      "name": "그룹 결속력",
+      "description": "생존자들 간의 협력과 신뢰 수준",
+      "min": 0,
+      "max": 100,
+      "initialValue": 55,
+      "polarity": "positive"
+    }
+  ]
+}
+</example>`,
       userPrompt: `<request>다음 시나리오에 적합한 4-6개의 스탯을 제안해주세요.</request>
 
 <scenario>${input}</scenario>
