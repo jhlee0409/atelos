@@ -9,7 +9,8 @@ export type GenerationCategory =
   | 'endings'
   | 'traits'
   | 'keywords'
-  | 'genre';
+  | 'genre'
+  | 'idea_suggestions';
 
 export interface GenerationContext {
   genre?: string[];
@@ -84,6 +85,16 @@ export interface TraitResult {
 export interface TraitsResult {
   buffs: TraitResult[];
   debuffs: TraitResult[];
+}
+
+export interface IdeaSuggestion {
+  idea: string;
+  genre: string;
+  hook: string;
+}
+
+export interface IdeaSuggestionsResult {
+  ideas: IdeaSuggestion[];
 }
 
 export interface AIGenerationResponse<T> {
@@ -178,5 +189,10 @@ export const CATEGORY_INFO: Record<
     label: '장르',
     description: '시나리오에 적합한 장르 태그를 생성합니다.',
     placeholder: '예: 종말 이후 세계에서 인간성을 지키려는 심리 드라마',
+  },
+  idea_suggestions: {
+    label: '아이디어 추천',
+    description: '다양한 시나리오 아이디어를 추천받습니다.',
+    placeholder: '예: SF, 호러 등 원하는 장르를 입력하거나 비워두세요',
   },
 };

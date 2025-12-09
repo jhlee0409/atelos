@@ -32,7 +32,8 @@ export type GenerationCategory =
   | 'endings'
   | 'traits'
   | 'keywords'
-  | 'genre';
+  | 'genre'
+  | 'idea_suggestions';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -118,6 +119,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
             initialValue: { type: SchemaType.INTEGER },
             polarity: {
               type: SchemaType.STRING,
+              format: 'enum',
               description: 'positive 또는 negative',
               enum: ['positive', 'negative'],
             },
@@ -140,6 +142,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
             flagName: { type: SchemaType.STRING, description: 'FLAG_ 접두사 대문자 ID' },
             type: {
               type: SchemaType.STRING,
+              format: 'enum',
               description: 'boolean 또는 count',
               enum: ['boolean', 'count'],
             },
@@ -176,6 +179,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
                       statId: { type: SchemaType.STRING },
                       comparison: {
                         type: SchemaType.STRING,
+                        format: 'enum',
                         enum: ['>=', '<=', '==', '>', '<', '!='],
                       },
                       value: { type: SchemaType.INTEGER },
@@ -256,6 +260,26 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['genres'],
   },
+
+  idea_suggestions: {
+    type: SchemaType.OBJECT,
+    properties: {
+      ideas: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            idea: { type: SchemaType.STRING, description: '시나리오 아이디어 (1-2문장)' },
+            genre: { type: SchemaType.STRING, description: '주요 장르' },
+            hook: { type: SchemaType.STRING, description: '핵심 매력 포인트' },
+          },
+          required: ['idea', 'genre', 'hook'],
+        },
+        description: '시나리오 아이디어 목록',
+      },
+    },
+    required: ['ideas'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -270,6 +294,7 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   traits: 0.5, // 중간 - 균형잡힌 특성
   keywords: 0.6, // 중간 - 적절한 키워드
   genre: 0.4, // 구조적 - 정확한 장르 분류
+  idea_suggestions: 0.9, // 매우 창의적 - 다양하고 독특한 아이디어
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -283,6 +308,7 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   traits: 3000, // 버프/디버프 각 3-4개
   keywords: 1000, // 간단한 목록
   genre: 1000, // 간단한 목록
+  idea_suggestions: 2000, // 여러 아이디어
 };
 
 interface AIGenerateRequestBody {
@@ -677,6 +703,60 @@ ${baseContext}`,
 
 <scenario>${input}</scenario>
 ${baseContext}`,
+    },
+
+    idea_suggestions: {
+      systemPrompt: `<role>인터랙티브 게임 시나리오 아이디어 발상가</role>
+
+<task>플레이어가 주인공이 되어 선택하는 인터랙티브 스토리 아이디어를 제안합니다.</task>
+
+<principles>
+  <principle>7일 등 명확한 시간 제한이 있는 구조</principle>
+  <principle>도덕적 딜레마와 의미 있는 선택지</principle>
+  <principle>다양한 엔딩으로 이어지는 분기점</principle>
+  <principle>감정적 몰입이 가능한 상황</principle>
+</principles>
+
+<guidelines>
+  <guideline>idea: 한글 1-2문장으로 핵심 상황과 목표 설명</guideline>
+  <guideline>genre: 주요 장르 1-2개</guideline>
+  <guideline>hook: 플레이어를 끌어당기는 핵심 매력 포인트</guideline>
+</guidelines>
+
+<genre_pool>
+포스트아포칼립스, SF, 판타지, 호러, 미스터리, 스릴러, 심리, 서바이벌, 역사, 현대, 로맨스, 범죄, 정치, 군사, 사이버펑크, 디스토피아
+</genre_pool>
+
+<example>
+{
+  "ideas": [
+    {
+      "idea": "좀비 아포칼립스 속 아파트 단지에서 30명의 생존자를 이끌며 7일간 구조대를 기다린다.",
+      "genre": "포스트아포칼립스, 서바이벌",
+      "hook": "모두를 살릴 수 없는 상황에서의 선택"
+    },
+    {
+      "idea": "1920년대 호화 열차에서 벌어진 살인 사건의 범인을 찾는 탐정이 되어 승객들을 심문한다.",
+      "genre": "미스터리, 역사",
+      "hook": "제한된 시간과 공간 속 추리"
+    },
+    {
+      "idea": "우주 정거장에서 산소가 고갈되기 전 탈출 방법을 찾아야 하는 엔지니어가 된다.",
+      "genre": "SF, 스릴러",
+      "hook": "극한 상황에서의 문제 해결"
+    }
+  ]
+}
+</example>`,
+      userPrompt: `<request>인터랙티브 게임에 적합한 시나리오 아이디어를 6-8개 제안해주세요.</request>
+
+<preference>${input || '다양한 장르'}</preference>
+
+<requirements>
+  <requirement>서로 다른 장르와 설정을 가진 다양한 아이디어</requirement>
+  <requirement>플레이어가 주인공으로 선택을 내리는 상황</requirement>
+  <requirement>간단하지만 흥미를 끄는 핵심 설정</requirement>
+</requirements>`,
     },
   };
 

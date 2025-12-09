@@ -51,6 +51,8 @@ import {
   type RelationshipResult,
   type TraitsResult,
   type TraitResult,
+  type IdeaSuggestionsResult,
+  type IdeaSuggestion,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, SystemCondition, Trait } from '@/types';
 
@@ -162,9 +164,37 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [flags, setFlags] = useState<FlagResult[]>([]);
   const [endings, setEndings] = useState<EndingResult[]>([]);
 
+  // 아이디어 추천
+  const [ideaSuggestions, setIdeaSuggestions] = useState<IdeaSuggestion[]>([]);
+  const [isLoadingIdeas, setIsLoadingIdeas] = useState(false);
+
   // 로딩 상태
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 아이디어 추천 생성
+  const handleGenerateIdeas = useCallback(async () => {
+    setIsLoadingIdeas(true);
+    setError(null);
+
+    try {
+      const response = await generateWithAI<IdeaSuggestionsResult>(
+        'idea_suggestions',
+        '', // 빈 입력 = 다양한 장르
+      );
+      setIdeaSuggestions(response.data.ideas || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '아이디어 추천에 실패했습니다.');
+    } finally {
+      setIsLoadingIdeas(false);
+    }
+  }, []);
+
+  // 추천 아이디어 선택
+  const handleSelectIdea = useCallback((selectedIdea: IdeaSuggestion) => {
+    setIdea(selectedIdea.idea);
+    setIdeaSuggestions([]); // 선택 후 추천 목록 숨기기
+  }, []);
 
   // 시놉시스 생성
   const handleGenerateSynopsis = useCallback(async () => {
@@ -452,7 +482,28 @@ ${flagDetails}
         return (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="idea">시나리오 아이디어</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="idea">시나리오 아이디어</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateIdeas}
+                  disabled={isLoadingIdeas}
+                  className="text-xs"
+                >
+                  {isLoadingIdeas ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      추천 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      아이디어 추천받기
+                    </>
+                  )}
+                </Button>
+              </div>
               <Textarea
                 id="idea"
                 value={idea}
@@ -464,6 +515,41 @@ ${flagDetails}
                 시나리오의 핵심 컨셉을 자유롭게 설명해주세요. AI가 이를 바탕으로 상세한 시놉시스를 생성합니다.
               </p>
             </div>
+
+            {/* 아이디어 추천 목록 */}
+            {ideaSuggestions.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">추천 아이디어</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIdeaSuggestions([])}
+                    className="text-xs text-zinc-500 h-6"
+                  >
+                    닫기
+                  </Button>
+                </div>
+                <div className="grid gap-2">
+                  {ideaSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleSelectIdea(suggestion)}
+                      className="text-left p-3 rounded-lg border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50 transition-colors"
+                    >
+                      <p className="text-sm text-zinc-200">{suggestion.idea}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {suggestion.genre}
+                        </Badge>
+                        <span className="text-xs text-zinc-500">{suggestion.hook}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
