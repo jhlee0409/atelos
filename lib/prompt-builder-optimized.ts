@@ -313,7 +313,9 @@ export const getCachedPrompt = (
   // 캐시 크기 제한
   if (promptCache.size > 20) {
     const firstKey = promptCache.keys().next().value;
-    promptCache.delete(firstKey);
+    if (firstKey !== undefined) {
+      promptCache.delete(firstKey);
+    }
   }
 
   return newPrompt;

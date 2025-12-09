@@ -477,6 +477,31 @@ export const cleanAndValidateAIResponse = (
 };
 
 // 게임 클라이언트에서 사용하는 인터페이스들
+export interface CharacterMoment {
+  day: number;
+  type: 'relationship' | 'status' | 'decision' | 'revelation';
+  description: string;
+  relatedCharacter?: string;
+  impact: 'positive' | 'negative' | 'neutral';
+}
+
+export interface CharacterArc {
+  characterName: string;
+  moments: CharacterMoment[];
+  currentMood: 'hopeful' | 'anxious' | 'angry' | 'resigned' | 'determined';
+  trustLevel: number;
+}
+
+export interface KeyDecision {
+  day: number;
+  turn: number;
+  choice: string;
+  consequence: string;
+  category: 'survival' | 'relationship' | 'moral' | 'strategic';
+  flagsAcquired?: string[];
+  impactedCharacters?: string[];
+}
+
 export interface SaveState {
   context: {
     scenarioId: string;
@@ -501,6 +526,8 @@ export interface SaveState {
     choice_a: string;
     choice_b: string;
   };
+  characterArcs?: CharacterArc[];
+  keyDecisions?: KeyDecision[];
 }
 
 export interface PlayerAction {
