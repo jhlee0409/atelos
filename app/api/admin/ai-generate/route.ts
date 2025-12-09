@@ -22,6 +22,7 @@ const getGeminiClient = (): GoogleGenerativeAI => {
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
+  | 'relationships'
   | 'stats'
   | 'flags'
   | 'endings'
@@ -100,6 +101,33 @@ scenarioId는 영문 대문자와 언더스코어만 사용합니다.`,
       userPrompt: `다음 설명을 바탕으로 캐릭터를 생성해주세요:\n${input}${baseContext}\n2-4명의 캐릭터를 제안해주세요.`,
     },
 
+    relationships: {
+      systemPrompt: `당신은 캐릭터 관계 디자이너입니다. 캐릭터들 간의 초기 관계를 설계합니다.
+응답은 반드시 다음 JSON 형식의 배열로:
+{
+  "relationships": [
+    {
+      "personA": "캐릭터A 이름 (한글)",
+      "personB": "캐릭터B 이름 (한글)",
+      "value": -100에서 100 사이의 정수,
+      "reason": "관계 설명 (한글, 50자 이내)"
+    }
+  ]
+}
+value 기준:
+- 100: 깊은 신뢰/사랑/헌신
+- 50~99: 우호적/협력적
+- 0~49: 중립~약간 우호적
+- -49~-1: 중립~약간 적대적
+- -99~-50: 적대적/불신
+- -100: 극심한 적대/증오
+
+관계는 양방향이 아닐 수 있습니다 (A→B와 B→A가 다를 수 있음).
+모든 캐릭터 쌍에 대해 최소 한 방향의 관계를 정의해주세요.
+갈등, 로맨스, 멘토-멘티, 라이벌 등 다양한 관계 역학을 포함해주세요.`,
+      userPrompt: `다음 캐릭터들 간의 초기 관계를 생성해주세요:\n${input}${baseContext}\n각 캐릭터 쌍마다 관계를 정의해주세요.`,
+    },
+
     stats: {
       systemPrompt: `당신은 게임 시스템 디자이너입니다. 시나리오에 적합한 게임 스탯을 설계합니다.
 응답은 반드시 다음 JSON 형식의 배열로:
@@ -134,8 +162,21 @@ polarity: positive는 높을수록 좋음, negative는 낮을수록 좋음
     }
   ]
 }
-플래그 예시: FLAG_ALLY_FOUND, FLAG_RESOURCE_SECURED, FLAG_ENEMY_DEFEATED, FLAG_SECRET_DISCOVERED`,
-      userPrompt: `다음 시나리오에 적합한 이벤트 플래그를 제안해주세요:\n${input}${baseContext}\n5-8개의 플래그를 제안해주세요.`,
+
+중요: 게임에는 3가지 주요 루트(경로)가 있으며, 각 루트에 맞는 플래그를 반드시 포함해야 합니다:
+
+1. 탈출 루트 (Escape Route): 위험을 피해 안전한 곳으로 이동하는 선택
+   - 예시: FLAG_ESCAPE_ROUTE_FOUND, FLAG_VEHICLE_SECURED, FLAG_EXIT_DISCOVERED
+
+2. 항전 루트 (Defense Route): 현재 위치를 지키고 방어하는 선택
+   - 예시: FLAG_DEFENSES_COMPLETE, FLAG_RESOURCE_STOCKPILE, FLAG_TERRITORY_SECURED
+
+3. 협상 루트 (Negotiation Route): 외부 세력과 협력하거나 대화로 해결하는 선택
+   - 예시: FLAG_ALLY_NETWORK_FORMED, FLAG_PEACE_TREATY, FLAG_CONTACT_ESTABLISHED
+
+각 루트별로 최소 1-2개의 플래그를 포함하고, 추가로 일반적인 이벤트 플래그도 포함해주세요.
+플래그 예시: FLAG_SECRET_DISCOVERED, FLAG_BETRAYAL_REVEALED, FLAG_LEADER_CHOSEN`,
+      userPrompt: `다음 시나리오에 적합한 이벤트 플래그를 제안해주세요:\n${input}${baseContext}\n\n중요: 탈출/항전/협상 3가지 루트에 맞는 플래그를 각각 포함해서 8-12개의 플래그를 제안해주세요.`,
     },
 
     endings: {

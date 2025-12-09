@@ -3,6 +3,7 @@
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
+  | 'relationships'
   | 'stats'
   | 'flags'
   | 'endings'
@@ -52,6 +53,13 @@ export interface FlagResult {
   type: 'boolean' | 'count';
   description: string;
   triggerCondition: string;
+}
+
+export interface RelationshipResult {
+  personA: string;
+  personB: string;
+  value: number;
+  reason: string;
 }
 
 export interface EndingResult {
@@ -131,6 +139,12 @@ export const CATEGORY_INFO: Record<
     description: '시나리오에 등장할 캐릭터들을 생성합니다.',
     placeholder:
       '예: 전직 군인 리더, 의사 출신 힐러, 기술자, 그리고 어린 생존자가 필요해',
+  },
+  relationships: {
+    label: '관계',
+    description: '캐릭터들 간의 초기 관계를 생성합니다.',
+    placeholder:
+      '예: 리더와 의사는 오래된 동료, 기술자는 리더를 불신함',
   },
   stats: {
     label: '스탯',

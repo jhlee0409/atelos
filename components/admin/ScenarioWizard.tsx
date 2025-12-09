@@ -48,8 +48,83 @@ import {
   type StatResult,
   type FlagResult,
   type EndingResult,
+  type RelationshipResult,
+  type TraitsResult,
+  type TraitResult,
 } from '@/lib/ai-scenario-generator';
-import type { ScenarioData } from '@/types';
+import type { ScenarioData, SystemCondition, Trait } from '@/types';
+
+// 비교 연산자 타입
+type ComparisonOperator =
+  | 'greater_equal'
+  | 'less_equal'
+  | 'equal'
+  | 'greater_than'
+  | 'less_than'
+  | 'not_equal';
+
+// 비교 연산자 변환 (AI 형식 → 게임 형식)
+const COMPARISON_MAP: Record<string, ComparisonOperator | undefined> = {
+  '>=': 'greater_equal',
+  '<=': 'less_equal',
+  '==': 'equal',
+  '>': 'greater_than',
+  '<': 'less_than',
+  '!=': 'not_equal',
+};
+
+// suggestedConditions를 SystemCondition[]으로 변환
+const convertToSystemConditions = (
+  suggestedConditions: EndingResult['suggestedConditions'] | undefined,
+): SystemCondition[] => {
+  if (!suggestedConditions) return [];
+
+  const conditions: SystemCondition[] = [];
+
+  // 스탯 조건 변환
+  if (suggestedConditions.stats && Array.isArray(suggestedConditions.stats)) {
+    for (const stat of suggestedConditions.stats) {
+      const comparison = COMPARISON_MAP[stat.comparison];
+      if (comparison && stat.statId && typeof stat.value === 'number') {
+        conditions.push({
+          type: 'required_stat',
+          statId: stat.statId,
+          comparison,
+          value: stat.value,
+        });
+      }
+    }
+  }
+
+  // 플래그 조건 변환
+  if (suggestedConditions.flags && Array.isArray(suggestedConditions.flags)) {
+    for (const flagName of suggestedConditions.flags) {
+      if (flagName && typeof flagName === 'string') {
+        conditions.push({
+          type: 'required_flag',
+          flagName: flagName.startsWith('FLAG_') ? flagName : `FLAG_${flagName}`,
+        });
+      }
+    }
+  }
+
+  return conditions;
+};
+
+// TraitResult를 Trait 타입으로 변환
+const convertTraitResult = (
+  trait: TraitResult,
+  type: 'positive' | 'negative',
+): Trait => ({
+  traitId: trait.traitId,
+  traitName: trait.traitName,
+  displayName: trait.displayName,
+  type,
+  weightType: trait.traitId, // weightType은 traitId와 동일하게 설정
+  displayText: trait.description || '',
+  systemInstruction: trait.effect || '',
+  iconUrl: '', // 기본값 - 에디터에서 설정 가능
+});
 
 // 단계 정의
 type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'endings' | 'complete';
@@ -81,6 +156,8 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   // 생성된 데이터
   const [synopsisResult, setSynopsisResult] = useState<SynopsisResult | null>(null);
   const [characters, setCharacters] = useState<CharacterResult[]>([]);
+  const [relationships, setRelationships] = useState<RelationshipResult[]>([]);
+  const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
   const [flags, setFlags] = useState<FlagResult[]>([]);
   const [endings, setEndings] = useState<EndingResult[]>([]);
@@ -115,7 +192,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, [idea, tone, setting, targetLength]);
 
-  // 캐릭터 생성
+  // 캐릭터 생성 (관계도 함께 생성)
   const handleGenerateCharacters = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -123,7 +200,8 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     setError(null);
 
     try {
-      const response = await generateWithAI<{ characters: CharacterResult[] }>(
+      // 1단계: 캐릭터 생성
+      const charResponse = await generateWithAI<{ characters: CharacterResult[] }>(
         'characters',
         `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n배경: ${synopsisResult.setting.place}, ${synopsisResult.setting.time}\n갈등: ${synopsisResult.conflictType}`,
         {
@@ -132,7 +210,47 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
           synopsis: synopsisResult.synopsis,
         },
       );
-      setCharacters(response.data.characters || []);
+      const generatedCharacters = charResponse.data.characters || [];
+      setCharacters(generatedCharacters);
+
+      // 2단계: 관계와 특성을 병렬로 생성
+      const characterDescriptions = generatedCharacters
+        .map((c) => `${c.characterName} (${c.roleName}): ${c.backstory}`)
+        .join('\n');
+
+      const suggestedTraitsSet = new Set(
+        generatedCharacters.flatMap((c) => c.suggestedTraits || []),
+      );
+
+      const [relResponse, traitsResponse] = await Promise.all([
+        // 관계 생성 (캐릭터가 2명 이상일 때만)
+        generatedCharacters.length >= 2
+          ? generateWithAI<{ relationships: RelationshipResult[] }>(
+              'relationships',
+              `캐릭터 목록:\n${characterDescriptions}\n\n시나리오 갈등: ${synopsisResult.conflictType}`,
+              {
+                genre: synopsisResult.genre,
+                title: synopsisResult.title,
+                synopsis: synopsisResult.synopsis,
+                existingCharacters: generatedCharacters.map((c) => c.characterName),
+              },
+            )
+          : Promise.resolve({ data: { relationships: [] } }),
+        // 특성 생성
+        generateWithAI<TraitsResult>(
+          'traits',
+          `시나리오: ${synopsisResult.title}\n캐릭터들의 제안된 특성: ${[...suggestedTraitsSet].join(', ')}\n캐릭터 목록:\n${characterDescriptions}`,
+          {
+            genre: synopsisResult.genre,
+            title: synopsisResult.title,
+            synopsis: synopsisResult.synopsis,
+          },
+        ),
+      ]);
+
+      setRelationships(relResponse.data.relationships || []);
+      setTraits(traitsResponse.data || { buffs: [], debuffs: [] });
+
       setCurrentStep('characters');
     } catch (err) {
       setError(err instanceof Error ? err.message : '캐릭터 생성에 실패했습니다.');
@@ -149,26 +267,43 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     setError(null);
 
     try {
+      // 캐릭터 상세정보 문자열 생성
+      const characterDetails = characters
+        .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory}`)
+        .join('\n');
+
       // 스탯과 플래그를 병렬로 생성
       const [statsResponse, flagsResponse] = await Promise.all([
         generateWithAI<{ stats: StatResult[] }>(
           'stats',
-          `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n테마: ${synopsisResult.suggestedThemes.join(', ')}\n갈등: ${synopsisResult.conflictType}`,
+          `시나리오: ${synopsisResult.title}
+시놉시스: ${synopsisResult.synopsis}
+테마: ${synopsisResult.suggestedThemes.join(', ')}
+갈등: ${synopsisResult.conflictType}
+
+등장 캐릭터:
+${characterDetails}`,
           {
             genre: synopsisResult.genre,
             title: synopsisResult.title,
             synopsis: synopsisResult.synopsis,
-            existingCharacters: characters.map((c) => c.characterName),
+            existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
           },
         ),
         generateWithAI<{ flags: FlagResult[] }>(
           'flags',
-          `시나리오: ${synopsisResult.title}\n시놉시스: ${synopsisResult.synopsis}\n서사적 훅: ${synopsisResult.narrativeHooks.join(', ')}`,
+          `시나리오: ${synopsisResult.title}
+시놉시스: ${synopsisResult.synopsis}
+서사적 훅: ${synopsisResult.narrativeHooks.join(', ')}
+갈등: ${synopsisResult.conflictType}
+
+등장 캐릭터:
+${characterDetails}`,
           {
             genre: synopsisResult.genre,
             title: synopsisResult.title,
             synopsis: synopsisResult.synopsis,
-            existingCharacters: characters.map((c) => c.characterName),
+            existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
           },
         ),
       ]);
@@ -191,14 +326,41 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     setError(null);
 
     try {
+      // 스탯 상세정보
+      const statDetails = stats
+        .map((s) => `- ${s.name} (${s.id}): ${s.description || '설명 없음'}, 범위 ${s.min}-${s.max}`)
+        .join('\n');
+
+      // 플래그 상세정보 (루트별 분류)
+      const flagDetails = flags
+        .map((f) => `- ${f.flagName}: ${f.description}`)
+        .join('\n');
+
+      // 캐릭터 정보
+      const characterNames = characters.map((c) => c.characterName).join(', ');
+
       const response = await generateWithAI<{ endings: EndingResult[] }>(
         'endings',
-        `시나리오: ${synopsisResult.title}\n목표: ${synopsisResult.playerGoal}\n갈등: ${synopsisResult.conflictType}\n스탯: ${stats.map((s) => s.name).join(', ')}\n플래그: ${flags.map((f) => f.flagName).join(', ')}`,
+        `시나리오: ${synopsisResult.title}
+시놉시스: ${synopsisResult.synopsis}
+플레이어 목표: ${synopsisResult.playerGoal}
+핵심 갈등: ${synopsisResult.conflictType}
+
+등장 캐릭터: ${characterNames}
+
+게임 스탯:
+${statDetails}
+
+이벤트 플래그:
+${flagDetails}
+
+엔딩은 스탯과 플래그 조건을 조합하여 다양한 결말을 만들어주세요.
+탈출/항전/협상 각 루트별로 최소 1개씩의 엔딩을 포함해주세요.`,
         {
           genre: synopsisResult.genre,
           title: synopsisResult.title,
           synopsis: synopsisResult.synopsis,
-          existingStats: stats.map((s) => s.name),
+          existingStats: stats.map((s) => `${s.name} (${s.id})`),
           existingFlags: flags.map((f) => f.flagName),
         },
       );
@@ -209,7 +371,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [synopsisResult, stats, flags]);
+  }, [synopsisResult, characters, stats, flags]);
 
   // 완료 및 적용
   const handleComplete = useCallback(() => {
@@ -232,7 +394,13 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         weightedTraitTypes: char.suggestedTraits || [],
         currentTrait: null,
       })),
-      initialRelationships: [], // 기본값 - 에디터에서 관계 설정 가능
+      initialRelationships: relationships.map((rel, idx) => ({
+        id: `rel_${idx + 1}`,
+        personA: rel.personA,
+        personB: rel.personB,
+        value: rel.value,
+        reason: rel.reason,
+      })),
       scenarioStats: stats.map((stat) => ({
         id: stat.id,
         name: stat.name,
@@ -243,7 +411,10 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         initialValue: stat.initialValue || 50,
         range: [stat.min || 0, stat.max || 100] as [number, number],
       })),
-      traitPool: { buffs: [], debuffs: [] }, // 기본값 - 에디터에서 특성 추가 가능
+      traitPool: {
+        buffs: (traits.buffs || []).map((t) => convertTraitResult(t, 'positive')),
+        debuffs: (traits.debuffs || []).map((t) => convertTraitResult(t, 'negative')),
+      },
       flagDictionary: flags.map((flag) => ({
         flagName: flag.flagName,
         description: flag.description || '',
@@ -256,14 +427,14 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         title: ending.title,
         description: ending.description || '',
         isGoalSuccess: ending.isGoalSuccess || false,
-        systemConditions: [],
+        systemConditions: convertToSystemConditions(ending.suggestedConditions),
       })),
       endCondition: { type: 'time_limit', value: 7, unit: 'days' }, // 기본값 - 7일 제한
       status: 'in_progress',
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, stats, flags, endings, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -439,28 +610,73 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
       case 'characters':
         return (
           <div className="space-y-6">
-            <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {characters.map((char, idx) => (
-                <Card key={idx} className="bg-zinc-800/30">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">{char.characterName}</h4>
-                        <p className="text-xs text-zinc-500">{char.roleName} ({char.roleId})</p>
-                      </div>
-                      {char.suggestedTraits && (
-                        <div className="flex gap-1">
-                          {char.suggestedTraits.slice(0, 2).map((t, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">{t}</Badge>
-                          ))}
+            {/* 캐릭터 목록 */}
+            <div>
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                캐릭터 ({characters.length}명)
+              </h4>
+              <div className="space-y-3 max-h-[250px] overflow-y-auto">
+                {characters.map((char, idx) => (
+                  <Card key={idx} className="bg-zinc-800/30">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{char.characterName}</h4>
+                          <p className="text-xs text-zinc-500">{char.roleName} ({char.roleId})</p>
                         </div>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-400">{char.backstory}</p>
-                  </CardContent>
-                </Card>
-              ))}
+                        {char.suggestedTraits && (
+                          <div className="flex gap-1">
+                            {char.suggestedTraits.slice(0, 2).map((t, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{t}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm text-zinc-400">{char.backstory}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
+
+            {/* 관계 목록 */}
+            {relationships.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  관계 ({relationships.length}개)
+                </h4>
+                <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                  {relationships.map((rel, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        'p-2 rounded text-sm flex items-center justify-between',
+                        rel.value >= 50 ? 'bg-green-900/20' :
+                        rel.value >= 0 ? 'bg-zinc-800/30' :
+                        rel.value >= -50 ? 'bg-yellow-900/20' : 'bg-red-900/20',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{rel.personA}</span>
+                        <span className="text-zinc-500">→</span>
+                        <span className="font-medium">{rel.personB}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={rel.value >= 0 ? 'default' : 'destructive'}
+                          className="text-xs"
+                        >
+                          {rel.value > 0 ? '+' : ''}{rel.value}
+                        </Badge>
+                        <span className="text-xs text-zinc-500">{rel.reason}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
@@ -469,6 +685,14 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 이전
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleGenerateCharacters}
+                disabled={isLoading}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 생성
               </Button>
               <Button
                 onClick={handleGenerateSystem}
@@ -530,6 +754,14 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
                 이전
               </Button>
               <Button
+                variant="outline"
+                onClick={handleGenerateSystem}
+                disabled={isLoading}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 생성
+              </Button>
+              <Button
                 onClick={handleGenerateEndings}
                 disabled={isLoading}
                 className="flex-1"
@@ -576,7 +808,16 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
                 이전
               </Button>
               <Button
+                variant="outline"
+                onClick={handleGenerateEndings}
+                disabled={isLoading}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 생성
+              </Button>
+              <Button
                 onClick={() => setCurrentStep('complete')}
+                disabled={isLoading}
                 className="flex-1"
               >
                 <Check className="w-4 h-4 mr-2" />
@@ -599,10 +840,18 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-4 gap-3 text-center text-sm">
+            <div className="grid grid-cols-3 gap-2 text-center text-sm">
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{characters.length}</div>
                 <div className="text-xs text-zinc-500">캐릭터</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{relationships.length}</div>
+                <div className="text-xs text-zinc-500">관계</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{(traits.buffs?.length || 0) + (traits.debuffs?.length || 0)}</div>
+                <div className="text-xs text-zinc-500">특성</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{stats.length}</div>
