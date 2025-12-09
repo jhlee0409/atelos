@@ -87,10 +87,15 @@ export interface TraitsResult {
   debuffs: TraitResult[];
 }
 
+export type ToneType = 'dark' | 'hopeful' | 'thriller' | 'dramatic' | 'comedic' | 'mysterious' | 'romantic' | 'action' | 'melancholic' | 'satirical' | 'epic' | 'intimate';
+
 export interface IdeaSuggestion {
   idea: string;
   genre: string;
   hook: string;
+  tone: ToneType;
+  targetLength: 'short' | 'medium' | 'long';
+  setting: string;
 }
 
 export interface IdeaSuggestionsResult {

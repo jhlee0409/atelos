@@ -272,8 +272,21 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
             idea: { type: SchemaType.STRING, description: '시나리오 아이디어 (1-2문장)' },
             genre: { type: SchemaType.STRING, description: '주요 장르' },
             hook: { type: SchemaType.STRING, description: '핵심 매력 포인트' },
+            tone: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              description: '추천 분위기/톤',
+              enum: ['dark', 'hopeful', 'thriller', 'dramatic', 'comedic', 'mysterious', 'romantic', 'action', 'melancholic', 'satirical', 'epic', 'intimate'],
+            },
+            targetLength: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              description: '추천 시놉시스 길이',
+              enum: ['short', 'medium', 'long'],
+            },
+            setting: { type: SchemaType.STRING, description: '배경 설정 (시대, 장소)' },
           },
-          required: ['idea', 'genre', 'hook'],
+          required: ['idea', 'genre', 'hook', 'tone', 'targetLength', 'setting'],
         },
         description: '시나리오 아이디어 목록',
       },
@@ -721,7 +734,14 @@ ${baseContext}`,
   <guideline>idea: 한글 1-2문장으로 핵심 상황과 목표 설명</guideline>
   <guideline>genre: 주요 장르 1-2개</guideline>
   <guideline>hook: 플레이어를 끌어당기는 핵심 매력 포인트</guideline>
+  <guideline>tone: 아이디어에 가장 어울리는 분위기/톤</guideline>
+  <guideline>targetLength: 시놉시스 적정 길이 (short/medium/long)</guideline>
+  <guideline>setting: 구체적인 시대와 장소 배경</guideline>
 </guidelines>
+
+<tone_options>
+dark(어둡고 절망적), hopeful(희망적 성장), thriller(긴장감 서스펜스), dramatic(감정적 갈등), comedic(유머러스 풍자), mysterious(수수께끼 반전), romantic(감정선 관계), action(빠른 전개), melancholic(쓸쓸한 애틋함), satirical(사회비평), epic(웅장한 서사), intimate(내밀한 감정)
+</tone_options>
 
 <genre_pool>
 포스트아포칼립스, SF, 판타지, 호러, 미스터리, 스릴러, 심리, 서바이벌, 역사, 현대, 로맨스, 범죄, 정치, 군사, 사이버펑크, 디스토피아
@@ -733,17 +753,26 @@ ${baseContext}`,
     {
       "idea": "좀비 아포칼립스 속 아파트 단지에서 30명의 생존자를 이끌며 7일간 구조대를 기다린다.",
       "genre": "포스트아포칼립스, 서바이벌",
-      "hook": "모두를 살릴 수 없는 상황에서의 선택"
+      "hook": "모두를 살릴 수 없는 상황에서의 선택",
+      "tone": "dark",
+      "targetLength": "long",
+      "setting": "2024년 대한민국 서울 외곽 아파트 단지"
     },
     {
       "idea": "1920년대 호화 열차에서 벌어진 살인 사건의 범인을 찾는 탐정이 되어 승객들을 심문한다.",
       "genre": "미스터리, 역사",
-      "hook": "제한된 시간과 공간 속 추리"
+      "hook": "제한된 시간과 공간 속 추리",
+      "tone": "mysterious",
+      "targetLength": "medium",
+      "setting": "1923년 유럽, 파리-이스탄불 오리엔트 특급열차"
     },
     {
       "idea": "우주 정거장에서 산소가 고갈되기 전 탈출 방법을 찾아야 하는 엔지니어가 된다.",
       "genre": "SF, 스릴러",
-      "hook": "극한 상황에서의 문제 해결"
+      "hook": "극한 상황에서의 문제 해결",
+      "tone": "thriller",
+      "targetLength": "medium",
+      "setting": "2157년 지구 궤도 국제우주정거장"
     }
   ]
 }
@@ -755,7 +784,8 @@ ${baseContext}`,
 <requirements>
   <requirement>서로 다른 장르와 설정을 가진 다양한 아이디어</requirement>
   <requirement>플레이어가 주인공으로 선택을 내리는 상황</requirement>
-  <requirement>간단하지만 흥미를 끄는 핵심 설정</requirement>
+  <requirement>각 아이디어에 어울리는 tone, targetLength, setting 포함</requirement>
+  <requirement>다양한 tone을 골고루 사용</requirement>
 </requirements>`,
     },
   };

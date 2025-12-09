@@ -105,6 +105,13 @@ const TONE_DESCRIPTIONS: Record<string, { name: string; description: string }> =
   thriller: { name: '스릴러', description: '긴장감 넘치는 서스펜스, 예측 불가능한 전개' },
   dramatic: { name: '드라마틱', description: '감정적 깊이와 인물 간 갈등 중심' },
   comedic: { name: '코믹', description: '유머러스하면서도 풍자적인 요소 포함' },
+  mysterious: { name: '미스터리', description: '수수께끼와 반전, 진실을 파헤치는 서사' },
+  romantic: { name: '로맨틱', description: '감정선과 관계 변화 중심의 이야기' },
+  action: { name: '액션', description: '빠른 전개와 긴박한 상황, 역동적인 서사' },
+  melancholic: { name: '멜랑콜릭', description: '쓸쓸하고 애틋한 분위기, 상실과 그리움' },
+  satirical: { name: '풍자적', description: '사회 비평과 아이러니, 날카로운 시선' },
+  epic: { name: '서사시적', description: '웅장한 스케일, 영웅적 여정과 대의' },
+  intimate: { name: '내밀한', description: '개인적이고 섬세한 감정, 일상의 깊이' },
 };
 
 const LENGTH_GUIDANCE: Record<string, { chars: string; description: string }> = {

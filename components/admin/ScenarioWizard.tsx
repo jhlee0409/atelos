@@ -190,9 +190,12 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, []);
 
-  // 추천 아이디어 선택
+  // 추천 아이디어 선택 - 톤, 길이, 배경 설정도 자동 적용
   const handleSelectIdea = useCallback((selectedIdea: IdeaSuggestion) => {
     setIdea(selectedIdea.idea);
+    setTone(selectedIdea.tone);
+    setTargetLength(selectedIdea.targetLength);
+    setSetting(selectedIdea.setting);
     setIdeaSuggestions([]); // 선택 후 추천 목록 숨기기
   }, []);
 
@@ -539,12 +542,16 @@ ${flagDetails}
                       className="text-left p-3 rounded-lg border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50 transition-colors"
                     >
                       <p className="text-sm text-zinc-200">{suggestion.idea}</p>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center flex-wrap gap-2 mt-2">
                         <Badge variant="secondary" className="text-xs">
                           {suggestion.genre}
                         </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {TONE_OPTIONS.find(t => t.value === suggestion.tone)?.label || suggestion.tone}
+                        </Badge>
                         <span className="text-xs text-zinc-500">{suggestion.hook}</span>
                       </div>
+                      <p className="text-xs text-zinc-600 mt-1">{suggestion.setting}</p>
                     </button>
                   ))}
                 </div>
