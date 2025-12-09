@@ -768,7 +768,8 @@ export async function POST(request: NextRequest) {
     const body: AIGenerateRequestBody = await request.json();
     const { category, input, context } = body;
 
-    if (!category || !input) {
+    // idea_suggestions는 빈 입력 허용 (다양한 장르로 자동 생성)
+    if (!category || (category !== 'idea_suggestions' && !input)) {
       return NextResponse.json(
         { error: 'category와 input은 필수입니다.' },
         { status: 400 },
@@ -777,7 +778,7 @@ export async function POST(request: NextRequest) {
 
     const { systemPrompt, userPrompt } = getCategoryPrompt(
       category,
-      input,
+      input || '', // idea_suggestions의 경우 빈 문자열 허용
       context,
     );
 
@@ -801,7 +802,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `🤖 [AI Generate] 카테고리: ${category}, temp: ${temperature}, maxTokens: ${maxOutputTokens}`,
     );
-    console.log(`📝 [AI Generate] 입력: ${input.substring(0, 100)}...`);
+    console.log(`📝 [AI Generate] 입력: ${input ? input.substring(0, 100) + '...' : '(빈 입력)'}`);
 
     const result = await model.generateContent(userPrompt);
     const response = await result.response;
