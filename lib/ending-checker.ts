@@ -26,13 +26,22 @@ export const checkFlagCondition = (
   return false;
 };
 
+export const checkSurvivorCountCondition = (
+  condition: Extract<SystemCondition, { type: 'survivor_count' }>,
+  survivorCount: number,
+): boolean => {
+  return compareValues(survivorCount, condition.comparison, condition.value);
+};
+
 export const checkEndingConditions = (
   playerState: PlayerState,
   endingArchetypes: EndingArchetype[],
+  survivorCount?: number,
 ): EndingArchetype | null => {
   console.log('🔍 엔딩 조건 체크 시작...');
   console.log('📊 현재 스탯:', playerState.stats);
   console.log('🏴 현재 플래그:', playerState.flags);
+  console.log('👥 생존자 수:', survivorCount ?? '정보 없음');
 
   // "결단의 날"과 같은 시간 제한 엔딩은 제외 (별도 처리)
   const checkableEndings = endingArchetypes.filter(
@@ -57,8 +66,14 @@ export const checkEndingConditions = (
         const currentValue = playerState.flags[condition.flagName];
         details = `플래그 ${condition.flagName}: ${currentValue} = ${result}`;
       } else if (condition.type === 'survivor_count') {
-        result = true; // Placeholder - 생존자 수 체크 로직 추가 필요
-        details = `생존자 수: true (placeholder)`;
+        // 생존자 수 조건 체크 - survivorCount가 전달되지 않으면 조건을 통과시키지 않음
+        if (survivorCount === undefined) {
+          result = false;
+          details = `생존자 수: 정보 없음 - 조건 미충족`;
+        } else {
+          result = checkSurvivorCountCondition(condition, survivorCount);
+          details = `생존자 수: ${survivorCount} ${condition.comparison} ${condition.value} = ${result}`;
+        }
       }
 
       console.log(`  ✓ ${details}`);

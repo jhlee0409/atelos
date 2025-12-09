@@ -223,18 +223,48 @@ export class SimulationUtils {
     flags: PlayerState['flags'],
   ): boolean {
     const flagValue = flags[condition.flagName];
-    return flagValue === true;
+    // boolean 플래그는 true 여부 체크, count 플래그는 > 0 체크
+    if (typeof flagValue === 'boolean') {
+      return flagValue === true;
+    } else if (typeof flagValue === 'number') {
+      return flagValue > 0;
+    }
+    return false;
+  }
+
+  private static checkSurvivorCountCondition(
+    condition: Extract<SystemCondition, { type: 'survivor_count' }>,
+    survivorCount: number,
+  ): boolean {
+    switch (condition.comparison) {
+      case 'greater_equal':
+        return survivorCount >= condition.value;
+      case 'less_equal':
+        return survivorCount <= condition.value;
+      case 'equal':
+        return survivorCount === condition.value;
+      case 'greater_than':
+        return survivorCount > condition.value;
+      case 'less_than':
+        return survivorCount < condition.value;
+      case 'not_equal':
+        return survivorCount !== condition.value;
+      default:
+        return false;
+    }
   }
 
   /**
    * Checks if any ending conditions have been met based on the current player state.
    * @param playerState - The current state of the player (stats, flags).
    * @param endingArchetypes - The list of possible endings for the scenario.
+   * @param survivorCount - The current survivor count (optional).
    * @returns The triggered EndingArchetype if conditions are met, otherwise null.
    */
   static checkEndingConditions(
     playerState: PlayerState,
     endingArchetypes: EndingArchetype[],
+    survivorCount?: number,
   ): EndingArchetype | null {
     for (const ending of endingArchetypes) {
       const conditionsMet = ending.systemConditions.every((condition) => {
@@ -244,9 +274,9 @@ export class SimulationUtils {
           case 'required_flag':
             return this.checkFlagCondition(condition, playerState.flags);
           case 'survivor_count':
-            // For now, assume we have the survivor count in playerState
-            // This would need to be implemented based on actual game logic
-            return true;
+            // survivorCount가 전달되지 않으면 조건 미충족
+            if (survivorCount === undefined) return false;
+            return this.checkSurvivorCountCondition(condition, survivorCount);
           default:
             return false;
         }
