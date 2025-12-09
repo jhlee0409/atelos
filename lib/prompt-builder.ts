@@ -380,17 +380,12 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
 
-FLAG ACQUISITION RULES (grant flag when condition is met):
-- **FLAG_ESCAPE_VEHICLE_SECURED**: Player secures transportation (truck, bus, etc.) for escape
-- **FLAG_ALLY_NETWORK_FORMED**: Successfully forms alliance with another survivor group
-- **FLAG_GOVERNMENT_CONTACT**: Establishes communication with military or government
-- **FLAG_UNDERGROUND_HIDEOUT**: Discovers or builds underground shelter
-- **FLAG_DEFENSES_COMPLETE**: Completes defensive fortifications
-- **FLAG_LEADER_SACRIFICE**: Leader chooses self-sacrifice for others
-- **FLAG_RESOURCE_MONOPOLY**: Secures control of critical resources
-- **FLAG_IDEOLOGY_ESTABLISHED**: Community's ideology inspires other survivors
-- **FLAG_MARTYR_LEGEND**: A hero's sacrifice becomes legendary
-- Only grant 1-2 flags per response when truly earned through player actions
+FLAG ACQUISITION RULES (IMPORTANT - grant flags when conditions are met):
+${scenario.flagDictionary && scenario.flagDictionary.length > 0
+  ? scenario.flagDictionary.map(flag => `- **${flag.flagName}**: ${flag.triggerCondition || flag.description}`).join('\n')
+  : '- No flags defined for this scenario'}
+- Grant 1-2 flags per response when conditions are clearly met by player actions
+- flags_acquired array must contain the exact flag name (e.g., "FLAG_POWER_AWAKENED")
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 

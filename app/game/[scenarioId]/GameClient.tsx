@@ -234,13 +234,13 @@ const updateSaveState = (
 
         let amplificationFactor: number;
 
-        // 스탯이 위험하거나 최대치에 가까울 때는 부드럽게 증폭
+        // 스탯이 위험하거나 최대치에 가까울 때는 최소한의 증폭
         if (percentage <= 25 || percentage >= 75) {
-          amplificationFactor = 1.5;
+          amplificationFactor = 1.2;
         }
-        // 스탯이 안정적인 중간 구간일 때는 크게 증폭하여 긴장감 조성
+        // 스탯이 안정적인 중간 구간일 때는 적당히 증폭하여 긴장감 조성
         else {
-          amplificationFactor = 3.0;
+          amplificationFactor = 2.0;
         }
 
         const originalChange = scenarioStats[originalKey];
@@ -400,7 +400,9 @@ const updateSaveState = (
         if (newSaveState.community.hiddenRelationships[key] === undefined) {
           newSaveState.community.hiddenRelationships[key] = 0;
         }
-        newSaveState.community.hiddenRelationships[key] += value;
+        // 관계값 변경 후 -100 ~ 100 범위로 clamp
+        const newRelationValue = newSaveState.community.hiddenRelationships[key] + value;
+        newSaveState.community.hiddenRelationships[key] = Math.max(-100, Math.min(100, newRelationValue));
         console.log(
           `🤝 관계도 변경: ${key} | 변화: ${value} | 현재: ${newSaveState.community.hiddenRelationships[key]}`,
         );
@@ -463,12 +465,12 @@ const updateSaveState = (
 
     // 시간 진행 조건:
     // 1. 최소 턴 수를 충족하고 (MIN_TURNS_PER_DAY)
-    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (4턴 이상)
+    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (3턴 이상)
     const enoughTurns = currentTurnsInDay >= MIN_TURNS_PER_DAY;
     const shouldProgress =
       shouldAdvanceTime === true ||
       hasSignificantEvent ||
-      currentTurnsInDay >= 4; // 4턴 후에는 자동으로 시간 진행
+      currentTurnsInDay >= 3; // 3턴 후에는 자동으로 시간 진행
 
     if (enoughTurns && shouldProgress) {
       if (newSaveState.context.currentDay !== undefined) {

@@ -204,6 +204,14 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
         .join(',')
     : '';
 
+  // 동적 플래그 규칙 생성
+  const flagRules = scenario.flagDictionary && scenario.flagDictionary.length > 0
+    ? `\nFLAGS TO GRANT (when condition met):\n${scenario.flagDictionary
+        .slice(0, 8) // 최대 8개만 포함 (토큰 절약)
+        .map(flag => `- ${flag.flagName}: ${(flag.triggerCondition || flag.description).substring(0, 50)}`)
+        .join('\n')}`
+    : '';
+
   const systemPrompt = COMPRESSED_SYSTEM_TEMPLATE
     .replace('{{TITLE}}', scenario.title)
     .replace('{{GENRE}}', genreText)
@@ -211,7 +219,8 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
     .replace('{{DAY}}', currentDay.toString())
     .replace('{{STATS}}', compressedStats)
     .replace('{{FLAGS}}', compressedFlags)
-    .replace('{{CHARS}}', compressedChars);
+    .replace('{{CHARS}}', compressedChars)
+    + flagRules;
 
   // 서사 단계 힌트
   const narrativeHint = getCompactNarrativeHint(currentDay);
