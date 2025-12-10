@@ -206,6 +206,9 @@ export interface SaveState {
     // --- 맥락 연결 시스템 (Phase 5) ---
     /** 현재 행동 맥락 */
     actionContext?: ActionContext;
+    // --- 동적 월드 시스템 (Phase 6) ---
+    /** 월드 상태 */
+    worldState?: WorldState;
   };
   community: {
     survivors: {
@@ -515,4 +518,202 @@ export interface ContextUpdate {
   newUrgentMatters?: string[];
   /** 해결된 긴급 사안 */
   resolvedMatters?: string[];
+}
+
+// =============================================================================
+// Phase 6: 동적 월드 시스템 (Dynamic World State System)
+// =============================================================================
+
+/**
+ * 위치 상태 - 위치의 현재 상태를 추적
+ */
+export type LocationStatus =
+  | 'available'      // 탐색 가능
+  | 'explored'       // 탐색 완료 (쿨다운 필요)
+  | 'destroyed'      // 파괴됨 (영구 접근 불가)
+  | 'blocked'        // 일시적 차단 (조건 충족 시 개방)
+  | 'hidden'         // 숨겨짐 (발견 필요)
+  | 'locked';        // 잠김 (특정 아이템/플래그 필요)
+
+/**
+ * 구체적 발견물 - 탐색으로 발견할 수 있는 실체적 아이템/정보
+ */
+export interface ConcreteDiscovery {
+  /** 발견물 고유 ID */
+  discoveryId: string;
+  /** 발견물 유형 */
+  type: 'item' | 'document' | 'equipment' | 'clue' | 'resource';
+  /** 발견물 이름 (구체적) */
+  name: string;
+  /** 발견물 설명 */
+  description: string;
+  /** 발견 장소 ID */
+  locationId: string;
+  /** 발견 조건 (플래그/스탯 조건) */
+  discoveryCondition?: {
+    requiredFlag?: string;
+    requiredStat?: { statId: string; minValue: number };
+    requiredItem?: string;
+  };
+  /** 발견 시 효과 */
+  effects?: {
+    statChanges?: Record<string, number>;
+    flagsAcquired?: string[];
+    newLocationsUnlocked?: string[];
+    locationsDestroyed?: string[];
+    locationsBlocked?: string[];
+    relationshipChanges?: Record<string, number>;
+  };
+  /** 발견 여부 */
+  discovered: boolean;
+  /** 발견 Day */
+  discoveredOnDay?: number;
+  /** 1회 발견 가능 여부 */
+  oneTimeOnly: boolean;
+  /** 중요도 */
+  importance: 'trivial' | 'minor' | 'major' | 'critical';
+}
+
+/**
+ * 월드 위치 - 탐색 가능한 위치의 상세 정보
+ */
+export interface WorldLocation {
+  /** 위치 ID */
+  locationId: string;
+  /** 위치 이름 */
+  name: string;
+  /** 기본 설명 */
+  baseDescription: string;
+  /** 현재 상태에 따른 설명 */
+  currentDescription: string;
+  /** 아이콘 타입 */
+  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters' | 'office' | 'corridor' | 'exterior' | 'hidden';
+  /** 위치 상태 */
+  status: LocationStatus;
+  /** 상태 사유 (파괴됨, 차단됨 등일 때) */
+  statusReason?: string;
+  /** 잠금 해제 조건 */
+  unlockCondition?: {
+    requiredFlag?: string;
+    requiredItem?: string;
+    requiredDay?: number;
+    requiredExploration?: string; // 다른 위치 탐색 필요
+  };
+  /** 탐색 쿨다운 (Day 단위) */
+  explorationCooldown: number;
+  /** 마지막 탐색 Day */
+  lastExploredDay?: number;
+  /** 연결된 위치들 (여기서 발견되면 개방) */
+  connectedLocations?: string[];
+  /** 위험도 (높을수록 부정적 이벤트 확률 증가) */
+  dangerLevel: 0 | 1 | 2 | 3;
+  /** 이 위치에서 발견 가능한 것들 */
+  possibleDiscoveries: string[]; // ConcreteDiscovery IDs
+}
+
+/**
+ * 오브젝트 관계 - 게임 오브젝트 간의 상관관계
+ */
+export interface ObjectRelation {
+  /** 관계 ID */
+  relationId: string;
+  /** 관계 유형 */
+  type:
+    | 'character-location'   // 캐릭터가 위치에 있음/관련됨
+    | 'character-item'       // 캐릭터가 아이템 소유/관련
+    | 'location-item'        // 위치에 아이템이 있음
+    | 'character-character'  // 캐릭터 간 관계
+    | 'location-location'    // 위치 간 연결
+    | 'item-flag';           // 아이템이 플래그와 연결
+  /** 주체 */
+  subject: { type: 'character' | 'location' | 'item'; id: string };
+  /** 대상 */
+  object: { type: 'character' | 'location' | 'item' | 'flag'; id: string };
+  /** 관계 설명 */
+  description: string;
+  /** 관계 강도 (-100 ~ 100) */
+  strength: number;
+  /** 관계 활성화 여부 */
+  active: boolean;
+  /** 관계 활성화/비활성화 조건 */
+  activationCondition?: {
+    requiredFlag?: string;
+    requiredDay?: number;
+  };
+}
+
+/**
+ * 월드 이벤트 - 게임 상태 변화를 일으키는 이벤트
+ */
+export interface WorldEvent {
+  /** 이벤트 ID */
+  eventId: string;
+  /** 이벤트 유형 */
+  type: 'location_destroyed' | 'location_unlocked' | 'location_blocked' | 'item_discovered' | 'character_moved' | 'character_unavailable';
+  /** 이벤트 설명 */
+  description: string;
+  /** 트리거 조건 */
+  trigger: {
+    flag?: string;
+    stat?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number };
+    day?: number;
+    exploration?: string; // 특정 위치 탐색 시
+    choice?: string; // 특정 선택지 선택 시
+  };
+  /** 이벤트 효과 */
+  effects: {
+    locationChanges?: { locationId: string; newStatus: LocationStatus; reason?: string }[];
+    characterChanges?: { characterName: string; available: boolean; reason?: string }[];
+    newDiscoveries?: string[]; // ConcreteDiscovery IDs to unlock
+    removeDiscoveries?: string[]; // ConcreteDiscovery IDs to remove
+    newRelations?: ObjectRelation[];
+    removeRelations?: string[]; // Relation IDs to remove
+  };
+  /** 발동 여부 */
+  triggered: boolean;
+  /** 발동 Day */
+  triggeredOnDay?: number;
+  /** 1회성 이벤트 여부 */
+  oneTime: boolean;
+}
+
+/**
+ * 월드 상태 - 동적 월드의 전체 상태
+ */
+export interface WorldState {
+  /** 모든 위치 */
+  locations: WorldLocation[];
+  /** 모든 발견물 */
+  discoveries: ConcreteDiscovery[];
+  /** 모든 관계 */
+  relations: ObjectRelation[];
+  /** 대기 중인 이벤트 */
+  pendingEvents: WorldEvent[];
+  /** 발동된 이벤트 기록 */
+  triggeredEvents: WorldEvent[];
+  /** 수집한 아이템 목록 */
+  inventory: string[]; // ConcreteDiscovery IDs of 'item' type
+  /** 획득한 문서/정보 목록 */
+  documents: string[]; // ConcreteDiscovery IDs of 'document' or 'clue' type
+  /** 월드 상태 마지막 업데이트 */
+  lastUpdated: {
+    day: number;
+    actionIndex: number;
+  };
+}
+
+/**
+ * 월드 상태 업데이트 결과
+ */
+export interface WorldStateUpdateResult {
+  /** 업데이트된 월드 상태 */
+  worldState: WorldState;
+  /** 트리거된 이벤트들 */
+  triggeredEvents: WorldEvent[];
+  /** 새로 발견한 것들 */
+  newDiscoveries: ConcreteDiscovery[];
+  /** 상태가 변경된 위치들 */
+  changedLocations: { locationId: string; previousStatus: LocationStatus; newStatus: LocationStatus; reason?: string }[];
+  /** UI에 표시할 알림 메시지 */
+  notifications: string[];
 }

@@ -45,6 +45,15 @@ import {
   generateDynamicLocations,
   generateDynamicCharacters,
 } from '@/lib/context-manager';
+import {
+  createInitialWorldState,
+  processExploration,
+  processEvents,
+  advanceWorldStateToNewDay,
+  getLocationsForUI,
+  updateLocationStatus,
+} from '@/lib/world-state-manager';
+import type { WorldState, WorldLocation } from '@/types';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
 const LEGACY_STAT_MAPPING: Record<string, string> = {
@@ -132,6 +141,21 @@ const consumeActionPoint = (
         newDay
       );
       console.log(`📝 맥락 리셋: Day ${newDay}로 전환 (발견한 단서는 유지됨)`);
+    }
+
+    // 동적 월드 시스템: Day 전환 시 이벤트 처리
+    if (newState.context.worldState) {
+      const worldResult = advanceWorldStateToNewDay(
+        newState.context.worldState,
+        newDay,
+        newState
+      );
+      newState.context.worldState = worldResult.worldState;
+
+      // 월드 이벤트 알림
+      if (worldResult.notifications.length > 0) {
+        console.log(`🌍 월드 이벤트:`, worldResult.notifications);
+      }
     }
 
     // Day 전환 시스템 메시지
@@ -247,6 +271,9 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     dilemma: { prompt: '', choice_a: '', choice_b: '' },
   });
 
+  // 초기 WorldState 생성 (동적 월드 시스템)
+  const initialWorldState = createInitialWorldState(scenario, 1);
+
   return {
     context: {
       scenarioId: scenario.scenarioId,
@@ -261,6 +288,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionsThisDay: [],
       // 맥락 연결 시스템 초기화
       actionContext: initialActionContext,
+      // 동적 월드 시스템 초기화
+      worldState: initialWorldState,
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -1553,7 +1582,7 @@ export default function GameClient({ scenario }: GameClientProps) {
     }
   };
 
-  // Phase 3: 탐색 핸들러
+  // Phase 3: 탐색 핸들러 (WorldState 통합)
   const handleExplore = async (location: ExplorationLocation) => {
     // 행동 게이지 부족 체크
     if (hasInsufficientAP(saveState, 'exploration')) {
@@ -1567,6 +1596,21 @@ export default function GameClient({ scenario }: GameClientProps) {
 
     try {
       console.log(`🔍 탐색 시작: ${location.name}`);
+
+      // WorldState에서 탐색 처리
+      let worldStateResult = null;
+      if (saveState.context.worldState) {
+        worldStateResult = processExploration(
+          saveState.context.worldState,
+          location.locationId,
+          saveState
+        );
+        console.log(`🌍 WorldState 탐색 처리:`, {
+          discoveries: worldStateResult.newDiscoveries.length,
+          events: worldStateResult.triggeredEvents.length,
+          locationChanges: worldStateResult.changedLocations.length,
+        });
+      }
 
       const explorationResult = await generateExplorationResult(
         location,
@@ -1591,7 +1635,62 @@ export default function GameClient({ scenario }: GameClientProps) {
         timestamp: Date.now() + 1,
       });
 
-      // 보상 적용
+      // WorldState 결과 적용
+      if (worldStateResult) {
+        newSaveState.context.worldState = worldStateResult.worldState;
+
+        // WorldState에서 발견한 아이템 알림
+        for (const discovery of worldStateResult.newDiscoveries) {
+          newSaveState.chatHistory.push({
+            type: 'system',
+            content: `📦 발견: ${discovery.name} - ${discovery.description}`,
+            timestamp: Date.now() + 2,
+          });
+
+          // 발견물 효과 적용
+          if (discovery.effects?.statChanges) {
+            for (const [statId, change] of Object.entries(discovery.effects.statChanges)) {
+              if (newSaveState.context.scenarioStats[statId] !== undefined) {
+                const statDef = scenario.scenarioStats.find(s => s.id === statId);
+                const min = statDef?.min || 0;
+                const max = statDef?.max || 100;
+                newSaveState.context.scenarioStats[statId] = Math.max(min, Math.min(max,
+                  newSaveState.context.scenarioStats[statId] + change
+                ));
+              }
+            }
+          }
+
+          if (discovery.effects?.flagsAcquired) {
+            for (const flag of discovery.effects.flagsAcquired) {
+              if (newSaveState.context.flags[flag] === undefined) {
+                const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
+                newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
+              }
+            }
+          }
+        }
+
+        // 위치 변경 알림
+        for (const change of worldStateResult.changedLocations) {
+          const statusText = change.newStatus === 'destroyed' ? '파괴되었습니다'
+            : change.newStatus === 'blocked' ? '차단되었습니다'
+            : change.newStatus === 'available' ? '접근 가능해졌습니다'
+            : '상태가 변경되었습니다';
+          newSaveState.chatHistory.push({
+            type: 'system',
+            content: `⚠️ ${change.locationId} ${statusText}${change.reason ? ` (${change.reason})` : ''}`,
+            timestamp: Date.now() + 3,
+          });
+        }
+
+        // 트리거된 이벤트 알림
+        for (const event of worldStateResult.triggeredEvents) {
+          console.log(`🎭 월드 이벤트 발동: ${event.description}`);
+        }
+      }
+
+      // AI 생성 보상 적용 (WorldState와 별도)
       if (explorationResult.rewards) {
         // 스탯 변화
         if (explorationResult.rewards.statChanges) {
@@ -1620,8 +1719,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           }
         }
 
-        // 정보 획득
-        if (explorationResult.rewards.infoGained) {
+        // 정보 획득 (WorldState에서 이미 구체적 발견물을 추가했으므로 중복 방지)
+        if (explorationResult.rewards.infoGained && !worldStateResult?.newDiscoveries.length) {
           newSaveState.chatHistory.push({
             type: 'system',
             content: `💡 발견: ${explorationResult.rewards.infoGained}`,
@@ -1644,13 +1743,26 @@ export default function GameClient({ scenario }: GameClientProps) {
       }
 
       // 행동 게이지 소모 및 Day 전환 처리
+      const allStatChanges = {
+        ...(worldStateResult?.newDiscoveries.reduce((acc, d) => {
+          if (d.effects?.statChanges) Object.assign(acc, d.effects.statChanges);
+          return acc;
+        }, {} as Record<string, number>) || {}),
+        ...(explorationResult.rewards?.statChanges || {}),
+      };
+
+      const allFlagsAcquired = [
+        ...(worldStateResult?.newDiscoveries.flatMap(d => d.effects?.flagsAcquired || []) || []),
+        ...(explorationResult.rewards?.flagsAcquired || []),
+      ].filter((flag, i, arr) => arr.indexOf(flag) === i);
+
       const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
         newSaveState,
         'exploration',
         location.locationId,
         {
-          statChanges: explorationResult.rewards?.statChanges,
-          flagsAcquired: explorationResult.rewards?.flagsAcquired,
+          statChanges: Object.keys(allStatChanges).length > 0 ? allStatChanges : undefined,
+          flagsAcquired: allFlagsAcquired.length > 0 ? allFlagsAcquired : undefined,
           infoGained: explorationResult.rewards?.infoGained,
         }
       );
