@@ -641,67 +641,24 @@ const updateSaveState = (
     });
   }
 
-  // 시간 진행 로직 개선 - 여러 대화 후 하루가 진행되도록
-  // 최소 대화 턴 수 (이 이상 대화해야 시간 진행 가능)
-  const MIN_TURNS_PER_DAY = 2;
+  // =============================================================================
+  // 기존 Day 전환 로직 제거됨 (Phase 4: 행동 게이지 시스템으로 대체)
+  // Day 전환은 이제 consumeActionPoint 함수에서 AP 소진 시 처리됩니다.
+  // =============================================================================
 
-  // 현재 하루 내 턴 수 증가
-  newSaveState.context.turnsInCurrentDay =
-    (newSaveState.context.turnsInCurrentDay || 0) + 1;
-  const currentTurnsInDay = newSaveState.context.turnsInCurrentDay;
-
+  // 시간 기반 시나리오의 remainingHours 감소만 유지
   if (
     scenario.endCondition.type === 'time_limit' &&
     scenario.endCondition.unit === 'hours'
   ) {
-    // 시간 기반 시나리오 (기존 로직 유지)
     if (newSaveState.context.remainingHours !== undefined) {
       newSaveState.context.remainingHours -= 1;
       newSaveState.log = `[남은 시간: ${newSaveState.context.remainingHours}시간] ${aiResponse.log}`;
     }
   } else {
-    // 날짜 기반 시나리오 - 여러 대화 후 시간 진행
-    const dayBeforeUpdate = newSaveState.context.currentDay || 1;
-    let dayAfterUpdate = dayBeforeUpdate;
-
-    // 중요 이벤트 여부 확인 (플래그 획득 등)
-    const hasSignificantEvent = (flags_acquired && flags_acquired.length > 0);
-
-    // 시간 진행 조건:
-    // 1. 최소 턴 수를 충족하고 (MIN_TURNS_PER_DAY)
-    // 2. AI가 shouldAdvanceTime: true를 보내거나, 중요 이벤트가 발생하거나, 충분한 턴이 쌓였을 때 (3턴 이상)
-    const enoughTurns = currentTurnsInDay >= MIN_TURNS_PER_DAY;
-    const shouldProgress =
-      shouldAdvanceTime === true ||
-      hasSignificantEvent ||
-      currentTurnsInDay >= 3; // 3턴 후에는 자동으로 시간 진행
-
-    if (enoughTurns && shouldProgress) {
-      if (newSaveState.context.currentDay !== undefined) {
-        newSaveState.context.currentDay += 1;
-        dayAfterUpdate = newSaveState.context.currentDay;
-
-        // 턴 카운터 리셋
-        newSaveState.context.turnsInCurrentDay = 0;
-
-        // 날짜가 바뀔 때 채팅 히스토리에 시스템 메시지 추가
-        newSaveState.chatHistory.push({
-          type: 'system',
-          content: `Day ${dayAfterUpdate} 시작 - 새로운 하루가 밝았습니다.`,
-          timestamp: Date.now() + 1, // AI 메시지보다 1ms 늦게 설정하여 순서 보장
-        });
-
-        console.log(
-          `⏳ 시간이 진행됩니다. Day ${dayBeforeUpdate} -> Day ${dayAfterUpdate} (턴: ${currentTurnsInDay}, 이벤트: ${hasSignificantEvent})`,
-        );
-      }
-    } else {
-      console.log(
-        `⏳ 시간 유지. Day ${dayBeforeUpdate}, 턴 ${currentTurnsInDay}/${MIN_TURNS_PER_DAY} (shouldAdvance: ${shouldAdvanceTime}, 이벤트: ${hasSignificantEvent})`,
-      );
-    }
-    // 로그에 날짜 정보 포함 (시간이 흐르지 않아도 현재 날짜 표시)
-    newSaveState.log = `[Day ${dayAfterUpdate}] ${aiResponse.log}`;
+    // 날짜 기반 시나리오 - 로그에 현재 Day 정보 포함
+    const currentDay = newSaveState.context.currentDay || 1;
+    newSaveState.log = `[Day ${currentDay}] ${aiResponse.log}`;
   }
 
   // 캐릭터 아크 업데이트
@@ -1380,6 +1337,13 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   // Phase 3: 캐릭터 대화 핸들러
   const handleDialogueSelect = async (characterName: string, topic: DialogueTopic) => {
+    // 행동 게이지 부족 체크
+    if (hasInsufficientAP(saveState, 'dialogue')) {
+      console.warn('⚠️ AP 부족: dialogue 행동 불가');
+      setError('오늘의 행동력을 모두 사용했습니다.');
+      return;
+    }
+
     setIsDialogueLoading(true);
     setError(null);
 
@@ -1440,8 +1404,40 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       }
 
-      setSaveState(newSaveState);
+      // 행동 게이지 소모 및 Day 전환 처리
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+        newSaveState,
+        'dialogue',
+        `${characterName}:${topic.label}`,
+        {
+          relationshipChanges: dialogueResponse.relationshipChange
+            ? { [characterName]: dialogueResponse.relationshipChange }
+            : undefined,
+          infoGained: dialogueResponse.infoGained,
+        }
+      );
+
+      setSaveState(stateAfterAP);
       setGameMode('choice'); // 대화 후 선택 모드로 복귀
+
+      // Day 전환 시 엔딩 체크
+      if (shouldAdvanceDay && newDay && newDay >= 5) {
+        const currentPlayerState: PlayerState = {
+          stats: stateAfterAP.context.scenarioStats,
+          flags: stateAfterAP.context.flags,
+          traits: [],
+          relationships: stateAfterAP.community.hiddenRelationships,
+        };
+        const ending = checkEndingConditions(
+          currentPlayerState,
+          scenario.endingArchetypes,
+          stateAfterAP.community.survivors.length
+        );
+        if (ending) {
+          console.log(`🎯 Day ${newDay} 대화 후 엔딩 조건 만족: ${ending.title}`);
+          setTriggeredEnding(ending);
+        }
+      }
     } catch (err) {
       console.error('💬 대화 오류:', err);
       setError('캐릭터와 대화하는 중 오류가 발생했습니다.');
@@ -1452,6 +1448,13 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   // Phase 3: 탐색 핸들러
   const handleExplore = async (location: ExplorationLocation) => {
+    // 행동 게이지 부족 체크
+    if (hasInsufficientAP(saveState, 'exploration')) {
+      console.warn('⚠️ AP 부족: exploration 행동 불가');
+      setError('오늘의 행동력을 모두 사용했습니다.');
+      return;
+    }
+
     setIsExplorationLoading(true);
     setError(null);
 
@@ -1520,8 +1523,39 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
       }
 
-      setSaveState(newSaveState);
+      // 행동 게이지 소모 및 Day 전환 처리
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+        newSaveState,
+        'exploration',
+        location.locationId,
+        {
+          statChanges: explorationResult.rewards?.statChanges,
+          flagsAcquired: explorationResult.rewards?.flagsAcquired,
+          infoGained: explorationResult.rewards?.infoGained,
+        }
+      );
+
+      setSaveState(stateAfterAP);
       setGameMode('choice'); // 탐색 후 선택 모드로 복귀
+
+      // Day 전환 시 엔딩 체크
+      if (shouldAdvanceDay && newDay && newDay >= 5) {
+        const currentPlayerState: PlayerState = {
+          stats: stateAfterAP.context.scenarioStats,
+          flags: stateAfterAP.context.flags,
+          traits: [],
+          relationships: stateAfterAP.community.hiddenRelationships,
+        };
+        const ending = checkEndingConditions(
+          currentPlayerState,
+          scenario.endingArchetypes,
+          stateAfterAP.community.survivors.length
+        );
+        if (ending) {
+          console.log(`🎯 Day ${newDay} 탐색 후 엔딩 조건 만족: ${ending.title}`);
+          setTriggeredEnding(ending);
+        }
+      }
     } catch (err) {
       console.error('🔍 탐색 오류:', err);
       setError('탐색 중 오류가 발생했습니다.');
@@ -1533,6 +1567,13 @@ export default function GameClient({ scenario }: GameClientProps) {
   // Phase 3: 자유 텍스트 입력 핸들러
   const handleFreeTextSubmit = async (text: string) => {
     if (!text.trim()) return;
+
+    // 행동 게이지 부족 체크
+    if (hasInsufficientAP(saveState, 'freeText')) {
+      console.warn('⚠️ AP 부족: freeText 행동 불가');
+      setError('오늘의 행동력을 모두 사용했습니다.');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -1590,24 +1631,40 @@ export default function GameClient({ scenario }: GameClientProps) {
         scenario,
       );
 
-      setSaveState(updatedSaveState);
+      // 행동 게이지 소모 및 Day 전환 처리
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+        updatedSaveState,
+        'freeText',
+        text,
+        {
+          statChanges: cleanedResponse.statChanges?.scenarioStats,
+          flagsAcquired: cleanedResponse.statChanges?.flags_acquired,
+        }
+      );
 
-      // 엔딩 체크 (handlePlayerChoice와 동일한 로직)
-      const currentDay = updatedSaveState.context.currentDay || 1;
+      setSaveState(stateAfterAP);
+
+      if (shouldAdvanceDay) {
+        console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);
+      }
+
+      // 엔딩 체크 (stateAfterAP 사용)
+      const currentDay = stateAfterAP.context.currentDay || 1;
       if (currentDay >= 5) {
         const currentPlayerState: PlayerState = {
-          stats: updatedSaveState.context.scenarioStats,
-          flags: updatedSaveState.context.flags,
+          stats: stateAfterAP.context.scenarioStats,
+          flags: stateAfterAP.context.flags,
           traits: [],
-          relationships: updatedSaveState.community.hiddenRelationships,
+          relationships: stateAfterAP.community.hiddenRelationships,
         };
-        const survivorCount = updatedSaveState.community.survivors.length;
+        const survivorCount = stateAfterAP.community.survivors.length;
         const ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
           survivorCount,
         );
         if (ending) {
+          console.log(`🎯 Day ${currentDay} 자유 입력 후 엔딩 조건 만족: ${ending.title}`);
           setTriggeredEnding(ending);
         }
       }
