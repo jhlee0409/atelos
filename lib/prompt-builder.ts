@@ -236,8 +236,8 @@ const buildMinimalPrompt = (
 
   const systemPrompt = `Korean survival game AI. Scenario: ${scenario.title}
 Stats: ${stats}
-Rules: 1) Korean narrative 2) JSON format 3) 2 choices
-JSON: {"log":"story","dilemma":{"prompt":"?","choice_a":"A","choice_b":"B"},"statChanges":{"scenarioStats":{}}}`;
+Rules: 1) Korean narrative 2) JSON format 3) 3 choices (active/cautious/wait)
+JSON: {"log":"story","dilemma":{"prompt":"?","choice_a":"적극적","choice_b":"신중한","choice_c":"대기/관망"},"statChanges":{"scenarioStats":{}}}`;
 
   const userPrompt = `Action: ${playerAction.actionDescription}
 Result in Korean (50 words max):`;
@@ -330,15 +330,20 @@ STORY RULES:
 10. Minimum 200 characters for the log field - describe scene vividly
 
 CHOICE FORMAT RULES (CRITICAL - MUST FOLLOW):
-10. **LENGTH**: Each choice MUST be 15-50 Korean characters (not words)
-11. **ENDING**: Each choice MUST end with "~한다" or "~이다" (e.g., "협상을 시도한다", "방어를 강화한다")
-12. **CONTRAST**: Two choices MUST represent DIFFERENT strategies (e.g., aggressive vs defensive, solo vs cooperative)
-13. **CHARACTER**: Include character name when the choice involves specific person
-14. **NO SYSTEM IDS**: Never expose internal IDs like [ACTION_ID] in choices
+10. **THREE CHOICES**: Always provide exactly 3 choices:
+    - **choice_a**: Active/aggressive approach (적극적 행동)
+    - **choice_b**: Cautious/defensive approach (신중한 접근)
+    - **choice_c**: Wait/observe approach (대기/관망 - 낮은 위험, 시간 소모)
+11. **LENGTH**: Each choice MUST be 15-50 Korean characters (not words)
+12. **ENDING**: Each choice MUST end with "~한다" or "~이다" (e.g., "협상을 시도한다", "방어를 강화한다")
+13. **CONTRAST**: Three choices MUST represent DIFFERENT strategies
+14. **CHARACTER**: Include character name when the choice involves specific person
+15. **NO SYSTEM IDS**: Never expose internal IDs like [ACTION_ID] in choices
 
 CHOICE EXAMPLES (follow this format exactly):
-- GOOD: "박준경과 함께 외부 그룹과의 협상을 시도한다" (32자, 협력적)
-- GOOD: "내부 방어 시설을 보강하며 경계를 강화한다" (22자, 방어적)
+- choice_a (적극적): "박준경과 함께 외부 그룹과의 협상을 시도한다" (32자)
+- choice_b (신중한): "내부 방어 시설을 보강하며 경계를 강화한다" (22자)
+- choice_c (대기): "일단 상황을 더 지켜보며 정보를 수집한다" (21자)
 - BAD: "예" (too short, no context)
 - BAD: "[NEGOTIATE] 협상한다" (exposes system ID)
 - BAD: "동의함" (no verb ending, too vague)
@@ -348,8 +353,9 @@ Output JSON:
   "log": "Korean narrative (200-300 characters MINIMUM) with emotional depth and character interactions",
   "dilemma": {
     "prompt": "Emotional Korean dilemma with character involvement (80-150 characters)",
-    "choice_a": "First strategic choice in Korean (15-50 characters, ends with ~한다/~이다)",
-    "choice_b": "Contrasting strategic choice in Korean (15-50 characters, ends with ~한다/~이다)"
+    "choice_a": "Active choice in Korean (15-50 characters, ends with ~한다/~이다)",
+    "choice_b": "Cautious choice in Korean (15-50 characters, ends with ~한다/~이다)",
+    "choice_c": "Wait/observe choice in Korean (15-50 characters, ends with ~한다/~이다)"
   },
   "statChanges": {
     "scenarioStats": {"statId": change_amount},
@@ -681,8 +687,9 @@ CRITICAL FORMATTING RULES:
 Output ONLY this JSON structure:
 {
   "prompt": "Korean narrative with proper line breaks (use \\\\n)",
-  "choice_a": "First choice option in Korean",
-  "choice_b": "Second choice option in Korean"
+  "choice_a": "Active/aggressive choice in Korean (적극적 행동)",
+  "choice_b": "Cautious/defensive choice in Korean (신중한 접근)",
+  "choice_c": "Wait/observe choice in Korean (대기/관망 - 낮은 위험)"
 }
 
 Critical Rules:

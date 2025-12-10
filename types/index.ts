@@ -216,6 +216,7 @@ export interface SaveState {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   characterArcs?: CharacterArc[]; // 캐릭터 아크 트래킹
   keyDecisions?: KeyDecision[]; // 회상 시스템 - 주요 결정 기록
@@ -228,6 +229,7 @@ export interface AIResponse {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   statChanges: {
     scenarioStats: { [key: string]: number };

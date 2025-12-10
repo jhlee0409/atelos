@@ -79,22 +79,38 @@ export const ChoiceButtons = ({
       <div className="mx-auto max-w-2xl">
         {/* Dilemma Prompt */}
         <DilemmaPrompt prompt={saveState.dilemma.prompt} isUrgent={isUrgent} />
-        {/* Choice Buttons */}
-        <div className="flex space-x-3">
-          <ChoiceButton
-            choice={saveState.dilemma.choice_a}
-            onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
-            variant="primary"
-            disabled={isLoading}
-            urgency={isUrgent}
-          />
-          <ChoiceButton
-            choice={saveState.dilemma.choice_b}
-            onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
-            variant="secondary"
-            disabled={isLoading || !saveState.dilemma.choice_b}
-            urgency={isUrgent}
-          />
+        {/* Choice Buttons - 3개 선택지 */}
+        <div className="flex flex-col space-y-2">
+          {/* 상단: 적극적/신중한 선택지 2개 */}
+          <div className="flex space-x-3">
+            <ChoiceButton
+              choice={saveState.dilemma.choice_a}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
+              variant="primary"
+              disabled={isLoading}
+              urgency={isUrgent}
+              choiceType="active"
+            />
+            <ChoiceButton
+              choice={saveState.dilemma.choice_b}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
+              variant="secondary"
+              disabled={isLoading || !saveState.dilemma.choice_b}
+              urgency={isUrgent}
+              choiceType="cautious"
+            />
+          </div>
+          {/* 하단: 대기/관망 선택지 (있는 경우) */}
+          {saveState.dilemma.choice_c && (
+            <ChoiceButton
+              choice={saveState.dilemma.choice_c}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_c!)}
+              variant="tertiary"
+              disabled={isLoading}
+              urgency={false}
+              choiceType="wait"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -109,13 +125,15 @@ const ChoiceButton = ({
   disabled = false,
   urgency = false,
   showHints = true,
+  choiceType = 'active',
 }: {
   choice: string | undefined;
   onClick: () => void;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'tertiary';
   disabled?: boolean;
   urgency?: boolean;
   showHints?: boolean;
+  choiceType?: 'active' | 'cautious' | 'wait';
 }) => {
   // 기본적으로 힌트 표시 (사용자가 숨기기 가능)
   const [isHintVisible, setIsHintVisible] = useState(true);
@@ -123,10 +141,34 @@ const ChoiceButton = ({
   const baseClasses =
     'flex-1 p-4 font-bold transition-all duration-300 transform hover:-translate-y-1 active:scale-95 min-h-[48px] relative overflow-hidden border';
 
-  const variantClasses =
-    variant === 'primary'
-      ? 'bg-red-900 hover:bg-red-800 text-white border-red-700 shadow-[0_0_15px_rgba(127,29,29,0.5)]'
-      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+  const getVariantClasses = () => {
+    switch (variant) {
+      case 'primary':
+        return 'bg-red-900 hover:bg-red-800 text-white border-red-700 shadow-[0_0_15px_rgba(127,29,29,0.5)]';
+      case 'secondary':
+        return 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+      case 'tertiary':
+        return 'bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-800 text-sm';
+      default:
+        return 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+    }
+  };
+
+  const variantClasses = getVariantClasses();
+
+  // 선택지 유형별 라벨
+  const getChoiceTypeLabel = () => {
+    switch (choiceType) {
+      case 'active':
+        return '⚔️ 적극적';
+      case 'cautious':
+        return '🛡️ 신중한';
+      case 'wait':
+        return '⏳ 관망';
+      default:
+        return '';
+    }
+  };
 
   const urgencyClasses = urgency ? 'animate-pulse ring-2 ring-yellow-400' : '';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : '';
@@ -185,6 +227,8 @@ const ChoiceButton = ({
     }
   };
 
+  const choiceTypeLabel = getChoiceTypeLabel();
+
   return (
     <div className="flex-1">
       <button
@@ -198,8 +242,17 @@ const ChoiceButton = ({
           'w-full',
         )}
       >
+        {/* 선택지 유형 라벨 */}
+        {choiceTypeLabel && (
+          <div className="absolute left-2 top-2 z-10 text-[10px] opacity-70">
+            {choiceTypeLabel}
+          </div>
+        )}
         <div
-          className="relative z-10 text-center leading-tight"
+          className={cn(
+            "relative z-10 text-center leading-tight",
+            choiceTypeLabel && "pt-3" // 라벨이 있으면 위쪽 패딩 추가
+          )}
           dangerouslySetInnerHTML={{ __html: highlightKeywords(choice || '') }}
         />
         {urgency && (

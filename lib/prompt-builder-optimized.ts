@@ -53,8 +53,9 @@ OUTPUT:
   "log": "Korean story (100-150 words, use \\n for paragraphs)",
   "dilemma": {
     "prompt": "Korean dilemma",
-    "choice_a": "Choice A",
-    "choice_b": "Choice B"
+    "choice_a": "Active choice (적극적 ~한다)",
+    "choice_b": "Cautious choice (신중한 ~한다)",
+    "choice_c": "Wait/observe choice (대기/관망 ~한다)"
   },
   "statChanges": {
     "scenarioStats": {},
@@ -77,8 +78,9 @@ You MUST respond with ONLY this JSON (no other text):
   "log": "한국어 서사 (100자 이상)",
   "dilemma": {
     "prompt": "상황 설명",
-    "choice_a": "선택지A (~한다로 끝남)",
-    "choice_b": "선택지B (~한다로 끝남)"
+    "choice_a": "적극적 선택지 (~한다로 끝남)",
+    "choice_b": "신중한 선택지 (~한다로 끝남)",
+    "choice_c": "대기/관망 선택지 (~한다로 끝남)"
   },
   "statChanges": {
     "scenarioStats": {"USE_STAT_IDS_ABOVE": 5},
@@ -88,7 +90,7 @@ You MUST respond with ONLY this JSON (no other text):
   }
 }
 
-Rules: Korean only. Choices must end with ~한다/~이다. Use ONLY stat IDs from VALID STAT IDs above.`;
+Rules: Korean only. 3 choices (active/cautious/wait). Choices must end with ~한다/~이다.`;
 
 // 캐릭터 정보 압축
 const compressCharacters = (characters: Character[]): string => {
@@ -404,11 +406,12 @@ Genre Style:
 Generate Korean dilemma JSON:
 {
   "prompt": "Urgent ${genreText} situation (한국어로 작성)",
-  "choice_a": "Option A (한국어, ~한다로 끝남)",
-  "choice_b": "Option B (한국어, ~한다로 끝남)"
+  "choice_a": "적극적 행동 (한국어, ~한다로 끝남)",
+  "choice_b": "신중한 접근 (한국어, ~한다로 끝남)",
+  "choice_c": "대기/관망 (한국어, ~한다로 끝남)"
 }
 
-Korean only. No foreign text. Match the ${genreText} genre tone.`;
+Korean only. 3 choices (active/cautious/wait). Match the ${genreText} genre tone.`;
 };
 
 // 프롬프트 품질 메트릭
