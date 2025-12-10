@@ -1,0 +1,128 @@
+{
+  "project": "Action Gauge System Implementation",
+  "startDate": "2025-12-10",
+  "lastUpdated": "2025-12-10T00:05:00Z",
+  "currentPhase": 1,
+  "currentStep": 5,
+  "status": "phase1_completed",
+
+  "phases": {
+    "phase1": {
+      "name": "기본 구조 구현",
+      "status": "completed",
+      "completedAt": "2025-12-10T00:05:00Z",
+      "estimatedHours": "2-3",
+      "steps": [
+        {
+          "step": 1,
+          "task": "types/index.ts에 새 타입 추가",
+          "status": "completed",
+          "completedAt": "2025-12-10T00:01:00Z",
+          "files": ["types/index.ts"],
+          "changes": [
+            {"file": "types/index.ts", "lineRange": "333-383", "description": "ActionType, ActionRecord, ActionGaugeConfig 타입 추가"},
+            {"file": "types/index.ts", "lineRange": "197-205", "description": "SaveState.context에 actionPoints, maxActionPoints, actionsThisDay 추가"}
+          ]
+        },
+        {
+          "step": 2,
+          "task": "GameClient.tsx에 상수 및 consumeActionPoint 함수 추가",
+          "status": "completed",
+          "completedAt": "2025-12-10T00:02:00Z",
+          "files": ["app/game/[scenarioId]/GameClient.tsx"],
+          "changes": [
+            {"file": "GameClient.tsx", "lineNumber": 28, "description": "ActionType, ActionRecord import 추가"},
+            {"file": "GameClient.tsx", "lineRange": "52-143", "description": "ACTION_POINTS_PER_DAY, ACTION_COSTS 상수 및 consumeActionPoint, hasInsufficientAP 함수 추가"}
+          ]
+        },
+        {
+          "step": 3,
+          "task": "createInitialSaveState 함수 수정",
+          "status": "completed",
+          "completedAt": "2025-12-10T00:03:00Z",
+          "files": ["app/game/[scenarioId]/GameClient.tsx"],
+          "changes": [
+            {"file": "GameClient.tsx", "lineRange": "217-221", "description": "context에 actionPoints, maxActionPoints, actionsThisDay 초기화 추가"}
+          ]
+        },
+        {
+          "step": 4,
+          "task": "handlePlayerChoice 함수에 AP 소모 로직 추가",
+          "status": "completed",
+          "completedAt": "2025-12-10T00:04:00Z",
+          "files": ["app/game/[scenarioId]/GameClient.tsx"],
+          "changes": [
+            {"file": "GameClient.tsx", "lineRange": "1090-1095", "description": "hasInsufficientAP 체크 추가"},
+            {"file": "GameClient.tsx", "lineRange": "1250-1266", "description": "consumeActionPoint 호출 및 Day 전환 처리"},
+            {"file": "GameClient.tsx", "lineRange": "1268-1305", "description": "엔딩 체크에서 stateAfterAP 사용으로 변경"}
+          ]
+        },
+        {
+          "step": 5,
+          "task": "기본 UI에 AP 표시 추가 (StatsBar)",
+          "status": "completed",
+          "completedAt": "2025-12-10T00:05:00Z",
+          "files": ["components/client/GameClient/StatsBar.tsx"],
+          "changes": [
+            {"file": "StatsBar.tsx", "lineRange": "1-94", "description": "ActionPointsDisplay 컴포넌트 추가"},
+            {"file": "StatsBar.tsx", "lineRange": "111-126", "description": "StatsBar에 AP 표시 통합"}
+          ]
+        }
+      ]
+    },
+    "phase2": {
+      "name": "전체 행동 통합",
+      "status": "pending",
+      "estimatedHours": "1-2",
+      "steps": [
+        {"step": 1, "task": "handleDialogueSelect AP 소모 적용", "status": "pending", "files": ["app/game/[scenarioId]/GameClient.tsx"]},
+        {"step": 2, "task": "handleExplore AP 소모 적용", "status": "pending", "files": ["app/game/[scenarioId]/GameClient.tsx"]},
+        {"step": 3, "task": "handleFreeTextSubmit AP 소모 적용", "status": "pending", "files": ["app/game/[scenarioId]/GameClient.tsx"]},
+        {"step": 4, "task": "updateSaveState에서 기존 Day 전환 로직 제거", "status": "pending", "files": ["app/game/[scenarioId]/GameClient.tsx"]}
+      ]
+    },
+    "phase3": {
+      "name": "UI 개선",
+      "status": "pending",
+      "estimatedHours": "1-2",
+      "steps": [
+        {"step": 1, "task": "TimelineProgress AP 기반 시간대 표시", "status": "pending", "files": ["components/client/GameClient/TimelineProgress.tsx"]},
+        {"step": 2, "task": "ChoiceButtons AP 비용 표시", "status": "pending", "files": ["components/client/GameClient/ChoiceButtons.tsx"]},
+        {"step": 3, "task": "AP 부족 시 UX 처리", "status": "pending", "files": ["components/client/GameClient/ChoiceButtons.tsx"]}
+      ]
+    }
+  },
+
+  "completedChanges": [
+    {"phase": 1, "step": 1, "timestamp": "2025-12-10T00:01:00Z", "summary": "타입 추가", "filesModified": ["types/index.ts"]},
+    {"phase": 1, "step": 2, "timestamp": "2025-12-10T00:02:00Z", "summary": "AP 상수 및 함수 추가", "filesModified": ["GameClient.tsx"]},
+    {"phase": 1, "step": 3, "timestamp": "2025-12-10T00:03:00Z", "summary": "초기 상태에 AP 필드 추가", "filesModified": ["GameClient.tsx"]},
+    {"phase": 1, "step": 4, "timestamp": "2025-12-10T00:04:00Z", "summary": "handlePlayerChoice에 AP 소모 로직", "filesModified": ["GameClient.tsx"]},
+    {"phase": 1, "step": 5, "timestamp": "2025-12-10T00:05:00Z", "summary": "StatsBar에 AP 표시 UI", "filesModified": ["StatsBar.tsx"]}
+  ],
+
+  "testResults": [],
+  "issues": [],
+
+  "rollbackPoints": [
+    {"timestamp": "2025-12-10T00:00:00Z", "commit": "193ee68", "description": "Phase 1 시작 전"}
+  ],
+
+  "summary": {
+    "phase1": {
+      "description": "행동 게이지 시스템의 기본 구조 구현 완료",
+      "keyChanges": [
+        "ActionType, ActionRecord, ActionGaugeConfig 타입 정의",
+        "SaveState.context에 actionPoints, maxActionPoints, actionsThisDay 필드 추가",
+        "consumeActionPoint 함수로 AP 소모 및 Day 전환 중앙 관리",
+        "handlePlayerChoice에서 AP 체크 및 소모 로직 통합",
+        "StatsBar에 ActionPointsDisplay 컴포넌트 추가"
+      ],
+      "remainingWork": [
+        "dialogue/exploration/freeText 핸들러에도 AP 소모 적용 (Phase 2)",
+        "기존 Day 전환 로직 제거 (Phase 2)",
+        "UI 개선 (Phase 3)"
+      ]
+    }
+  }
+}

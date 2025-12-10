@@ -25,7 +25,7 @@ import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
 import { StatsBar } from '@/components/client/GameClient/StatsBar';
 import { ChatHistory } from '@/components/client/GameClient/ChatHistory';
 import { ChoiceButtons } from '@/components/client/GameClient/ChoiceButtons';
-import { SaveState, AIResponse, PlayerAction } from '@/types';
+import { SaveState, AIResponse, PlayerAction, ActionType, ActionRecord } from '@/types';
 import { checkEndingConditions } from '@/lib/ending-checker';
 import {
   generateFallbackInitialChoices,
@@ -48,6 +48,99 @@ const LEGACY_STAT_MAPPING: Record<string, string> = {
 };
 
 // --- Game Logic v2.0 ---
+
+// =============================================================================
+// 행동 게이지 시스템 상수 및 함수
+// =============================================================================
+
+/** 일일 기본 행동 포인트 */
+const ACTION_POINTS_PER_DAY = 3;
+
+/** 행동 유형별 비용 (Phase 1: 모든 행동 1 AP) */
+const ACTION_COSTS: Record<ActionType, number> = {
+  choice: 1,
+  dialogue: 1,
+  exploration: 1,
+  freeText: 1,
+};
+
+/**
+ * 행동 포인트 소모 및 Day 전환 처리
+ * 모든 행동 핸들러에서 공통으로 사용
+ */
+const consumeActionPoint = (
+  currentSaveState: SaveState,
+  actionType: ActionType,
+  target?: string,
+  result?: ActionRecord['result']
+): { newState: SaveState; shouldAdvanceDay: boolean; newDay?: number } => {
+  const newState: SaveState = JSON.parse(JSON.stringify(currentSaveState));
+  const currentAP = newState.context.actionPoints ?? ACTION_POINTS_PER_DAY;
+  const maxAP = newState.context.maxActionPoints ?? ACTION_POINTS_PER_DAY;
+  const currentDay = newState.context.currentDay ?? 1;
+  const cost = ACTION_COSTS[actionType];
+
+  // 행동 기록 초기화 (없는 경우)
+  if (!newState.context.actionsThisDay) {
+    newState.context.actionsThisDay = [];
+  }
+
+  // 행동 기록 추가
+  const actionRecord: ActionRecord = {
+    actionType,
+    timestamp: Date.now(),
+    target,
+    cost,
+    day: currentDay,
+    result,
+  };
+  newState.context.actionsThisDay.push(actionRecord);
+
+  // AP 소모
+  const newAP = currentAP - cost;
+  newState.context.actionPoints = newAP;
+
+  // 하위 호환성: turnsInCurrentDay도 동기화 (deprecated)
+  newState.context.turnsInCurrentDay = (newState.context.turnsInCurrentDay ?? 0) + 1;
+
+  console.log(`⚡ AP 소모: ${actionType} | ${currentAP} -> ${newAP} (비용: ${cost})`);
+
+  // Day 전환 체크
+  const shouldAdvanceDay = newAP <= 0;
+
+  if (shouldAdvanceDay) {
+    const newDay = currentDay + 1;
+    newState.context.currentDay = newDay;
+    newState.context.actionPoints = ACTION_POINTS_PER_DAY;
+    newState.context.maxActionPoints = ACTION_POINTS_PER_DAY;
+    newState.context.actionsThisDay = [];
+    newState.context.turnsInCurrentDay = 0; // 하위 호환성
+
+    // Day 전환 시스템 메시지
+    newState.chatHistory.push({
+      type: 'system',
+      content: `━━━ Day ${newDay} ━━━\n새로운 하루가 밝았습니다. [행동력 ${ACTION_POINTS_PER_DAY}/${ACTION_POINTS_PER_DAY}]`,
+      timestamp: Date.now(),
+    });
+
+    console.log(`🌅 Day 전환: Day ${currentDay} -> Day ${newDay}`);
+
+    return { newState, shouldAdvanceDay: true, newDay };
+  }
+
+  return { newState, shouldAdvanceDay: false };
+};
+
+/**
+ * 현재 AP 부족 여부 체크
+ */
+const hasInsufficientAP = (saveState: SaveState, actionType: ActionType): boolean => {
+  const currentAP = saveState.context.actionPoints ?? ACTION_POINTS_PER_DAY;
+  const cost = ACTION_COSTS[actionType];
+  return currentAP < cost;
+};
+
+// =============================================================================
 
 interface GameClientProps {
   scenario: ScenarioData;
@@ -121,7 +214,11 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       flags,
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
-      turnsInCurrentDay: 0, // 하루 내 대화 턴 수 초기화
+      turnsInCurrentDay: 0, // @deprecated - 하위 호환성 유지
+      // 행동 게이지 시스템 초기화
+      actionPoints: ACTION_POINTS_PER_DAY,
+      maxActionPoints: ACTION_POINTS_PER_DAY,
+      actionsThisDay: [],
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -990,6 +1087,13 @@ export default function GameClient({ scenario }: GameClientProps) {
     // 초기 딜레마 생성 전에는 선택 불가
     if (!initialDilemmaGenerated.current || isLoading) return;
 
+    // 행동 게이지 부족 체크
+    if (hasInsufficientAP(saveState, 'choice')) {
+      console.warn('⚠️ AP 부족: choice 행동 불가');
+      setError('오늘의 행동력을 모두 사용했습니다. 다음 날을 기다려주세요.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -1142,23 +1246,39 @@ export default function GameClient({ scenario }: GameClientProps) {
       };
 
       recordKeyDecision();
-      setSaveState(updatedSaveState);
+
+      // 행동 게이지 소모 및 Day 전환 처리
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+        updatedSaveState,
+        'choice',
+        choiceDetails,
+        {
+          statChanges: cleanedResponse.statChanges?.scenarioStats,
+          flagsAcquired: cleanedResponse.statChanges?.flags_acquired,
+        }
+      );
+
+      setSaveState(stateAfterAP);
 
       console.log('🔄 상태 업데이트 완료, 엔딩 조건 확인 시작...');
+      if (shouldAdvanceDay) {
+        console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진`);
+      }
 
       // Check for ending condition after state is updated
+      // stateAfterAP 사용 (Day 전환이 반영된 상태)
       const currentPlayerState: PlayerState = {
-        stats: updatedSaveState.context.scenarioStats,
-        flags: updatedSaveState.context.flags,
+        stats: stateAfterAP.context.scenarioStats,
+        flags: stateAfterAP.context.flags,
         traits: [],
-        relationships: updatedSaveState.community.hiddenRelationships,
+        relationships: stateAfterAP.community.hiddenRelationships,
       };
 
       let ending: EndingArchetype | null = null;
-      const currentDay = updatedSaveState.context.currentDay || 1;
+      const currentDay = stateAfterAP.context.currentDay || 1;
 
       // Day 5 이후에만 엔딩 조건 체크
-      const survivorCount = updatedSaveState.community.survivors.length;
+      const survivorCount = stateAfterAP.community.survivors.length;
       if (currentDay >= 5) {
         ending = checkEndingConditions(
           currentPlayerState,
@@ -1180,9 +1300,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       // 시간제한 엔딩 조건 확인 (Day 7 완료 후 강제 엔딩)
       if (!ending && scenario.endCondition.type === 'time_limit') {
         const timeLimit = scenario.endCondition.value || 0;
-        // currentDay는 이미 위에서 선언됨 (line 1059)
+        // currentDay는 이미 위에서 선언됨
         const currentHours =
-          updatedSaveState.context.remainingHours || Infinity;
+          stateAfterAP.context.remainingHours || Infinity;
 
         const isTimeUp =
           scenario.endCondition.unit === 'days'

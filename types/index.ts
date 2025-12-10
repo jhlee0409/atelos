@@ -194,7 +194,15 @@ export interface SaveState {
     flags: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
-    turnsInCurrentDay?: number; // 현재 하루 내 대화 턴 수
+    /** @deprecated turnsInCurrentDay는 actionPoints로 대체됩니다. 하위 호환성을 위해 유지. */
+    turnsInCurrentDay?: number;
+    // --- 행동 게이지 시스템 (Phase 4) ---
+    /** 현재 잔여 행동 포인트 */
+    actionPoints?: number;
+    /** 해당 일 최대 행동 포인트 */
+    maxActionPoints?: number;
+    /** 오늘 수행한 행동 기록 */
+    actionsThisDay?: ActionRecord[];
   };
   community: {
     survivors: {
@@ -328,4 +336,56 @@ export type GameMode = 'choice' | 'dialogue' | 'exploration';
 export interface FreeTextInput {
   text: string;
   timestamp: number;
+}
+
+// =============================================================================
+// Phase 4: 행동 게이지 시스템 (Action Gauge System)
+// =============================================================================
+
+/**
+ * 행동 유형 - 플레이어가 수행할 수 있는 모든 행동 종류
+ */
+export type ActionType = 'choice' | 'dialogue' | 'exploration' | 'freeText';
+
+/**
+ * 행동 기록 - 각 행동의 상세 정보를 기록
+ * 엔딩 분기 및 리플레이 분석에 활용
+ */
+export interface ActionRecord {
+  /** 행동 유형 */
+  actionType: ActionType;
+  /** 행동 수행 시각 */
+  timestamp: number;
+  /** 행동 대상 (캐릭터명, 장소명, 선택지 텍스트 등) */
+  target?: string;
+  /** 소모된 행동 포인트 */
+  cost: number;
+  /** 행동 수행 시점의 Day */
+  day: number;
+  /** 행동 결과 요약 */
+  result?: {
+    /** 스탯 변화 */
+    statChanges?: Record<string, number>;
+    /** 획득한 플래그 */
+    flagsAcquired?: string[];
+    /** 관계 변화 */
+    relationshipChanges?: Record<string, number>;
+    /** 획득한 정보 */
+    infoGained?: string;
+  };
+}
+
+/**
+ * 행동 게이지 설정 - 시나리오별 커스터마이징 가능
+ * (Phase 4 확장용, 현재는 기본값 사용)
+ */
+export interface ActionGaugeConfig {
+  /** 기본 일일 행동 포인트 */
+  baseActionPoints: number;
+  /** 행동 유형별 비용 */
+  actionCosts: Record<ActionType, number>;
+  /** 가변 AP 활성화 여부 */
+  enableVariableAP?: boolean;
+  /** 가변 AP 계산에 사용할 스탯 ID */
+  variableAPStatId?: string;
 }
