@@ -203,6 +203,9 @@ export interface SaveState {
     maxActionPoints?: number;
     /** 오늘 수행한 행동 기록 */
     actionsThisDay?: ActionRecord[];
+    // --- 맥락 연결 시스템 (Phase 5) ---
+    /** 현재 행동 맥락 */
+    actionContext?: ActionContext;
   };
   community: {
     survivors: {
@@ -388,4 +391,128 @@ export interface ActionGaugeConfig {
   enableVariableAP?: boolean;
   /** 가변 AP 계산에 사용할 스탯 ID */
   variableAPStatId?: string;
+}
+
+// =============================================================================
+// Phase 5: 맥락 연결 시스템 (Context Linking System)
+// =============================================================================
+
+/**
+ * 발견한 단서/정보 - 탐색/대화를 통해 획득
+ */
+export interface DiscoveredClue {
+  /** 단서 ID (자동 생성) */
+  clueId: string;
+  /** 단서 내용 */
+  content: string;
+  /** 발견 출처 */
+  source: {
+    type: 'exploration' | 'dialogue' | 'choice';
+    locationId?: string;
+    characterName?: string;
+  };
+  /** 발견 시점 */
+  discoveredAt: {
+    day: number;
+    actionIndex: number;
+  };
+  /** 관련 플래그 */
+  relatedFlags?: string[];
+  /** 관련 캐릭터 */
+  relatedCharacters?: string[];
+  /** 단서 중요도 */
+  importance: 'low' | 'medium' | 'high';
+}
+
+/**
+ * 캐릭터 현재 상태 - 동적 대화 상대 결정에 사용
+ */
+export interface CharacterPresence {
+  /** 캐릭터 이름 */
+  characterName: string;
+  /** 현재 위치 */
+  currentLocation: string;
+  /** 대화 가능 여부 */
+  availableForDialogue: boolean;
+  /** 대화 불가 사유 */
+  unavailableReason?: string;
+  /** 현재 활동 */
+  currentActivity?: string;
+  /** 마지막 상호작용 */
+  lastInteraction?: {
+    day: number;
+    type: 'dialogue' | 'choice';
+    summary: string;
+  };
+}
+
+/**
+ * 동적 탐색 위치 - 상황에 따라 생성
+ */
+export interface DynamicLocation {
+  /** 위치 ID */
+  locationId: string;
+  /** 위치 이름 */
+  name: string;
+  /** 위치 설명 (현재 상황 반영) */
+  description: string;
+  /** 탐색 가능 여부 */
+  available: boolean;
+  /** 탐색 불가 사유 */
+  unavailableReason?: string;
+  /** 위치 유형 */
+  type: 'interior' | 'exterior' | 'hidden' | 'temporary';
+  /** 발견 조건 (플래그 또는 이전 탐색) */
+  discoveredBy?: string;
+  /** 예상 발견물 힌트 */
+  hint?: string;
+}
+
+/**
+ * 현재 행동 맥락 - 모든 AI 호출에 전달
+ */
+export interface ActionContext {
+  /** 현재 위치/장소 */
+  currentLocation: string;
+  /** 현재 상황 요약 (AI가 생성) */
+  currentSituation: string;
+  /** 오늘 수행한 행동 요약 */
+  todayActions: {
+    explorations: { location: string; result: string }[];
+    dialogues: { character: string; topic: string; outcome: string }[];
+    choices: { choice: string; consequence: string }[];
+  };
+  /** 발견한 단서들 */
+  discoveredClues: DiscoveredClue[];
+  /** 긴급한 사안 (다음 선택지에 반영) */
+  urgentMatters: string[];
+  /** 캐릭터 현재 상태들 */
+  characterPresences: CharacterPresence[];
+  /** 탐색 가능한 위치들 (동적 생성) */
+  availableLocations: DynamicLocation[];
+  /** 마지막 업데이트 시점 */
+  lastUpdated: {
+    day: number;
+    actionIndex: number;
+  };
+}
+
+/**
+ * 맥락 업데이트 이벤트 - 행동 후 맥락 변경 사항
+ */
+export interface ContextUpdate {
+  /** 새로 발견한 단서 */
+  newClues?: DiscoveredClue[];
+  /** 캐릭터 위치/상태 변경 */
+  characterChanges?: Partial<CharacterPresence>[];
+  /** 새로 개방된 위치 */
+  newLocations?: DynamicLocation[];
+  /** 닫힌 위치 */
+  closedLocations?: string[];
+  /** 현재 상황 업데이트 */
+  situationUpdate?: string;
+  /** 긴급 사안 추가 */
+  newUrgentMatters?: string[];
+  /** 해결된 긴급 사안 */
+  resolvedMatters?: string[];
 }

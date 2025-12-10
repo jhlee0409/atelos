@@ -36,6 +36,15 @@ import { ExplorationPanel } from '@/components/client/GameClient/ExplorationPane
 import { TimelineProgress } from '@/components/client/GameClient/TimelineProgress';
 import { generateDialogueResponse } from '@/lib/dialogue-generator';
 import { generateExplorationResult } from '@/lib/exploration-generator';
+import {
+  createInitialContext,
+  updateContextAfterExploration,
+  updateContextAfterDialogue,
+  updateContextAfterChoice,
+  resetContextForNewDay,
+  generateDynamicLocations,
+  generateDynamicCharacters,
+} from '@/lib/context-manager';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
 const LEGACY_STAT_MAPPING: Record<string, string> = {
@@ -115,6 +124,15 @@ const consumeActionPoint = (
     newState.context.maxActionPoints = ACTION_POINTS_PER_DAY;
     newState.context.actionsThisDay = [];
     newState.context.turnsInCurrentDay = 0; // 하위 호환성
+
+    // 맥락 연결 시스템: Day 전환 시 오늘 행동 리셋 (단서는 유지)
+    if (newState.context.actionContext) {
+      newState.context.actionContext = resetContextForNewDay(
+        newState.context.actionContext,
+        newDay
+      );
+      console.log(`📝 맥락 리셋: Day ${newDay}로 전환 (발견한 단서는 유지됨)`);
+    }
 
     // Day 전환 시스템 메시지
     newState.chatHistory.push({
@@ -207,6 +225,28 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     return char;
   });
 
+  // 초기 ActionContext 생성 (맥락 연결 시스템)
+  const initialActionContext = createInitialContext(scenario, {
+    context: {
+      scenarioId: scenario.scenarioId,
+      scenarioStats,
+      flags,
+      currentDay: 1,
+      remainingHours: (scenario.endCondition.value || 7) * 24,
+      turnsInCurrentDay: 0,
+      actionPoints: ACTION_POINTS_PER_DAY,
+      maxActionPoints: ACTION_POINTS_PER_DAY,
+      actionsThisDay: [],
+    },
+    community: {
+      survivors: [],
+      hiddenRelationships,
+    },
+    log: '',
+    chatHistory: [],
+    dilemma: { prompt: '', choice_a: '', choice_b: '' },
+  });
+
   return {
     context: {
       scenarioId: scenario.scenarioId,
@@ -219,6 +259,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionPoints: ACTION_POINTS_PER_DAY,
       maxActionPoints: ACTION_POINTS_PER_DAY,
       actionsThisDay: [],
+      // 맥락 연결 시스템 초기화
+      actionContext: initialActionContext,
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -1204,6 +1246,18 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       recordKeyDecision();
 
+      // 맥락 연결 시스템: 선택 결과로 맥락 업데이트
+      if (updatedSaveState.context.actionContext) {
+        const currentDay = updatedSaveState.context.currentDay || 1;
+        updatedSaveState.context.actionContext = updateContextAfterChoice(
+          updatedSaveState.context.actionContext,
+          choiceDetails,
+          cleanedResponse.log,
+          currentDay
+        );
+        console.log(`📝 맥락 업데이트: "${choiceDetails.substring(0, 30)}..." 선택 결과 반영`);
+      }
+
       // 행동 게이지 소모 및 Day 전환 처리
       const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
         updatedSaveState,
@@ -1404,6 +1458,20 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       }
 
+      // 맥락 연결 시스템: 대화 결과로 맥락 업데이트
+      if (newSaveState.context.actionContext) {
+        const currentDay = newSaveState.context.currentDay || 1;
+        newSaveState.context.actionContext = updateContextAfterDialogue(
+          newSaveState.context.actionContext,
+          characterName,
+          topic.label,
+          dialogueResponse.dialogue,
+          dialogueResponse.infoGained,
+          currentDay
+        );
+        console.log(`📝 맥락 업데이트: ${characterName}와 "${topic.label}" 대화 반영`);
+      }
+
       // 행동 게이지 소모 및 Day 전환 처리
       const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
         newSaveState,
@@ -1523,6 +1591,19 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
       }
 
+      // 맥락 연결 시스템: 탐색 결과로 맥락 업데이트
+      if (newSaveState.context.actionContext) {
+        const currentDay = newSaveState.context.currentDay || 1;
+        newSaveState.context.actionContext = updateContextAfterExploration(
+          newSaveState.context.actionContext,
+          location.name,
+          explorationResult.narrative,
+          explorationResult.rewards,
+          currentDay
+        );
+        console.log(`📝 맥락 업데이트: ${location.name} 탐색 결과 반영`);
+      }
+
       // 행동 게이지 소모 및 Day 전환 처리
       const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
         newSaveState,
@@ -1630,6 +1711,18 @@ export default function GameClient({ scenario }: GameClientProps) {
         cleanedResponse,
         scenario,
       );
+
+      // 맥락 연결 시스템: 자유 입력 결과로 맥락 업데이트
+      if (updatedSaveState.context.actionContext) {
+        const currentDay = updatedSaveState.context.currentDay || 1;
+        updatedSaveState.context.actionContext = updateContextAfterChoice(
+          updatedSaveState.context.actionContext,
+          text,
+          cleanedResponse.log,
+          currentDay
+        );
+        console.log(`📝 맥락 업데이트: 자유 입력 "${text.substring(0, 30)}..." 결과 반영`);
+      }
 
       // 행동 게이지 소모 및 Day 전환 처리
       const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(

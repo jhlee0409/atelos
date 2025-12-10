@@ -1,6 +1,7 @@
 import { DialogueTopic, DialogueResponse, SaveState, ScenarioData, CharacterArc } from '@/types';
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { getKoreanRoleName, getKoreanStatName, getKoreanFlagName } from '@/constants/korean-english-mapping';
+import { buildContextSummary, buildCluesSummary } from './context-manager';
 
 // 대화 프롬프트 빌드
 const buildDialoguePrompt = (
@@ -51,6 +52,19 @@ const buildDialoguePrompt = (
     .slice(0, 3)
     .join(', ');
 
+  // 오늘의 맥락 (이전 행동들)
+  const actionContext = saveState.context.actionContext;
+  const contextSummary = actionContext ? buildContextSummary(actionContext) : '첫 대화';
+  const cluesSummary = actionContext ? buildCluesSummary(actionContext) : '없음';
+
+  // 이 캐릭터와의 이전 상호작용
+  const previousInteraction = actionContext?.characterPresences?.find(
+    (p) => p.characterName === characterName
+  )?.lastInteraction;
+  const previousInteractionInfo = previousInteraction
+    ? `마지막 상호작용: Day ${previousInteraction.day} - ${previousInteraction.summary}`
+    : '이전 대화 없음';
+
   const prompt = `당신은 ${scenario.title}의 캐릭터 "${characterName}"입니다.
 
 ## 캐릭터 정보
@@ -61,12 +75,19 @@ const buildDialoguePrompt = (
 - 현재 상태: ${survivorInfo?.status || 'normal'}
 - 현재 기분: ${characterArc?.currentMood || 'anxious'}
 - 플레이어 신뢰도: ${characterArc?.trustLevel || 0} (-100~100)
+- ${previousInteractionInfo}
 
 ## 현재 상황
 - Day ${currentDay}/${scenario.endCondition.value || 7}
 - 주요 스탯: ${statsSummary}
 - 획득 플래그: ${acquiredFlags || '없음'}
 - 관계: ${playerRelations || '정보 없음'}
+
+## 오늘의 맥락 (플레이어가 오늘 한 일 - 대화에 반영할 것)
+${contextSummary}
+
+## 플레이어가 발견한 단서 (캐릭터가 아는 정보와 연결)
+${cluesSummary}
 
 ## 대화 주제
 플레이어가 "${topic.label}"에 대해 물어봅니다.
@@ -76,9 +97,10 @@ const buildDialoguePrompt = (
 1. 캐릭터의 성격, 역할, 현재 기분에 맞게 대사를 작성하세요
 2. 신뢰도가 높으면 더 친밀하고 정보를 많이 공유합니다
 3. 신뢰도가 낮으면 경계하며 간단히 답합니다
-4. 반드시 한국어로만 응답하세요
-5. 대사는 자연스러운 구어체로 2-4문장 정도로 작성하세요
-6. 캐릭터의 감정과 상태가 대사에 드러나야 합니다
+4. 플레이어가 오늘 탐색한 장소나 다른 캐릭터와의 대화를 자연스럽게 언급할 수 있습니다
+5. 반드시 한국어로만 응답하세요
+6. 대사는 자연스러운 구어체로 2-4문장 정도로 작성하세요
+7. 캐릭터의 감정과 상태가 대사에 드러나야 합니다
 
 ## 출력 형식 (JSON만 출력)
 {

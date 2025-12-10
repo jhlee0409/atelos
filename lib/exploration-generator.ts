@@ -1,14 +1,16 @@
-import { ExplorationLocation, ExplorationResult, SaveState, ScenarioData } from '@/types';
+import { ExplorationLocation, ExplorationResult, SaveState, ScenarioData, ActionContext } from '@/types';
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { getKoreanStatName } from '@/constants/korean-english-mapping';
+import { buildContextSummary, buildCluesSummary } from './context-manager';
 
 // 탐색 프롬프트 빌드
 const buildExplorationPrompt = (
-  location: ExplorationLocation,
+  location: ExplorationLocation | { locationId: string; name: string; description: string },
   saveState: SaveState,
   scenario: ScenarioData
 ): string => {
   const currentDay = saveState.context.currentDay || 1;
+  const actionContext = saveState.context.actionContext;
 
   // 현재 스탯 상황
   const statsSummary = Object.entries(saveState.context.scenarioStats)
@@ -30,25 +32,39 @@ const buildExplorationPrompt = (
     .slice(0, 5)
     .map((f) => f.flagName);
 
+  // 오늘의 맥락 (이전 행동들)
+  const contextSummary = actionContext ? buildContextSummary(actionContext) : '첫 탐색';
+  const cluesSummary = actionContext ? buildCluesSummary(actionContext) : '없음';
+
   const prompt = `당신은 ${scenario.title}의 게임 마스터입니다.
 
 ## 현재 상황
 - Day ${currentDay}/${scenario.endCondition.value || 7}
 - 주요 스탯: ${statsSummary}
 
+## 오늘의 맥락 (이전 행동과 연결할 것)
+${contextSummary}
+
+## 발견한 단서
+${cluesSummary}
+
 ## 탐색 장소
 - 장소: ${location.name}
 - 설명: ${location.description}
 
 ## 요청
-플레이어가 "${location.name}"을(를) 탐색합니다. 짧은 탐색 결과 서사와 보상을 생성해주세요.
+플레이어가 "${location.name}"을(를) 탐색합니다.
+- 오늘 수행한 이전 행동들과 자연스럽게 연결되는 결과를 생성하세요
+- 이전에 발견한 단서와 관련된 새로운 발견이 있을 수 있습니다
+- 캐릭터와의 대화에서 들은 정보가 탐색에 영향을 줄 수 있습니다
 
 ## 응답 규칙
 1. 서사는 2-3문장으로 간결하게
-2. 보상은 선택적입니다 (없어도 됨)
-3. 스탯 변화는 -5 ~ +5 범위 내
-4. 반드시 한국어로만 응답
-5. 분위기는 ${scenario.genre?.join(', ') || '서바이벌'} 장르에 맞게
+2. 이전 맥락과 연결되는 발견물 포함
+3. 보상은 선택적입니다 (없어도 됨)
+4. 스탯 변화는 -5 ~ +5 범위 내
+5. 반드시 한국어로만 응답
+6. 분위기는 ${scenario.genre?.join(', ') || '서바이벌'} 장르에 맞게
 
 ## 사용 가능한 스탯 ID
 ${availableStatIds.join(', ')}
