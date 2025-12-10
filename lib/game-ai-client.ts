@@ -358,6 +358,7 @@ export const cleanAndValidateAIResponse = (
       prompt: response?.dilemma?.prompt || '다음 행동을 선택하세요.',
       choice_a: response?.dilemma?.choice_a || '신중하게 상황을 지켜본다',
       choice_b: response?.dilemma?.choice_b || '즉시 행동에 나선다',
+      choice_c: response?.dilemma?.choice_c || '잠시 상황을 관망한다', // 3번째 선택지 기본값
     },
     statChanges: {
       scenarioStats: response?.statChanges?.scenarioStats || {},
@@ -382,6 +383,9 @@ export const cleanAndValidateAIResponse = (
   const choiceBCleaning = detectAndCleanLanguageMixing(
     safeResponse.dilemma.choice_b,
   );
+  const choiceCCleaning = safeResponse.dilemma.choice_c
+    ? detectAndCleanLanguageMixing(safeResponse.dilemma.choice_c)
+    : { cleanedText: '', hasIssues: false, issues: [] };
 
   if (promptCleaning.hasIssues) {
     hasLanguageIssues = true;
@@ -401,10 +405,19 @@ export const cleanAndValidateAIResponse = (
       ...choiceBCleaning.issues.map((issue) => `choice_b: ${issue}`),
     );
   }
+  if (choiceCCleaning.hasIssues) {
+    hasLanguageIssues = true;
+    languageIssues.push(
+      ...choiceCCleaning.issues.map((issue) => `choice_c: ${issue}`),
+    );
+  }
 
   // 선택지 포맷 검증 (신규)
   const choiceAValidation = validateChoiceFormat(choiceACleaning.cleanedText);
   const choiceBValidation = validateChoiceFormat(choiceBCleaning.cleanedText);
+  const choiceCValidation = choiceCCleaning.cleanedText
+    ? validateChoiceFormat(choiceCCleaning.cleanedText)
+    : { isValid: true, issues: [] };
 
   if (!choiceAValidation.isValid) {
     hasChoiceIssues = true;
@@ -413,6 +426,10 @@ export const cleanAndValidateAIResponse = (
   if (!choiceBValidation.isValid) {
     hasChoiceIssues = true;
     choiceIssues.push(...choiceBValidation.issues.map((issue) => `choice_b: ${issue}`));
+  }
+  if (!choiceCValidation.isValid && choiceCCleaning.cleanedText) {
+    hasChoiceIssues = true;
+    choiceIssues.push(...choiceCValidation.issues.map((issue) => `choice_c: ${issue}`));
   }
 
   // 스탯 변화량 검증 및 보정 (신규)
@@ -434,6 +451,7 @@ export const cleanAndValidateAIResponse = (
       prompt: formattedPrompt,
       choice_a: choiceACleaning.cleanedText,
       choice_b: choiceBCleaning.cleanedText,
+      choice_c: choiceCCleaning.cleanedText || undefined, // 3번째 선택지 (있는 경우만)
     },
     statChanges: {
       ...safeResponse.statChanges,
@@ -525,6 +543,7 @@ export interface SaveState {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   characterArcs?: CharacterArc[];
   keyDecisions?: KeyDecision[];
@@ -542,6 +561,7 @@ export interface AIResponse {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   statChanges: {
     scenarioStats: { [key: string]: number };
@@ -1223,12 +1243,12 @@ export const classifyAction = (
 /**
  * PlayerAction 객체 생성을 위한 헬퍼 함수
  * @param choiceText 선택지 텍스트
- * @param choiceId 선택지 ID ('choice_a' | 'choice_b')
+ * @param choiceId 선택지 ID ('choice_a' | 'choice_b' | 'choice_c')
  * @returns PlayerAction 객체
  */
 export const createPlayerAction = (
   choiceText: string,
-  choiceId: 'choice_a' | 'choice_b',
+  choiceId: 'choice_a' | 'choice_b' | 'choice_c',
 ): PlayerAction => {
   const classification = classifyAction(choiceText);
 

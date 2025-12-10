@@ -160,6 +160,33 @@ export type StoryState = {
   recentEvents: string[];
 };
 
+// 스탯 변화 기록
+export interface StatChangeRecord {
+  statId: string;
+  statName: string;
+  originalChange: number;
+  amplifiedChange: number;
+  appliedChange: number;
+  previousValue: number;
+  newValue: number;
+}
+
+// 관계 변화 기록
+export interface RelationshipChangeRecord {
+  pair: string;
+  change: number;
+  previousValue: number;
+  newValue: number;
+}
+
+// 변화 요약 데이터
+export interface ChangeSummaryData {
+  statChanges: StatChangeRecord[];
+  relationshipChanges: RelationshipChangeRecord[];
+  flagsAcquired: string[];
+  timestamp: number;
+}
+
 export interface SaveState {
   context: {
     scenarioId: string;
@@ -180,17 +207,20 @@ export interface SaveState {
   };
   log: string;
   chatHistory: {
-    type: 'system' | 'player' | 'ai';
+    type: 'system' | 'player' | 'ai' | 'change-summary';
     content: string;
     timestamp: number;
+    changeSummary?: ChangeSummaryData; // 변화 요약 데이터 (type이 'change-summary'일 때)
   }[];
   dilemma: {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   characterArcs?: CharacterArc[]; // 캐릭터 아크 트래킹
   keyDecisions?: KeyDecision[]; // 회상 시스템 - 주요 결정 기록
+  lastChangeSummary?: ChangeSummaryData; // 마지막 변화 요약
 }
 
 export interface AIResponse {
@@ -199,6 +229,7 @@ export interface AIResponse {
     prompt: string;
     choice_a: string;
     choice_b: string;
+    choice_c?: string; // 3번째 선택지 (대기/관망 옵션)
   };
   statChanges: {
     scenarioStats: { [key: string]: number };
@@ -245,4 +276,56 @@ export interface KeyDecision {
 export interface AvailableAction {
   actionId: string;
   description_for_ai: string;
+}
+
+// Phase 3: 캐릭터 대화 시스템
+export interface DialogueTopic {
+  topicId: string;
+  label: string; // 표시될 대화 주제 (예: "탈출 계획에 대해 묻는다")
+  category: 'info' | 'advice' | 'relationship' | 'personal'; // 정보, 조언, 관계, 개인적
+}
+
+export interface CharacterDialogueOption {
+  characterName: string;
+  role: string;
+  availableTopics: DialogueTopic[];
+  currentMood?: CharacterArc['currentMood'];
+  trustLevel?: number;
+}
+
+export interface DialogueResponse {
+  characterName: string;
+  dialogue: string; // 캐릭터의 대사
+  mood: CharacterArc['currentMood'];
+  infoGained?: string; // 획득한 정보 (있는 경우)
+  relationshipChange?: number; // 관계 변화 (있는 경우)
+}
+
+// Phase 3: 탐색 시스템
+export interface ExplorationLocation {
+  locationId: string;
+  name: string; // 표시될 장소 이름
+  description: string; // 장소 설명
+  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters';
+  available: boolean; // 탐색 가능 여부
+  cooldownUntil?: number; // 쿨다운 (day 단위)
+}
+
+export interface ExplorationResult {
+  locationId: string;
+  narrative: string; // 탐색 결과 서사
+  rewards?: {
+    statChanges?: { [key: string]: number };
+    flagsAcquired?: string[];
+    infoGained?: string;
+  };
+}
+
+// Phase 3: 게임 모드 (선택지, 대화, 탐색)
+export type GameMode = 'choice' | 'dialogue' | 'exploration';
+
+// Phase 3: 자유 텍스트 입력
+export interface FreeTextInput {
+  text: string;
+  timestamp: number;
 }

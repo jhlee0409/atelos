@@ -1,8 +1,8 @@
 import { cn, escapeHtml, sanitizeHtml } from '@/lib/utils';
 import { getChoiceHint, formatImpactsForUI } from '@/lib/game-ai-client';
-import { SaveState } from '@/types';
-import { AlertTriangle, Info } from 'lucide-react';
-import { useState } from 'react';
+import { SaveState, GameMode } from '@/types';
+import { AlertTriangle, Info, MessageCircle, Send, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 export const ChoiceButtons = ({
   isLoading,
@@ -11,6 +11,13 @@ export const ChoiceButtons = ({
   isUrgent,
   handlePlayerChoice,
   isInitialLoading = false,
+  onOpenDialogue,
+  onOpenExploration,
+  onFreeTextSubmit,
+  gameMode = 'choice',
+  enableDialogue = true,
+  enableExploration = true,
+  enableFreeText = true,
 }: {
   isLoading: boolean;
   error: string | null;
@@ -18,7 +25,40 @@ export const ChoiceButtons = ({
   isUrgent: boolean;
   handlePlayerChoice: (choice: string) => void;
   isInitialLoading?: boolean;
+  onOpenDialogue?: () => void;
+  onOpenExploration?: () => void;
+  onFreeTextSubmit?: (text: string) => void;
+  gameMode?: GameMode;
+  enableDialogue?: boolean;
+  enableExploration?: boolean;
+  enableFreeText?: boolean;
 }) => {
+  const [showFreeTextInput, setShowFreeTextInput] = useState(false);
+  const [freeText, setFreeText] = useState('');
+  const [showActions, setShowActions] = useState(false);
+  const freeTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // 자유 입력 필드 포커스
+  useEffect(() => {
+    if (showFreeTextInput && freeTextRef.current) {
+      freeTextRef.current.focus();
+    }
+  }, [showFreeTextInput]);
+
+  const handleFreeTextSubmit = () => {
+    if (freeText.trim() && onFreeTextSubmit) {
+      onFreeTextSubmit(freeText.trim());
+      setFreeText('');
+      setShowFreeTextInput(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleFreeTextSubmit();
+    }
+  };
   if (isLoading) {
     const loadingMessage = isInitialLoading
       ? '첫 번째 딜레마를 생성하고 있습니다...'
@@ -79,23 +119,134 @@ export const ChoiceButtons = ({
       <div className="mx-auto max-w-2xl">
         {/* Dilemma Prompt */}
         <DilemmaPrompt prompt={saveState.dilemma.prompt} isUrgent={isUrgent} />
-        {/* Choice Buttons */}
-        <div className="flex space-x-3">
-          <ChoiceButton
-            choice={saveState.dilemma.choice_a}
-            onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
-            variant="primary"
-            disabled={isLoading}
-            urgency={isUrgent}
-          />
-          <ChoiceButton
-            choice={saveState.dilemma.choice_b}
-            onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
-            variant="secondary"
-            disabled={isLoading || !saveState.dilemma.choice_b}
-            urgency={isUrgent}
-          />
+        {/* Choice Buttons - 3개 선택지 */}
+        <div className="flex flex-col space-y-2">
+          {/* 상단: 적극적/신중한 선택지 2개 */}
+          <div className="flex space-x-3">
+            <ChoiceButton
+              choice={saveState.dilemma.choice_a}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
+              variant="primary"
+              disabled={isLoading}
+              urgency={isUrgent}
+              choiceType="active"
+            />
+            <ChoiceButton
+              choice={saveState.dilemma.choice_b}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
+              variant="secondary"
+              disabled={isLoading || !saveState.dilemma.choice_b}
+              urgency={isUrgent}
+              choiceType="cautious"
+            />
+          </div>
+          {/* 하단: 대기/관망 선택지 (있는 경우) */}
+          {saveState.dilemma.choice_c && (
+            <ChoiceButton
+              choice={saveState.dilemma.choice_c}
+              onClick={() => handlePlayerChoice(saveState.dilemma.choice_c!)}
+              variant="tertiary"
+              disabled={isLoading}
+              urgency={false}
+              choiceType="wait"
+            />
+          )}
         </div>
+
+        {/* 추가 액션 토글 버튼 */}
+        <button
+          onClick={() => setShowActions(!showActions)}
+          className="mt-3 flex w-full items-center justify-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <span>다른 행동</span>
+          {showActions ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </button>
+
+        {/* 추가 액션 패널 */}
+        {showActions && (
+          <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* 캐릭터 대화 & 탐색 버튼 */}
+            <div className="flex gap-2">
+              {enableDialogue && onOpenDialogue && (
+                <button
+                  onClick={onOpenDialogue}
+                  disabled={isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>캐릭터와 대화</span>
+                </button>
+              )}
+              {enableExploration && onOpenExploration && (
+                <button
+                  onClick={onOpenExploration}
+                  disabled={isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MapPin className="h-4 w-4" />
+                  <span>주변 탐색</span>
+                </button>
+              )}
+            </div>
+
+            {/* 자유 텍스트 입력 */}
+            {enableFreeText && onFreeTextSubmit && (
+              <div className="space-y-2">
+                {!showFreeTextInput ? (
+                  <button
+                    onClick={() => setShowFreeTextInput(true)}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-zinc-950/50 px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-900 hover:border-zinc-600 hover:text-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-3 w-3" />
+                    <span>직접 행동 입력</span>
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 p-2">
+                    <textarea
+                      ref={freeTextRef}
+                      value={freeText}
+                      onChange={(e) => setFreeText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="원하는 행동을 입력하세요... (예: 창문 밖을 살펴본다)"
+                      className="w-full resize-none bg-transparent text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none"
+                      rows={2}
+                      maxLength={200}
+                      disabled={isLoading}
+                    />
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-600">
+                        {freeText.length}/200
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowFreeTextInput(false);
+                            setFreeText('');
+                          }}
+                          className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={handleFreeTextSubmit}
+                          disabled={!freeText.trim() || isLoading}
+                          className="rounded bg-red-900 px-3 py-1 text-xs text-white hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          전송
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -109,23 +260,50 @@ const ChoiceButton = ({
   disabled = false,
   urgency = false,
   showHints = true,
+  choiceType = 'active',
 }: {
   choice: string | undefined;
   onClick: () => void;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'tertiary';
   disabled?: boolean;
   urgency?: boolean;
   showHints?: boolean;
+  choiceType?: 'active' | 'cautious' | 'wait';
 }) => {
-  const [isHintVisible, setIsHintVisible] = useState(false);
+  // 기본적으로 힌트 표시 (사용자가 숨기기 가능)
+  const [isHintVisible, setIsHintVisible] = useState(true);
 
   const baseClasses =
     'flex-1 p-4 font-bold transition-all duration-300 transform hover:-translate-y-1 active:scale-95 min-h-[48px] relative overflow-hidden border';
 
-  const variantClasses =
-    variant === 'primary'
-      ? 'bg-red-900 hover:bg-red-800 text-white border-red-700 shadow-[0_0_15px_rgba(127,29,29,0.5)]'
-      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+  const getVariantClasses = () => {
+    switch (variant) {
+      case 'primary':
+        return 'bg-red-900 hover:bg-red-800 text-white border-red-700 shadow-[0_0_15px_rgba(127,29,29,0.5)]';
+      case 'secondary':
+        return 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+      case 'tertiary':
+        return 'bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-800 text-sm';
+      default:
+        return 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-700';
+    }
+  };
+
+  const variantClasses = getVariantClasses();
+
+  // 선택지 유형별 라벨
+  const getChoiceTypeLabel = () => {
+    switch (choiceType) {
+      case 'active':
+        return '⚔️ 적극적';
+      case 'cautious':
+        return '🛡️ 신중한';
+      case 'wait':
+        return '⏳ 관망';
+      default:
+        return '';
+    }
+  };
 
   const urgencyClasses = urgency ? 'animate-pulse ring-2 ring-yellow-400' : '';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : '';
@@ -184,6 +362,8 @@ const ChoiceButton = ({
     }
   };
 
+  const choiceTypeLabel = getChoiceTypeLabel();
+
   return (
     <div className="flex-1">
       <button
@@ -197,25 +377,34 @@ const ChoiceButton = ({
           'w-full',
         )}
       >
+        {/* 선택지 유형 라벨 */}
+        {choiceTypeLabel && (
+          <div className="absolute left-2 top-2 z-10 text-[10px] opacity-70">
+            {choiceTypeLabel}
+          </div>
+        )}
         <div
-          className="relative z-10 text-center leading-tight"
+          className={cn(
+            "relative z-10 text-center leading-tight",
+            choiceTypeLabel && "pt-3" // 라벨이 있으면 위쪽 패딩 추가
+          )}
           dangerouslySetInnerHTML={{ __html: highlightKeywords(choice || '') }}
         />
         {urgency && (
           <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />
         )}
-        {/* 힌트 토글 버튼 */}
-        {showHints && hint && hint.category !== 'general' && (
+        {/* 힌트 토글 버튼 - 힌트가 표시 중일 때만 숨기기 버튼 표시 */}
+        {showHints && hint && hint.category !== 'general' && isHintVisible && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setIsHintVisible(!isHintVisible);
+              setIsHintVisible(false);
             }}
-            className="absolute right-2 top-2 z-20 rounded-full bg-black/30 p-1 transition-colors hover:bg-black/50"
-            aria-label="힌트 보기"
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1 text-[10px] text-white/50 transition-colors hover:bg-black/70 hover:text-white/80"
+            aria-label="힌트 숨기기"
           >
-            <Info className="h-3 w-3 text-white/70" />
+            ✕
           </button>
         )}
       </button>

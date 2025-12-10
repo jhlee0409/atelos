@@ -16,6 +16,9 @@ import type {
   PlayerState,
   EndingArchetype,
   ScenarioFlag,
+  GameMode,
+  DialogueTopic,
+  ExplorationLocation,
 } from '@/types';
 import { buildInitialDilemmaPrompt } from '@/lib/prompt-builder';
 import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
@@ -28,6 +31,11 @@ import {
   generateFallbackInitialChoices,
   detectUrgency,
 } from '@/lib/game-builder';
+import { CharacterDialoguePanel } from '@/components/client/GameClient/CharacterDialoguePanel';
+import { ExplorationPanel } from '@/components/client/GameClient/ExplorationPanel';
+import { TimelineProgress } from '@/components/client/GameClient/TimelineProgress';
+import { generateDialogueResponse } from '@/lib/dialogue-generator';
+import { generateExplorationResult } from '@/lib/exploration-generator';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
 const LEGACY_STAT_MAPPING: Record<string, string> = {
@@ -184,6 +192,13 @@ const parseCharacterPair = (
   return { personA, personB };
 };
 
+// 변화 추적용 타입
+import type {
+  StatChangeRecord,
+  RelationshipChangeRecord,
+  ChangeSummaryData,
+} from '@/types';
+
 // State updater function v2.0
 const updateSaveState = (
   currentSaveState: SaveState,
@@ -191,6 +206,11 @@ const updateSaveState = (
   scenario: ScenarioData,
 ): SaveState => {
   const newSaveState = JSON.parse(JSON.stringify(currentSaveState));
+
+  // 변화 추적 배열 초기화
+  const trackedStatChanges: StatChangeRecord[] = [];
+  const trackedRelationshipChanges: RelationshipChangeRecord[] = [];
+  const trackedFlagsAcquired: string[] = [];
 
   newSaveState.log = aiResponse.log;
   newSaveState.dilemma = aiResponse.dilemma;
@@ -289,21 +309,49 @@ const updateSaveState = (
         );
 
         // 스탯이 범위를 벗어나지 않도록 안전장치 추가
-        const newValue = currentValue + amplifiedChange;
         const clampedChange = Math.max(
           min - currentValue,
           Math.min(max - currentValue, amplifiedChange),
         );
 
+        const previousValue = currentValue;
         newSaveState.context.scenarioStats[mappedKey] += clampedChange;
+        const newValue = newSaveState.context.scenarioStats[mappedKey];
+
+        // 변화 추적 기록
+        if (clampedChange !== 0) {
+          trackedStatChanges.push({
+            statId: mappedKey,
+            statName: statDef.name,
+            originalChange,
+            amplifiedChange,
+            appliedChange: clampedChange,
+            previousValue,
+            newValue,
+          });
+        }
 
         console.log(
           `📊 스탯 변화: ${mappedKey} | 원본: ${originalChange} | 증폭: ${amplifiedChange} | 실제 적용: ${clampedChange} | 현재 비율: ${percentage.toFixed(1)}%`,
         );
       } else {
         // 스탯 정의를 찾을 수 없는 경우 기본 증폭 적용
+        const previousValue = newSaveState.context.scenarioStats[mappedKey];
         const amplifiedChange = Math.round(scenarioStats[originalKey] * 2.0);
         newSaveState.context.scenarioStats[mappedKey] += amplifiedChange;
+        const newValue = newSaveState.context.scenarioStats[mappedKey];
+
+        if (amplifiedChange !== 0) {
+          trackedStatChanges.push({
+            statId: mappedKey,
+            statName: mappedKey,
+            originalChange: scenarioStats[originalKey],
+            amplifiedChange,
+            appliedChange: amplifiedChange,
+            previousValue,
+            newValue,
+          });
+        }
       }
     }
   }
@@ -442,12 +490,24 @@ const updateSaveState = (
       ) {
         // 키는 항상 알파벳 순으로 정렬하여 일관성 유지
         const key = [personA, personB].sort().join('-');
+        const previousValue = newSaveState.community.hiddenRelationships[key] ?? 0;
         if (newSaveState.community.hiddenRelationships[key] === undefined) {
           newSaveState.community.hiddenRelationships[key] = 0;
         }
         // 관계값 변경 후 -100 ~ 100 범위로 clamp
         const newRelationValue = newSaveState.community.hiddenRelationships[key] + value;
         newSaveState.community.hiddenRelationships[key] = Math.max(-100, Math.min(100, newRelationValue));
+
+        // 관계 변화 추적
+        if (value !== 0) {
+          trackedRelationshipChanges.push({
+            pair: key,
+            change: value,
+            previousValue,
+            newValue: newSaveState.community.hiddenRelationships[key],
+          });
+        }
+
         console.log(
           `🤝 관계도 변경: ${key} | 변화: ${value} | 현재: ${newSaveState.community.hiddenRelationships[key]}`,
         );
@@ -470,6 +530,8 @@ const updateSaveState = (
         } else {
           newSaveState.context.flags[flag] = true;
         }
+        // 새로운 플래그 획득 추적
+        trackedFlagsAcquired.push(flag);
         console.log(
           `🚩 새로운 플래그 획득: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
         );
@@ -737,6 +799,38 @@ const updateSaveState = (
     );
   }
 
+  // 변화 요약 생성 및 저장
+  const hasAnyChanges =
+    trackedStatChanges.length > 0 ||
+    trackedRelationshipChanges.length > 0 ||
+    trackedFlagsAcquired.length > 0;
+
+  if (hasAnyChanges) {
+    const changeSummary: ChangeSummaryData = {
+      statChanges: trackedStatChanges,
+      relationshipChanges: trackedRelationshipChanges,
+      flagsAcquired: trackedFlagsAcquired,
+      timestamp: Date.now(),
+    };
+
+    // 변화 요약을 chat history에 추가
+    newSaveState.chatHistory.push({
+      type: 'change-summary',
+      content: '', // 내용은 changeSummary에서 렌더링
+      timestamp: Date.now() + 1,
+      changeSummary,
+    });
+
+    // lastChangeSummary도 저장 (필요 시 참조용)
+    newSaveState.lastChangeSummary = changeSummary;
+
+    console.log('📋 변화 요약:', {
+      stats: trackedStatChanges.length,
+      relationships: trackedRelationshipChanges.length,
+      flags: trackedFlagsAcquired.length,
+    });
+  }
+
   return newSaveState;
 };
 
@@ -753,6 +847,11 @@ export default function GameClient({ scenario }: GameClientProps) {
   const [languageWarning, setLanguageWarning] = useState<string | null>(null);
   const initialDilemmaGenerated = useRef(false);
   const dilemmaGenerationInProgress = useRef(false); // 딜레마 생성 중복 방지
+
+  // Phase 3: 게임 모드 상태
+  const [gameMode, setGameMode] = useState<GameMode>('choice');
+  const [isDialogueLoading, setIsDialogueLoading] = useState(false);
+  const [isExplorationLoading, setIsExplorationLoading] = useState(false);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -1159,6 +1258,247 @@ export default function GameClient({ scenario }: GameClientProps) {
     }
   };
 
+  // Phase 3: 캐릭터 대화 핸들러
+  const handleDialogueSelect = async (characterName: string, topic: DialogueTopic) => {
+    setIsDialogueLoading(true);
+    setError(null);
+
+    try {
+      console.log(`💬 대화 시작: ${characterName} - ${topic.label}`);
+
+      const dialogueResponse = await generateDialogueResponse(
+        characterName,
+        topic,
+        saveState,
+        scenario
+      );
+
+      // 대화 내용을 채팅 히스토리에 추가
+      const newSaveState = { ...saveState };
+
+      // 플레이어 질문
+      newSaveState.chatHistory.push({
+        type: 'player',
+        content: `[${characterName}에게] ${topic.label}`,
+        timestamp: Date.now(),
+      });
+
+      // 캐릭터 응답
+      newSaveState.chatHistory.push({
+        type: 'ai',
+        content: `**${characterName}**: "${dialogueResponse.dialogue}"`,
+        timestamp: Date.now() + 1,
+      });
+
+      // 관계 변화 적용
+      if (dialogueResponse.relationshipChange && dialogueResponse.relationshipChange !== 0) {
+        const playerKey = ['(플레이어)', characterName].sort().join('-');
+        if (newSaveState.community.hiddenRelationships[playerKey] === undefined) {
+          newSaveState.community.hiddenRelationships[playerKey] = 0;
+        }
+        const newValue = Math.max(-100, Math.min(100,
+          newSaveState.community.hiddenRelationships[playerKey] + dialogueResponse.relationshipChange
+        ));
+        newSaveState.community.hiddenRelationships[playerKey] = newValue;
+
+        // 캐릭터 아크 업데이트
+        const arc = newSaveState.characterArcs?.find(a => a.characterName === characterName);
+        if (arc) {
+          arc.trustLevel = Math.max(-100, Math.min(100, arc.trustLevel + dialogueResponse.relationshipChange));
+          arc.currentMood = dialogueResponse.mood;
+        }
+
+        console.log(`🤝 대화로 관계 변화: ${characterName} ${dialogueResponse.relationshipChange > 0 ? '+' : ''}${dialogueResponse.relationshipChange}`);
+      }
+
+      // 정보 획득 시 메시지 추가
+      if (dialogueResponse.infoGained) {
+        newSaveState.chatHistory.push({
+          type: 'system',
+          content: `💡 정보 획득: ${dialogueResponse.infoGained}`,
+          timestamp: Date.now() + 2,
+        });
+      }
+
+      setSaveState(newSaveState);
+      setGameMode('choice'); // 대화 후 선택 모드로 복귀
+    } catch (err) {
+      console.error('💬 대화 오류:', err);
+      setError('캐릭터와 대화하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsDialogueLoading(false);
+    }
+  };
+
+  // Phase 3: 탐색 핸들러
+  const handleExplore = async (location: ExplorationLocation) => {
+    setIsExplorationLoading(true);
+    setError(null);
+
+    try {
+      console.log(`🔍 탐색 시작: ${location.name}`);
+
+      const explorationResult = await generateExplorationResult(
+        location,
+        saveState,
+        scenario
+      );
+
+      // 탐색 결과를 채팅 히스토리에 추가
+      const newSaveState = { ...saveState };
+
+      // 플레이어 행동
+      newSaveState.chatHistory.push({
+        type: 'player',
+        content: `[탐색] ${location.name}을(를) 살펴본다`,
+        timestamp: Date.now(),
+      });
+
+      // 탐색 결과
+      newSaveState.chatHistory.push({
+        type: 'ai',
+        content: explorationResult.narrative,
+        timestamp: Date.now() + 1,
+      });
+
+      // 보상 적용
+      if (explorationResult.rewards) {
+        // 스탯 변화
+        if (explorationResult.rewards.statChanges) {
+          for (const [statId, change] of Object.entries(explorationResult.rewards.statChanges)) {
+            if (newSaveState.context.scenarioStats[statId] !== undefined) {
+              const statDef = scenario.scenarioStats.find(s => s.id === statId);
+              const min = statDef?.min || 0;
+              const max = statDef?.max || 100;
+              const newValue = Math.max(min, Math.min(max,
+                newSaveState.context.scenarioStats[statId] + change
+              ));
+              newSaveState.context.scenarioStats[statId] = newValue;
+              console.log(`📊 탐색 스탯 변화: ${statId} ${change > 0 ? '+' : ''}${change}`);
+            }
+          }
+        }
+
+        // 플래그 획득
+        if (explorationResult.rewards.flagsAcquired) {
+          for (const flag of explorationResult.rewards.flagsAcquired) {
+            if (newSaveState.context.flags[flag] === undefined) {
+              const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
+              newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
+              console.log(`🚩 탐색 플래그 획득: ${flag}`);
+            }
+          }
+        }
+
+        // 정보 획득
+        if (explorationResult.rewards.infoGained) {
+          newSaveState.chatHistory.push({
+            type: 'system',
+            content: `💡 발견: ${explorationResult.rewards.infoGained}`,
+            timestamp: Date.now() + 2,
+          });
+        }
+      }
+
+      setSaveState(newSaveState);
+      setGameMode('choice'); // 탐색 후 선택 모드로 복귀
+    } catch (err) {
+      console.error('🔍 탐색 오류:', err);
+      setError('탐색 중 오류가 발생했습니다.');
+    } finally {
+      setIsExplorationLoading(false);
+    }
+  };
+
+  // Phase 3: 자유 텍스트 입력 핸들러
+  const handleFreeTextSubmit = async (text: string) => {
+    if (!text.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    // 자유 입력을 플레이어 행동으로 처리
+    const newSaveState = { ...saveState };
+    newSaveState.chatHistory.push({
+      type: 'player',
+      content: text,
+      timestamp: Date.now(),
+    });
+    setSaveState(newSaveState);
+
+    // createPlayerAction으로 자유 텍스트를 행동으로 변환
+    const playerAction = createPlayerAction(text, 'choice_a');
+    playerAction.actionDescription = `플레이어 자유 행동: ${text}`;
+
+    try {
+      const aiSettings = getOptimalAISettings(
+        newSaveState.context.currentDay || 1,
+        'medium',
+        0,
+      );
+
+      const aiResponse = await generateGameResponse(
+        newSaveState,
+        playerAction,
+        scenario,
+        aiSettings.useLiteVersion,
+      );
+
+      const { cleanedResponse, hasLanguageIssues, languageIssues } =
+        cleanAndValidateAIResponse(aiResponse);
+
+      if (hasLanguageIssues) {
+        setLanguageWarning(
+          `언어 혼용 문제가 감지되어 자동으로 정리했습니다: ${languageIssues.join(', ')}`,
+        );
+        setTimeout(() => setLanguageWarning(null), 3000);
+      }
+
+      if (
+        !validateGameResponse(
+          cleanedResponse,
+          scenario,
+          aiSettings.useLiteVersion,
+        )
+      ) {
+        throw new Error('AI 응답이 유효하지 않습니다.');
+      }
+
+      const updatedSaveState = updateSaveState(
+        newSaveState,
+        cleanedResponse,
+        scenario,
+      );
+
+      setSaveState(updatedSaveState);
+
+      // 엔딩 체크 (handlePlayerChoice와 동일한 로직)
+      const currentDay = updatedSaveState.context.currentDay || 1;
+      if (currentDay >= 5) {
+        const currentPlayerState: PlayerState = {
+          stats: updatedSaveState.context.scenarioStats,
+          flags: updatedSaveState.context.flags,
+          traits: [],
+          relationships: updatedSaveState.community.hiddenRelationships,
+        };
+        const survivorCount = updatedSaveState.community.survivors.length;
+        const ending = checkEndingConditions(
+          currentPlayerState,
+          scenario.endingArchetypes,
+          survivorCount,
+        );
+        if (ending) {
+          setTriggeredEnding(ending);
+        }
+      }
+    } catch (err) {
+      console.error('자유 입력 처리 오류:', err);
+      setError('행동을 처리하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (triggeredEnding) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-telos-black text-zinc-100">
@@ -1210,15 +1550,49 @@ export default function GameClient({ scenario }: GameClientProps) {
       {/* Chat History - Takes up most of the screen */}
       <ChatHistory saveState={saveState} />
 
-      {/* Sticky Choice Buttons - Always visible at bottom */}
-      <ChoiceButtons
-        isLoading={isLoading || isInitialDilemmaLoading}
-        error={error}
-        saveState={saveState}
-        isUrgent={isUrgent}
-        handlePlayerChoice={handlePlayerChoice}
-        isInitialLoading={isInitialDilemmaLoading}
-      />
+      {/* Phase 3: 게임 모드별 패널 */}
+      {gameMode === 'dialogue' ? (
+        <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
+          <div className="mx-auto max-w-2xl">
+            <CharacterDialoguePanel
+              scenario={scenario}
+              saveState={saveState}
+              onSelectCharacter={handleDialogueSelect}
+              onClose={() => setGameMode('choice')}
+              isLoading={isDialogueLoading}
+            />
+          </div>
+        </div>
+      ) : gameMode === 'exploration' ? (
+        <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
+          <div className="mx-auto max-w-2xl">
+            <ExplorationPanel
+              scenario={scenario}
+              saveState={saveState}
+              onExplore={handleExplore}
+              onClose={() => setGameMode('choice')}
+              isLoading={isExplorationLoading}
+            />
+          </div>
+        </div>
+      ) : (
+        /* Sticky Choice Buttons - Always visible at bottom */
+        <ChoiceButtons
+          isLoading={isLoading || isInitialDilemmaLoading}
+          error={error}
+          saveState={saveState}
+          isUrgent={isUrgent}
+          handlePlayerChoice={handlePlayerChoice}
+          isInitialLoading={isInitialDilemmaLoading}
+          onOpenDialogue={() => setGameMode('dialogue')}
+          onOpenExploration={() => setGameMode('exploration')}
+          onFreeTextSubmit={handleFreeTextSubmit}
+          gameMode={gameMode}
+          enableDialogue={true}
+          enableExploration={true}
+          enableFreeText={true}
+        />
+      )}
     </div>
   );
 }
