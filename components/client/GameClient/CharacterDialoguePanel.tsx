@@ -139,14 +139,6 @@ const CharacterCard = ({
             {getKoreanRoleName(character.role) || character.role}
           </div>
         </div>
-        <div className="text-right">
-          <div className={cn(
-            "text-[10px]",
-            trustLevel >= 0 ? "text-green-400" : "text-red-400"
-          )}>
-            신뢰 {trustLevel >= 0 ? '+' : ''}{trustLevel}
-          </div>
-        </div>
       </div>
     </button>
   );
@@ -188,7 +180,6 @@ const TopicSelection = ({
       </div>
 
       {/* 대화 주제 목록 */}
-      <div className="text-xs text-zinc-500 mb-2">무엇에 대해 이야기하시겠습니까?</div>
       <div className="space-y-2">
         {topics.map((topic) => {
           const TopicIcon = getTopicIcon(topic.category);
@@ -276,18 +267,15 @@ export const CharacterDialoguePanel = ({
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
-      {/* 헤더 */}
+      {/* 헤더 - 간소화 */}
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-200">캐릭터 대화</span>
-        </div>
+        <span className="text-sm font-medium text-zinc-200">누구와 이야기할까?</span>
         <button
           onClick={onClose}
           className="text-xs text-zinc-500 hover:text-zinc-300"
           disabled={isLoading}
         >
-          닫기 ✕
+          돌아가기
         </button>
       </div>
 
@@ -302,7 +290,6 @@ export const CharacterDialoguePanel = ({
         />
       ) : (
         <div className="space-y-2">
-          <div className="text-xs text-zinc-500 mb-2">누구와 대화하시겠습니까?</div>
           {availableCharacters.map((character) => (
             <CharacterCard
               key={character.characterName}
@@ -315,7 +302,7 @@ export const CharacterDialoguePanel = ({
             onClick={onClose}
             className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
           >
-            다음 딜레마로 →
+            다음으로
           </button>
         </div>
       )}

@@ -158,10 +158,10 @@ const consumeActionPoint = (
       }
     }
 
-    // Day 전환 시스템 메시지
+    // Day 전환 시스템 메시지 (몰입감 있는 형식)
     newState.chatHistory.push({
       type: 'system',
-      content: `━━━ Day ${newDay} ━━━\n새로운 하루가 밝았습니다. [행동력 ${ACTION_POINTS_PER_DAY}/${ACTION_POINTS_PER_DAY}]`,
+      content: `Day ${newDay}`,
       timestamp: Date.now(),
     });
 
@@ -1478,11 +1478,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🤝 대화로 관계 변화: ${characterName} ${dialogueResponse.relationshipChange > 0 ? '+' : ''}${dialogueResponse.relationshipChange}`);
       }
 
-      // 정보 획득 시 메시지 추가
+      // 정보 획득 시 메시지 추가 (몰입감 있는 형식)
       if (dialogueResponse.infoGained) {
         newSaveState.chatHistory.push({
-          type: 'system',
-          content: `💡 정보 획득: ${dialogueResponse.infoGained}`,
+          type: 'ai-thought',
+          content: dialogueResponse.infoGained,
           timestamp: Date.now() + 2,
         });
       }
@@ -1639,11 +1639,11 @@ export default function GameClient({ scenario }: GameClientProps) {
       if (worldStateResult) {
         newSaveState.context.worldState = worldStateResult.worldState;
 
-        // WorldState에서 발견한 아이템 알림
+        // WorldState에서 발견한 아이템 알림 (몰입감 있는 형식)
         for (const discovery of worldStateResult.newDiscoveries) {
           newSaveState.chatHistory.push({
-            type: 'system',
-            content: `📦 발견: ${discovery.name} - ${discovery.description}`,
+            type: 'ai-narration',
+            content: `${discovery.name}을(를) 발견했다.`,
             timestamp: Date.now() + 2,
           });
 
@@ -1671,17 +1671,19 @@ export default function GameClient({ scenario }: GameClientProps) {
           }
         }
 
-        // 위치 변경 알림
+        // 위치 변경 알림 (몰입감 있는 형식 - 중요한 변화만)
         for (const change of worldStateResult.changedLocations) {
-          const statusText = change.newStatus === 'destroyed' ? '파괴되었습니다'
-            : change.newStatus === 'blocked' ? '차단되었습니다'
-            : change.newStatus === 'available' ? '접근 가능해졌습니다'
-            : '상태가 변경되었습니다';
-          newSaveState.chatHistory.push({
-            type: 'system',
-            content: `⚠️ ${change.locationId} ${statusText}${change.reason ? ` (${change.reason})` : ''}`,
-            timestamp: Date.now() + 3,
-          });
+          // 파괴나 차단만 알림 (접근 가능 등은 불필요)
+          if (change.newStatus === 'destroyed' || change.newStatus === 'blocked') {
+            const narrativeText = change.newStatus === 'destroyed'
+              ? `${change.locationId}이(가) 더 이상 갈 수 없는 곳이 되었다.`
+              : `${change.locationId}으로 가는 길이 막혔다.`;
+            newSaveState.chatHistory.push({
+              type: 'ai-narration',
+              content: narrativeText,
+              timestamp: Date.now() + 3,
+            });
+          }
         }
 
         // 트리거된 이벤트 알림
@@ -1722,8 +1724,8 @@ export default function GameClient({ scenario }: GameClientProps) {
         // 정보 획득 (WorldState에서 이미 구체적 발견물을 추가했으므로 중복 방지)
         if (explorationResult.rewards.infoGained && !worldStateResult?.newDiscoveries.length) {
           newSaveState.chatHistory.push({
-            type: 'system',
-            content: `💡 발견: ${explorationResult.rewards.infoGained}`,
+            type: 'ai-thought',
+            content: explorationResult.rewards.infoGained,
             timestamp: Date.now() + 2,
           });
         }
