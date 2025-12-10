@@ -1,8 +1,8 @@
 import { cn, escapeHtml, sanitizeHtml } from '@/lib/utils';
 import { getChoiceHint, formatImpactsForUI } from '@/lib/game-ai-client';
-import { SaveState } from '@/types';
-import { AlertTriangle, Info } from 'lucide-react';
-import { useState } from 'react';
+import { SaveState, GameMode } from '@/types';
+import { AlertTriangle, Info, MessageCircle, Send, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 export const ChoiceButtons = ({
   isLoading,
@@ -11,6 +11,13 @@ export const ChoiceButtons = ({
   isUrgent,
   handlePlayerChoice,
   isInitialLoading = false,
+  onOpenDialogue,
+  onOpenExploration,
+  onFreeTextSubmit,
+  gameMode = 'choice',
+  enableDialogue = true,
+  enableExploration = true,
+  enableFreeText = true,
 }: {
   isLoading: boolean;
   error: string | null;
@@ -18,7 +25,40 @@ export const ChoiceButtons = ({
   isUrgent: boolean;
   handlePlayerChoice: (choice: string) => void;
   isInitialLoading?: boolean;
+  onOpenDialogue?: () => void;
+  onOpenExploration?: () => void;
+  onFreeTextSubmit?: (text: string) => void;
+  gameMode?: GameMode;
+  enableDialogue?: boolean;
+  enableExploration?: boolean;
+  enableFreeText?: boolean;
 }) => {
+  const [showFreeTextInput, setShowFreeTextInput] = useState(false);
+  const [freeText, setFreeText] = useState('');
+  const [showActions, setShowActions] = useState(false);
+  const freeTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // 자유 입력 필드 포커스
+  useEffect(() => {
+    if (showFreeTextInput && freeTextRef.current) {
+      freeTextRef.current.focus();
+    }
+  }, [showFreeTextInput]);
+
+  const handleFreeTextSubmit = () => {
+    if (freeText.trim() && onFreeTextSubmit) {
+      onFreeTextSubmit(freeText.trim());
+      setFreeText('');
+      setShowFreeTextInput(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleFreeTextSubmit();
+    }
+  };
   if (isLoading) {
     const loadingMessage = isInitialLoading
       ? '첫 번째 딜레마를 생성하고 있습니다...'
@@ -112,6 +152,101 @@ export const ChoiceButtons = ({
             />
           )}
         </div>
+
+        {/* 추가 액션 토글 버튼 */}
+        <button
+          onClick={() => setShowActions(!showActions)}
+          className="mt-3 flex w-full items-center justify-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <span>다른 행동</span>
+          {showActions ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </button>
+
+        {/* 추가 액션 패널 */}
+        {showActions && (
+          <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* 캐릭터 대화 & 탐색 버튼 */}
+            <div className="flex gap-2">
+              {enableDialogue && onOpenDialogue && (
+                <button
+                  onClick={onOpenDialogue}
+                  disabled={isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>캐릭터와 대화</span>
+                </button>
+              )}
+              {enableExploration && onOpenExploration && (
+                <button
+                  onClick={onOpenExploration}
+                  disabled={isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MapPin className="h-4 w-4" />
+                  <span>주변 탐색</span>
+                </button>
+              )}
+            </div>
+
+            {/* 자유 텍스트 입력 */}
+            {enableFreeText && onFreeTextSubmit && (
+              <div className="space-y-2">
+                {!showFreeTextInput ? (
+                  <button
+                    onClick={() => setShowFreeTextInput(true)}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-zinc-950/50 px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-900 hover:border-zinc-600 hover:text-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-3 w-3" />
+                    <span>직접 행동 입력</span>
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 p-2">
+                    <textarea
+                      ref={freeTextRef}
+                      value={freeText}
+                      onChange={(e) => setFreeText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="원하는 행동을 입력하세요... (예: 창문 밖을 살펴본다)"
+                      className="w-full resize-none bg-transparent text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none"
+                      rows={2}
+                      maxLength={200}
+                      disabled={isLoading}
+                    />
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-600">
+                        {freeText.length}/200
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setShowFreeTextInput(false);
+                            setFreeText('');
+                          }}
+                          className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={handleFreeTextSubmit}
+                          disabled={!freeText.trim() || isLoading}
+                          className="rounded bg-red-900 px-3 py-1 text-xs text-white hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          전송
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

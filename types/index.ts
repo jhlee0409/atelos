@@ -277,3 +277,55 @@ export interface AvailableAction {
   actionId: string;
   description_for_ai: string;
 }
+
+// Phase 3: 캐릭터 대화 시스템
+export interface DialogueTopic {
+  topicId: string;
+  label: string; // 표시될 대화 주제 (예: "탈출 계획에 대해 묻는다")
+  category: 'info' | 'advice' | 'relationship' | 'personal'; // 정보, 조언, 관계, 개인적
+}
+
+export interface CharacterDialogueOption {
+  characterName: string;
+  role: string;
+  availableTopics: DialogueTopic[];
+  currentMood?: CharacterArc['currentMood'];
+  trustLevel?: number;
+}
+
+export interface DialogueResponse {
+  characterName: string;
+  dialogue: string; // 캐릭터의 대사
+  mood: CharacterArc['currentMood'];
+  infoGained?: string; // 획득한 정보 (있는 경우)
+  relationshipChange?: number; // 관계 변화 (있는 경우)
+}
+
+// Phase 3: 탐색 시스템
+export interface ExplorationLocation {
+  locationId: string;
+  name: string; // 표시될 장소 이름
+  description: string; // 장소 설명
+  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters';
+  available: boolean; // 탐색 가능 여부
+  cooldownUntil?: number; // 쿨다운 (day 단위)
+}
+
+export interface ExplorationResult {
+  locationId: string;
+  narrative: string; // 탐색 결과 서사
+  rewards?: {
+    statChanges?: { [key: string]: number };
+    flagsAcquired?: string[];
+    infoGained?: string;
+  };
+}
+
+// Phase 3: 게임 모드 (선택지, 대화, 탐색)
+export type GameMode = 'choice' | 'dialogue' | 'exploration';
+
+// Phase 3: 자유 텍스트 입력
+export interface FreeTextInput {
+  text: string;
+  timestamp: number;
+}
