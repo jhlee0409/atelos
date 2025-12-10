@@ -160,6 +160,33 @@ export type StoryState = {
   recentEvents: string[];
 };
 
+// 스탯 변화 기록
+export interface StatChangeRecord {
+  statId: string;
+  statName: string;
+  originalChange: number;
+  amplifiedChange: number;
+  appliedChange: number;
+  previousValue: number;
+  newValue: number;
+}
+
+// 관계 변화 기록
+export interface RelationshipChangeRecord {
+  pair: string;
+  change: number;
+  previousValue: number;
+  newValue: number;
+}
+
+// 변화 요약 데이터
+export interface ChangeSummaryData {
+  statChanges: StatChangeRecord[];
+  relationshipChanges: RelationshipChangeRecord[];
+  flagsAcquired: string[];
+  timestamp: number;
+}
+
 export interface SaveState {
   context: {
     scenarioId: string;
@@ -180,9 +207,10 @@ export interface SaveState {
   };
   log: string;
   chatHistory: {
-    type: 'system' | 'player' | 'ai';
+    type: 'system' | 'player' | 'ai' | 'change-summary';
     content: string;
     timestamp: number;
+    changeSummary?: ChangeSummaryData; // 변화 요약 데이터 (type이 'change-summary'일 때)
   }[];
   dilemma: {
     prompt: string;
@@ -191,6 +219,7 @@ export interface SaveState {
   };
   characterArcs?: CharacterArc[]; // 캐릭터 아크 트래킹
   keyDecisions?: KeyDecision[]; // 회상 시스템 - 주요 결정 기록
+  lastChangeSummary?: ChangeSummaryData; // 마지막 변화 요약
 }
 
 export interface AIResponse {

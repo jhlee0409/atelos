@@ -184,6 +184,13 @@ const parseCharacterPair = (
   return { personA, personB };
 };
 
+// 변화 추적용 타입
+import type {
+  StatChangeRecord,
+  RelationshipChangeRecord,
+  ChangeSummaryData,
+} from '@/types';
+
 // State updater function v2.0
 const updateSaveState = (
   currentSaveState: SaveState,
@@ -191,6 +198,11 @@ const updateSaveState = (
   scenario: ScenarioData,
 ): SaveState => {
   const newSaveState = JSON.parse(JSON.stringify(currentSaveState));
+
+  // 변화 추적 배열 초기화
+  const trackedStatChanges: StatChangeRecord[] = [];
+  const trackedRelationshipChanges: RelationshipChangeRecord[] = [];
+  const trackedFlagsAcquired: string[] = [];
 
   newSaveState.log = aiResponse.log;
   newSaveState.dilemma = aiResponse.dilemma;
@@ -289,21 +301,49 @@ const updateSaveState = (
         );
 
         // 스탯이 범위를 벗어나지 않도록 안전장치 추가
-        const newValue = currentValue + amplifiedChange;
         const clampedChange = Math.max(
           min - currentValue,
           Math.min(max - currentValue, amplifiedChange),
         );
 
+        const previousValue = currentValue;
         newSaveState.context.scenarioStats[mappedKey] += clampedChange;
+        const newValue = newSaveState.context.scenarioStats[mappedKey];
+
+        // 변화 추적 기록
+        if (clampedChange !== 0) {
+          trackedStatChanges.push({
+            statId: mappedKey,
+            statName: statDef.name,
+            originalChange,
+            amplifiedChange,
+            appliedChange: clampedChange,
+            previousValue,
+            newValue,
+          });
+        }
 
         console.log(
           `📊 스탯 변화: ${mappedKey} | 원본: ${originalChange} | 증폭: ${amplifiedChange} | 실제 적용: ${clampedChange} | 현재 비율: ${percentage.toFixed(1)}%`,
         );
       } else {
         // 스탯 정의를 찾을 수 없는 경우 기본 증폭 적용
+        const previousValue = newSaveState.context.scenarioStats[mappedKey];
         const amplifiedChange = Math.round(scenarioStats[originalKey] * 2.0);
         newSaveState.context.scenarioStats[mappedKey] += amplifiedChange;
+        const newValue = newSaveState.context.scenarioStats[mappedKey];
+
+        if (amplifiedChange !== 0) {
+          trackedStatChanges.push({
+            statId: mappedKey,
+            statName: mappedKey,
+            originalChange: scenarioStats[originalKey],
+            amplifiedChange,
+            appliedChange: amplifiedChange,
+            previousValue,
+            newValue,
+          });
+        }
       }
     }
   }
@@ -442,12 +482,24 @@ const updateSaveState = (
       ) {
         // 키는 항상 알파벳 순으로 정렬하여 일관성 유지
         const key = [personA, personB].sort().join('-');
+        const previousValue = newSaveState.community.hiddenRelationships[key] ?? 0;
         if (newSaveState.community.hiddenRelationships[key] === undefined) {
           newSaveState.community.hiddenRelationships[key] = 0;
         }
         // 관계값 변경 후 -100 ~ 100 범위로 clamp
         const newRelationValue = newSaveState.community.hiddenRelationships[key] + value;
         newSaveState.community.hiddenRelationships[key] = Math.max(-100, Math.min(100, newRelationValue));
+
+        // 관계 변화 추적
+        if (value !== 0) {
+          trackedRelationshipChanges.push({
+            pair: key,
+            change: value,
+            previousValue,
+            newValue: newSaveState.community.hiddenRelationships[key],
+          });
+        }
+
         console.log(
           `🤝 관계도 변경: ${key} | 변화: ${value} | 현재: ${newSaveState.community.hiddenRelationships[key]}`,
         );
@@ -470,6 +522,8 @@ const updateSaveState = (
         } else {
           newSaveState.context.flags[flag] = true;
         }
+        // 새로운 플래그 획득 추적
+        trackedFlagsAcquired.push(flag);
         console.log(
           `🚩 새로운 플래그 획득: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
         );
@@ -735,6 +789,38 @@ const updateSaveState = (
           `${a.characterName}(신뢰:${a.trustLevel}, 순간:${a.moments.length})`,
       ),
     );
+  }
+
+  // 변화 요약 생성 및 저장
+  const hasAnyChanges =
+    trackedStatChanges.length > 0 ||
+    trackedRelationshipChanges.length > 0 ||
+    trackedFlagsAcquired.length > 0;
+
+  if (hasAnyChanges) {
+    const changeSummary: ChangeSummaryData = {
+      statChanges: trackedStatChanges,
+      relationshipChanges: trackedRelationshipChanges,
+      flagsAcquired: trackedFlagsAcquired,
+      timestamp: Date.now(),
+    };
+
+    // 변화 요약을 chat history에 추가
+    newSaveState.chatHistory.push({
+      type: 'change-summary',
+      content: '', // 내용은 changeSummary에서 렌더링
+      timestamp: Date.now() + 1,
+      changeSummary,
+    });
+
+    // lastChangeSummary도 저장 (필요 시 참조용)
+    newSaveState.lastChangeSummary = changeSummary;
+
+    console.log('📋 변화 요약:', {
+      stats: trackedStatChanges.length,
+      relationships: trackedRelationshipChanges.length,
+      flags: trackedFlagsAcquired.length,
+    });
   }
 
   return newSaveState;

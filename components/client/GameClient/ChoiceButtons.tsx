@@ -117,7 +117,8 @@ const ChoiceButton = ({
   urgency?: boolean;
   showHints?: boolean;
 }) => {
-  const [isHintVisible, setIsHintVisible] = useState(false);
+  // 기본적으로 힌트 표시 (사용자가 숨기기 가능)
+  const [isHintVisible, setIsHintVisible] = useState(true);
 
   const baseClasses =
     'flex-1 p-4 font-bold transition-all duration-300 transform hover:-translate-y-1 active:scale-95 min-h-[48px] relative overflow-hidden border';
@@ -204,18 +205,18 @@ const ChoiceButton = ({
         {urgency && (
           <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-yellow-400/20 to-orange-400/20" />
         )}
-        {/* 힌트 토글 버튼 */}
-        {showHints && hint && hint.category !== 'general' && (
+        {/* 힌트 토글 버튼 - 힌트가 표시 중일 때만 숨기기 버튼 표시 */}
+        {showHints && hint && hint.category !== 'general' && isHintVisible && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setIsHintVisible(!isHintVisible);
+              setIsHintVisible(false);
             }}
-            className="absolute right-2 top-2 z-20 rounded-full bg-black/30 p-1 transition-colors hover:bg-black/50"
-            aria-label="힌트 보기"
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1 text-[10px] text-white/50 transition-colors hover:bg-black/70 hover:text-white/80"
+            aria-label="힌트 숨기기"
           >
-            <Info className="h-3 w-3 text-white/70" />
+            ✕
           </button>
         )}
       </button>

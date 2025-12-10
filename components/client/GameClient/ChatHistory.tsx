@@ -1,5 +1,6 @@
-import { SaveState } from '@/types';
+import { SaveState, ChangeSummaryData } from '@/types';
 import { ChatMessage } from './ChatMessage';
+import { ChangeSummary } from './ChangeSummary';
 
 /**
  * AI 메시지를 대화/독백/서술 단위로 분리
@@ -82,9 +83,10 @@ const splitAIMessageIntoParts = (
 export const ChatHistory = ({ saveState }: { saveState: SaveState }) => {
   // 메시지를 처리하여 AI 메시지는 분리
   const processedMessages: Array<{
-    type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-thought' | 'ai-narration';
+    type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-thought' | 'ai-narration' | 'change-summary';
     content: string;
     timestamp: number;
+    changeSummary?: ChangeSummaryData;
   }> = [];
 
   saveState.chatHistory.forEach((message) => {
@@ -92,6 +94,14 @@ export const ChatHistory = ({ saveState }: { saveState: SaveState }) => {
       // AI 메시지는 대화/서술로 분리
       const parts = splitAIMessageIntoParts(message.content, message.timestamp);
       processedMessages.push(...parts);
+    } else if (message.type === 'change-summary') {
+      // 변화 요약 메시지는 그대로 (changeSummary 포함)
+      processedMessages.push({
+        type: 'change-summary',
+        content: message.content,
+        timestamp: message.timestamp,
+        changeSummary: message.changeSummary,
+      });
     } else {
       // 다른 타입은 그대로
       processedMessages.push(message);
@@ -107,6 +117,17 @@ export const ChatHistory = ({ saveState }: { saveState: SaveState }) => {
       <div className="mx-auto max-w-2xl pt-4">
         {processedMessages.map((message, index) => {
           const isLatest = index === processedMessages.length - 1;
+
+          // 변화 요약 메시지는 ChangeSummary 컴포넌트로 렌더링
+          if (message.type === 'change-summary' && message.changeSummary) {
+            return (
+              <ChangeSummary
+                key={`${message.timestamp}-${index}`}
+                data={message.changeSummary}
+                isCompact={false}
+              />
+            );
+          }
 
           return (
             <ChatMessage
