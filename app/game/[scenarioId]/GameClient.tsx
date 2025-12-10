@@ -1488,21 +1488,60 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 대화 후 선택 모드로 복귀
 
-      // Day 전환 시 엔딩 체크
-      if (shouldAdvanceDay && newDay && newDay >= 5) {
+      if (shouldAdvanceDay) {
+        console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
+      }
+
+      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      const currentDay = stateAfterAP.context.currentDay || 1;
+      const survivorCount = stateAfterAP.community.survivors.length;
+
+      if (currentDay >= 5) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
           traits: [],
           relationships: stateAfterAP.community.hiddenRelationships,
         };
-        const ending = checkEndingConditions(
+
+        let ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
-          stateAfterAP.community.survivors.length
+          survivorCount
         );
+
         if (ending) {
-          console.log(`🎯 Day ${newDay} 대화 후 엔딩 조건 만족: ${ending.title}`);
+          console.log(`🎯 Day ${currentDay} 대화 후 엔딩 조건 만족: ${ending.title}`);
+        }
+
+        // 시간제한 엔딩 체크 (handlePlayerChoice와 동일)
+        if (!ending && scenario.endCondition.type === 'time_limit') {
+          const timeLimit = scenario.endCondition.value || 0;
+          const currentHours = stateAfterAP.context.remainingHours || Infinity;
+          const isTimeUp =
+            scenario.endCondition.unit === 'days'
+              ? currentDay > timeLimit
+              : currentHours <= 0;
+
+          if (isTimeUp) {
+            console.log(`⏰ 시간 제한 도달! Day ${currentDay}/${timeLimit}`);
+            ending = checkEndingConditions(currentPlayerState, scenario.endingArchetypes, survivorCount);
+            if (!ending) {
+              ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
+            }
+            if (!ending) {
+              ending = {
+                endingId: 'DEFAULT_TIME_UP',
+                title: '결단의 시간',
+                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                systemConditions: [],
+                isGoalSuccess: false,
+              };
+            }
+          }
+        }
+
+        if (ending) {
           setTriggeredEnding(ending);
         }
       }
@@ -1619,21 +1658,60 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 탐색 후 선택 모드로 복귀
 
-      // Day 전환 시 엔딩 체크
-      if (shouldAdvanceDay && newDay && newDay >= 5) {
+      if (shouldAdvanceDay) {
+        console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
+      }
+
+      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      const currentDay = stateAfterAP.context.currentDay || 1;
+      const survivorCount = stateAfterAP.community.survivors.length;
+
+      if (currentDay >= 5) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
           traits: [],
           relationships: stateAfterAP.community.hiddenRelationships,
         };
-        const ending = checkEndingConditions(
+
+        let ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
-          stateAfterAP.community.survivors.length
+          survivorCount
         );
+
         if (ending) {
-          console.log(`🎯 Day ${newDay} 탐색 후 엔딩 조건 만족: ${ending.title}`);
+          console.log(`🎯 Day ${currentDay} 탐색 후 엔딩 조건 만족: ${ending.title}`);
+        }
+
+        // 시간제한 엔딩 체크 (handlePlayerChoice와 동일)
+        if (!ending && scenario.endCondition.type === 'time_limit') {
+          const timeLimit = scenario.endCondition.value || 0;
+          const currentHours = stateAfterAP.context.remainingHours || Infinity;
+          const isTimeUp =
+            scenario.endCondition.unit === 'days'
+              ? currentDay > timeLimit
+              : currentHours <= 0;
+
+          if (isTimeUp) {
+            console.log(`⏰ 시간 제한 도달! Day ${currentDay}/${timeLimit}`);
+            ending = checkEndingConditions(currentPlayerState, scenario.endingArchetypes, survivorCount);
+            if (!ending) {
+              ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
+            }
+            if (!ending) {
+              ending = {
+                endingId: 'DEFAULT_TIME_UP',
+                title: '결단의 시간',
+                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                systemConditions: [],
+                isGoalSuccess: false,
+              };
+            }
+          }
+        }
+
+        if (ending) {
           setTriggeredEnding(ending);
         }
       }
@@ -1741,8 +1819,10 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);
       }
 
-      // 엔딩 체크 (stateAfterAP 사용)
+      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
+      const survivorCount = stateAfterAP.community.survivors.length;
+
       if (currentDay >= 5) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
@@ -1750,14 +1830,45 @@ export default function GameClient({ scenario }: GameClientProps) {
           traits: [],
           relationships: stateAfterAP.community.hiddenRelationships,
         };
-        const survivorCount = stateAfterAP.community.survivors.length;
-        const ending = checkEndingConditions(
+
+        let ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
           survivorCount,
         );
+
         if (ending) {
           console.log(`🎯 Day ${currentDay} 자유 입력 후 엔딩 조건 만족: ${ending.title}`);
+        }
+
+        // 시간제한 엔딩 체크 (handlePlayerChoice와 동일)
+        if (!ending && scenario.endCondition.type === 'time_limit') {
+          const timeLimit = scenario.endCondition.value || 0;
+          const currentHours = stateAfterAP.context.remainingHours || Infinity;
+          const isTimeUp =
+            scenario.endCondition.unit === 'days'
+              ? currentDay > timeLimit
+              : currentHours <= 0;
+
+          if (isTimeUp) {
+            console.log(`⏰ 시간 제한 도달! Day ${currentDay}/${timeLimit}`);
+            ending = checkEndingConditions(currentPlayerState, scenario.endingArchetypes, survivorCount);
+            if (!ending) {
+              ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
+            }
+            if (!ending) {
+              ending = {
+                endingId: 'DEFAULT_TIME_UP',
+                title: '결단의 시간',
+                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                systemConditions: [],
+                isGoalSuccess: false,
+              };
+            }
+          }
+        }
+
+        if (ending) {
           setTriggeredEnding(ending);
         }
       }
