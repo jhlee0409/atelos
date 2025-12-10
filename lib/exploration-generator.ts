@@ -133,11 +133,13 @@ export const generateExplorationResult = async (
   scenario: ScenarioData
 ): Promise<ExplorationResult> => {
   try {
-    const prompt = buildExplorationPrompt(location, saveState, scenario);
+    const userPrompt = buildExplorationPrompt(location, saveState, scenario);
 
     console.log(`🔍 탐색 결과 생성 요청: ${location.name}`);
 
-    const response = await callGeminiAPI(prompt, {
+    const response = await callGeminiAPI({
+      systemPrompt: `당신은 ${scenario.title}의 게임 마스터입니다. 플레이어의 탐색 행동에 대한 결과를 JSON 형식으로 생성합니다.`,
+      userPrompt,
       temperature: 0.7,
       maxTokens: 400,
     });

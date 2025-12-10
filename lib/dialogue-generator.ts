@@ -182,11 +182,13 @@ export const generateDialogueResponse = async (
   scenario: ScenarioData
 ): Promise<DialogueResponse> => {
   try {
-    const prompt = buildDialoguePrompt(characterName, topic, saveState, scenario);
+    const userPrompt = buildDialoguePrompt(characterName, topic, saveState, scenario);
 
     console.log(`💬 캐릭터 대화 생성 요청: ${characterName} - ${topic.label}`);
 
-    const response = await callGeminiAPI(prompt, {
+    const response = await callGeminiAPI({
+      systemPrompt: `당신은 ${scenario.title}의 캐릭터 "${characterName}"입니다. 플레이어와의 대화에 자연스럽게 응답합니다. JSON 형식으로 응답하세요.`,
+      userPrompt,
       temperature: 0.8, // 대화는 좀 더 다양하게
       maxTokens: 500, // 짧은 응답
     });
