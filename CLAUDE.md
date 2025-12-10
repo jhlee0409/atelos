@@ -56,11 +56,16 @@ atelos/
 │   ├── client/GameClient/            # Game UI components
 │   │   ├── ChatHistory.tsx           # Message history display
 │   │   ├── ChatMessage.tsx           # Individual message component
-│   │   ├── ChoiceButtons.tsx         # Player choice interface
+│   │   ├── ChoiceButtons.tsx         # Player choice interface (+ free text input)
 │   │   ├── StatsBar.tsx              # Compact stat display
-│   │   ├── StatDisplay.tsx           # Detailed stat visualization
+│   │   ├── StatDisplay.tsx           # Detailed stat visualization (+ amplification tooltip)
 │   │   ├── CharacterArcPanel.tsx     # Character mood/trust display
-│   │   └── RouteIndicator.tsx        # Narrative route tracker
+│   │   ├── RouteIndicator.tsx        # Narrative route tracker
+│   │   ├── CharacterDialoguePanel.tsx # Phase 3: Character conversation system
+│   │   ├── ExplorationPanel.tsx      # Phase 3: Location exploration system
+│   │   ├── TimelineProgress.tsx      # Phase 3: Day/time visualization
+│   │   ├── EndingProgress.tsx        # Phase 2: Ending progress tracker
+│   │   └── KeyDecisionPanel.tsx      # Phase 2: Decision history panel
 │   ├── admin/ScenarioEditor/         # Scenario editor components
 │   │   ├── BaseContent.tsx           # Basic scenario info
 │   │   ├── CharacterContent.tsx      # Character management
@@ -86,6 +91,8 @@ atelos/
 │   ├── game-builder.ts               # Initial game state & fallbacks
 │   ├── chat-history-manager.ts       # Chat history compression
 │   ├── simulation-utils.ts           # Stat calculations & dilemmas
+│   ├── dialogue-generator.ts         # Phase 3: Character dialogue AI generation
+│   ├── exploration-generator.ts      # Phase 3: Location exploration AI generation
 │   ├── validations.ts                # Form validation schemas
 │   └── utils.ts                      # General utilities (cn, etc.)
 ├── constants/
@@ -198,6 +205,41 @@ Tracks character development throughout the game:
 - **Trust Level**: -100 to 100, displayed via border colors
 - **Moments**: Events that shape character development
 
+#### Game Modes System (Phase 3)
+
+The game supports multiple interaction modes beyond standard choice selection:
+
+**Game Mode Types** (`GameMode` type):
+- `choice`: Default mode - player selects from AI-generated choices
+- `dialogue`: Character conversation mode - talk with NPCs
+- `exploration`: Location exploration mode - investigate areas
+
+**Character Dialogue System** (`CharacterDialoguePanel.tsx`, `dialogue-generator.ts`):
+- Players can initiate conversations with any available character
+- Topic categories: `info` (정보), `advice` (조언), `relationship` (관계), `personal` (개인)
+- Topics generated dynamically based on character role
+- AI generates contextual dialogue responses
+- Can affect relationship values and provide in-game information
+- Fallback responses available when AI fails
+
+**Exploration System** (`ExplorationPanel.tsx`, `exploration-generator.ts`):
+- Day-gated locations: storage, entrance, medical (Day 1+), roof (Day 3+), basement (Day 5+)
+- Genre-specific locations (e.g., crew quarters for SF scenarios)
+- AI generates exploration narratives and rewards
+- Rewards include: stat changes, flag acquisition, information
+- Fallback results for each location type
+
+**Free Text Input** (`ChoiceButtons.tsx`):
+- Optional player-written actions (max 200 characters)
+- Processed by AI as custom player input
+- Available via "다른 행동" toggle in choice interface
+
+**Timeline Visualization** (`TimelineProgress.tsx`):
+- Day progress bar with day markers
+- Time of day indicator (morning/afternoon/evening/night based on turns)
+- Remaining days warning (urgent at Day 6+)
+- Compact version available for StatsBar integration
+
 ### Component Architecture
 
 #### GameClient.tsx (Main Game Component)
@@ -207,11 +249,16 @@ State management:
 - `isLoading` / `isInitialDilemmaLoading`: Loading states
 - `triggeredEnding`: Active ending state
 - `languageWarning`: AI language issue notifications
+- `gameMode`: Current interaction mode ('choice' | 'dialogue' | 'exploration')
+- `isDialogueLoading` / `isExplorationLoading`: Mode-specific loading states
 
 Key functions:
 - `createInitialSaveState()`: Initialize game from scenario with character arcs
 - `updateSaveState()`: Apply AI response changes with stat amplification
 - `handlePlayerChoice()`: Process player selection and call AI
+- `handleDialogueSelect()`: Process character dialogue interactions (Phase 3)
+- `handleExplore()`: Process location exploration (Phase 3)
+- `handleFreeTextSubmit()`: Process free text player input (Phase 3)
 
 ### Data Flow
 
