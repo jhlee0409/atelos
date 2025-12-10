@@ -1,8 +1,32 @@
 import { cn, escapeHtml, sanitizeHtml } from '@/lib/utils';
 import { getChoiceHint, formatImpactsForUI } from '@/lib/game-ai-client';
-import { SaveState, GameMode } from '@/types';
-import { AlertTriangle, Info, MessageCircle, Send, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { SaveState, GameMode, ActionType } from '@/types';
+import { AlertTriangle, Info, MessageCircle, Send, MapPin, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+
+/** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
+const DEFAULT_ACTION_POINTS = 3;
+
+/** 행동 유형별 AP 비용 */
+const ACTION_COSTS: Record<ActionType, number> = {
+  choice: 1,
+  dialogue: 1,
+  exploration: 1,
+  freeText: 1,
+};
+
+/** AP 비용 배지 컴포넌트 */
+const APCostBadge = ({ cost, isDisabled = false }: { cost: number; isDisabled?: boolean }) => (
+  <span className={cn(
+    "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]",
+    isDisabled
+      ? "bg-zinc-800 text-zinc-600"
+      : "bg-blue-900/50 text-blue-300"
+  )}>
+    <Zap className="h-2.5 w-2.5" />
+    <span>{cost}</span>
+  </span>
+);
 
 export const ChoiceButtons = ({
   isLoading,
@@ -37,6 +61,20 @@ export const ChoiceButtons = ({
   const [freeText, setFreeText] = useState('');
   const [showActions, setShowActions] = useState(false);
   const freeTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // AP 관련 계산
+  const currentAP = saveState.context.actionPoints ?? DEFAULT_ACTION_POINTS;
+  const maxAP = saveState.context.maxActionPoints ?? DEFAULT_ACTION_POINTS;
+
+  // 각 행동별 AP 충족 여부
+  const canDoChoice = currentAP >= ACTION_COSTS.choice;
+  const canDoDialogue = currentAP >= ACTION_COSTS.dialogue;
+  const canDoExploration = currentAP >= ACTION_COSTS.exploration;
+  const canDoFreeText = currentAP >= ACTION_COSTS.freeText;
+
+  // AP 부족 상태
+  const isAPDepleted = currentAP === 0;
+  const isLowAP = currentAP === 1;
 
   // 자유 입력 필드 포커스
   useEffect(() => {
@@ -117,17 +155,34 @@ export const ChoiceButtons = ({
   return (
     <div className="sticky bottom-0 z-10 bg-gradient-to-t from-telos-black via-telos-black/95 to-transparent p-4">
       <div className="mx-auto max-w-2xl">
+        {/* AP 부족 경고 배너 */}
+        {isAPDepleted && (
+          <div className="mb-3 flex items-center justify-center gap-2 rounded-lg border border-orange-800/50 bg-orange-950/30 px-4 py-2 text-orange-400">
+            <Zap className="h-4 w-4" />
+            <span className="text-sm">행동력을 모두 사용했습니다. 다음 날을 기다려주세요.</span>
+          </div>
+        )}
+
+        {/* 마지막 행동 경고 */}
+        {isLowAP && !isAPDepleted && (
+          <div className="mb-3 flex items-center justify-center gap-2 rounded-lg border border-yellow-800/50 bg-yellow-950/20 px-4 py-2 text-yellow-400">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="text-sm">마지막 행동입니다. 신중하게 선택하세요.</span>
+          </div>
+        )}
+
         {/* Dilemma Prompt */}
         <DilemmaPrompt prompt={saveState.dilemma.prompt} isUrgent={isUrgent} />
+
         {/* Choice Buttons - 3개 선택지 */}
-        <div className="flex flex-col space-y-2">
+        <div className={cn("flex flex-col space-y-2", isAPDepleted && "opacity-50 pointer-events-none")}>
           {/* 상단: 적극적/신중한 선택지 2개 */}
           <div className="flex space-x-3">
             <ChoiceButton
               choice={saveState.dilemma.choice_a}
               onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
               variant="primary"
-              disabled={isLoading}
+              disabled={isLoading || !canDoChoice}
               urgency={isUrgent}
               choiceType="active"
             />
@@ -135,7 +190,7 @@ export const ChoiceButtons = ({
               choice={saveState.dilemma.choice_b}
               onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
               variant="secondary"
-              disabled={isLoading || !saveState.dilemma.choice_b}
+              disabled={isLoading || !saveState.dilemma.choice_b || !canDoChoice}
               urgency={isUrgent}
               choiceType="cautious"
             />
@@ -146,7 +201,7 @@ export const ChoiceButtons = ({
               choice={saveState.dilemma.choice_c}
               onClick={() => handlePlayerChoice(saveState.dilemma.choice_c!)}
               variant="tertiary"
-              disabled={isLoading}
+              disabled={isLoading || !canDoChoice}
               urgency={false}
               choiceType="wait"
             />
@@ -169,41 +224,62 @@ export const ChoiceButtons = ({
         {/* 추가 액션 패널 */}
         {showActions && (
           <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-            {/* 캐릭터 대화 & 탐색 버튼 */}
+            {/* 캐릭터 대화 & 탐색 버튼 (AP 비용 표시) */}
             <div className="flex gap-2">
               {enableDialogue && onOpenDialogue && (
                 <button
                   onClick={onOpenDialogue}
-                  disabled={isLoading}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading || !canDoDialogue}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all",
+                    canDoDialogue
+                      ? "border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600"
+                      : "border-zinc-800 bg-zinc-950/50 text-zinc-600 cursor-not-allowed",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
                 >
                   <MessageCircle className="h-4 w-4" />
                   <span>캐릭터와 대화</span>
+                  <APCostBadge cost={ACTION_COSTS.dialogue} isDisabled={!canDoDialogue} />
                 </button>
               )}
               {enableExploration && onOpenExploration && (
                 <button
                   onClick={onOpenExploration}
-                  disabled={isLoading}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading || !canDoExploration}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all",
+                    canDoExploration
+                      ? "border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600"
+                      : "border-zinc-800 bg-zinc-950/50 text-zinc-600 cursor-not-allowed",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
                 >
                   <MapPin className="h-4 w-4" />
                   <span>주변 탐색</span>
+                  <APCostBadge cost={ACTION_COSTS.exploration} isDisabled={!canDoExploration} />
                 </button>
               )}
             </div>
 
-            {/* 자유 텍스트 입력 */}
+            {/* 자유 텍스트 입력 (AP 비용 표시) */}
             {enableFreeText && onFreeTextSubmit && (
               <div className="space-y-2">
                 {!showFreeTextInput ? (
                   <button
                     onClick={() => setShowFreeTextInput(true)}
-                    disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-zinc-950/50 px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-900 hover:border-zinc-600 hover:text-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isLoading || !canDoFreeText}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm transition-all",
+                      canDoFreeText
+                        ? "border-zinc-700 bg-zinc-950/50 text-zinc-500 hover:bg-zinc-900 hover:border-zinc-600 hover:text-zinc-300"
+                        : "border-zinc-800 bg-zinc-950/50 text-zinc-600 cursor-not-allowed",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
                   >
                     <Send className="h-3 w-3" />
                     <span>직접 행동 입력</span>
+                    <APCostBadge cost={ACTION_COSTS.freeText} isDisabled={!canDoFreeText} />
                   </button>
                 ) : (
                   <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 p-2">
