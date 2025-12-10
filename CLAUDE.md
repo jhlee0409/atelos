@@ -450,3 +450,85 @@ Custom colors defined in `tailwind.config.ts`:
 1. Check `ADMIN_PASSWORD` environment variable is set
 2. Clear sessionStorage if stuck (`sessionStorage.removeItem('atelos_admin_auth')`)
 3. Verify `/api/admin/auth` endpoint is responding
+
+## 🚨 Development Checklist (MANDATORY)
+
+**이 체크리스트는 기능 구현/개선 시 반드시 따라야 합니다.**
+
+### 기능 구현 완료 후 자동 검증 단계
+
+모든 기능 구현/개선 작업 후, 다음을 **자동으로** 수행:
+
+#### 1. 타입 일관성 검증
+- [ ] 새로 추가한 타입이 `types/index.ts`에 정의되어 있는가?
+- [ ] 해당 타입을 사용하는 모든 파일에서 import 되었는가?
+- [ ] Optional 필드(`?`)와 required 필드가 일관되게 처리되는가?
+
+#### 2. 함수 호출 체인 검증
+- [ ] 새로운 파라미터를 추가했다면, 호출하는 **모든 곳**에서 전달되는가?
+- [ ] 함수 시그니처 변경 시, 모든 호출부가 업데이트 되었는가?
+- [ ] API 함수 호출 시그니처가 올바른가? (예: `callGeminiAPI({...})` 형식)
+
+#### 3. 데이터 흐름 검증
+```
+GameClient.tsx → game-ai-client.ts → prompt-builder.ts → gemini-client.ts
+                                   → context-manager.ts
+                                   → exploration-generator.ts
+                                   → dialogue-generator.ts
+```
+- [ ] 새로운 상태/데이터가 이 체인 전체에서 올바르게 전달되는가?
+- [ ] 상태 업데이트가 모든 관련 핸들러에서 동일하게 처리되는가?
+
+#### 4. 핸들러 일관성 검증
+GameClient의 4개 주요 핸들러에 동일한 로직이 필요한 경우:
+- [ ] `handlePlayerChoice()` - 선택지 처리
+- [ ] `handleDialogueSelect()` - 대화 처리
+- [ ] `handleExplore()` - 탐색 처리
+- [ ] `handleFreeTextSubmit()` - 자유 입력 처리
+
+#### 5. AI 프롬프트 통합 검증
+새로운 컨텍스트/데이터를 AI에 전달해야 하는 경우:
+- [ ] `prompt-builder.ts`의 `buildOptimizedGamePrompt()` 옵션에 추가되었는가?
+- [ ] `prompt-builder-optimized.ts`의 `buildOptimizedGamePromptV2()` 옵션에 추가되었는가?
+- [ ] `game-ai-client.ts`의 호출부에서 해당 옵션을 전달하는가?
+- [ ] `exploration-generator.ts`에서 해당 컨텍스트를 사용하는가?
+- [ ] `dialogue-generator.ts`에서 해당 컨텍스트를 사용하는가?
+
+#### 6. UI 컴포넌트 연동 검증
+상태 변경이 UI에 반영되어야 하는 경우:
+- [ ] 관련 UI 컴포넌트에 props가 전달되는가?
+- [ ] 상태 변경 시 리렌더링이 발생하는가?
+
+#### 7. 폴백/에러 처리 검증
+- [ ] AI 호출 실패 시 폴백 로직이 있는가?
+- [ ] Optional 데이터 접근 시 null/undefined 체크가 있는가?
+
+### 체크리스트 적용 예시
+
+```
+❌ 잘못된 패턴:
+"ActionContext 타입 추가했고, context-manager.ts 만들었습니다. 빌드 성공!"
+
+✅ 올바른 패턴:
+"ActionContext 타입 추가 완료. 검증 결과:
+- types/index.ts: ✅ 타입 정의됨
+- GameClient.tsx: ✅ 초기화 및 업데이트 로직 추가
+- 4개 핸들러: ✅ 모두 context 업데이트 호출
+- game-ai-client.ts: ✅ 프롬프트 빌더에 전달
+- prompt-builder.ts: ✅ 옵션 추가 및 프롬프트에 포함
+- prompt-builder-optimized.ts: ✅ 옵션 추가 및 프롬프트에 포함
+- exploration-generator.ts: ✅ context 사용
+- dialogue-generator.ts: ✅ context 사용
+모든 통합 지점 확인 완료."
+```
+
+### 현재 시스템 핵심 통합 지점
+
+| 시스템 | 초기화 | 업데이트 | AI 전달 | UI 표시 |
+|--------|--------|----------|---------|---------|
+| Action Gauge (AP) | `createInitialSaveState` | `consumeActionPoint` | N/A | `ChoiceButtons`, `TimelineProgress` |
+| ActionContext | `createInitialSaveState` | 4개 핸들러 | `prompt-builder*.ts` | N/A |
+| Character Arc | `createInitialSaveState` | `updateSaveState` | `prompt-builder.ts` | `CharacterArcPanel` |
+| Key Decisions | N/A | `handlePlayerChoice` | `prompt-builder*.ts` | `KeyDecisionPanel` |
+| Flags | `createInitialSaveState` | `updateSaveState` | `prompt-builder*.ts` | `RouteIndicator` |
+
