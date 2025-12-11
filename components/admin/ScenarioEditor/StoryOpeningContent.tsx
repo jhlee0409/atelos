@@ -13,9 +13,19 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, User, Zap, Users, Clock, MapPin, Palette } from 'lucide-react';
-import type { ScenarioData, StoryOpening, OpeningTone, CharacterIntroductionStyle } from '@/types';
-import { SetStateAction } from 'react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { BookOpen, User, Zap, Users, Clock, MapPin, Palette, Eye, EyeOff, Sparkles, ListOrdered, Plus, Trash2, Link2 } from 'lucide-react';
+import type {
+  ScenarioData,
+  StoryOpening,
+  OpeningTone,
+  CharacterIntroductionStyle,
+  CharacterIntroductionSequence,
+  HiddenNPCRelationship,
+  RelationshipVisibility,
+} from '@/types';
+import { SetStateAction, useState } from 'react';
 
 type Props = {
   scenario: ScenarioData;
@@ -47,6 +57,44 @@ const TIME_OF_DAY_OPTIONS: { value: NonNullable<StoryOpening['timeOfDay']>; labe
   { value: 'night', label: '밤', emoji: '🌙' },
 ];
 
+// [2025 Enhanced] NPC 관계 노출 모드 옵션
+const NPC_RELATIONSHIP_EXPOSURE_OPTIONS: {
+  value: NonNullable<StoryOpening['npcRelationshipExposure']>;
+  label: string;
+  description: string;
+  icon: 'hidden' | 'partial' | 'visible';
+}[] = [
+  {
+    value: 'hidden',
+    label: '숨김 (권장)',
+    description: 'NPC-NPC 관계를 플레이어가 발견할 때까지 완전히 숨김',
+    icon: 'hidden',
+  },
+  {
+    value: 'partial',
+    label: '일부 공개',
+    description: '일부 관계만 초기에 공개, 나머지는 숨김',
+    icon: 'partial',
+  },
+  {
+    value: 'visible',
+    label: '모두 공개 (기존 방식)',
+    description: '모든 NPC 관계를 처음부터 공개',
+    icon: 'visible',
+  },
+];
+
+// [2025 Enhanced] 캐릭터 만남 시점 옵션
+const EXPECTED_TIMING_OPTIONS: {
+  value: NonNullable<CharacterIntroductionSequence['expectedTiming']>;
+  label: string;
+}[] = [
+  { value: 'opening', label: '오프닝' },
+  { value: 'day1', label: '1일차' },
+  { value: 'day2', label: '2일차' },
+  { value: 'event-driven', label: '이벤트 기반' },
+];
+
 export default function StoryOpeningContent({ scenario, setScenario }: Props) {
   // 스토리 오프닝 업데이트 헬퍼
   const updateStoryOpening = (updates: Partial<StoryOpening>) => {
@@ -76,6 +124,11 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
   const storyOpening = scenario.storyOpening || {};
   const protagonistSetup = storyOpening.protagonistSetup || {};
 
+  // [2025 Enhanced] 1:1 소개 시퀀스 활성화 상태
+  const [useIntroSequence, setUseIntroSequence] = useState(
+    !!(storyOpening.characterIntroductionSequence && storyOpening.characterIntroductionSequence.length > 0)
+  );
+
   // 첫 번째 캐릭터 선택을 위한 옵션
   const characterOptions = scenario.characters
     .filter((c) => c.characterName !== '(플레이어)')
@@ -83,6 +136,49 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
       value: c.characterName,
       label: `${c.characterName} (${c.roleName})`,
     }));
+
+  // [2025 Enhanced] 캐릭터 소개 시퀀스 업데이트 헬퍼
+  const updateCharacterIntroSequence = (sequence: CharacterIntroductionSequence[]) => {
+    updateStoryOpening({ characterIntroductionSequence: sequence });
+  };
+
+  // [2025 Enhanced] 시퀀스에 캐릭터 추가
+  const addCharacterToSequence = () => {
+    const currentSequence = storyOpening.characterIntroductionSequence || [];
+    const usedCharacters = currentSequence.map((s) => s.characterName);
+    const availableCharacters = characterOptions.filter((c) => !usedCharacters.includes(c.value));
+
+    if (availableCharacters.length === 0) return;
+
+    const newSequence: CharacterIntroductionSequence[] = [
+      ...currentSequence,
+      {
+        characterName: availableCharacters[0].value,
+        order: currentSequence.length + 1,
+        encounterContext: '',
+        expectedTiming: currentSequence.length === 0 ? 'opening' : 'day1',
+      },
+    ];
+    updateCharacterIntroSequence(newSequence);
+  };
+
+  // [2025 Enhanced] 시퀀스에서 캐릭터 제거
+  const removeCharacterFromSequence = (index: number) => {
+    const currentSequence = storyOpening.characterIntroductionSequence || [];
+    const newSequence = currentSequence
+      .filter((_, i) => i !== index)
+      .map((item, i) => ({ ...item, order: i + 1 }));
+    updateCharacterIntroSequence(newSequence);
+  };
+
+  // [2025 Enhanced] 시퀀스 아이템 업데이트
+  const updateSequenceItem = (index: number, updates: Partial<CharacterIntroductionSequence>) => {
+    const currentSequence = storyOpening.characterIntroductionSequence || [];
+    const newSequence = currentSequence.map((item, i) =>
+      i === index ? { ...item, ...updates } : item
+    );
+    updateCharacterIntroSequence(newSequence);
+  };
 
   return (
     <div className="space-y-6">
@@ -375,6 +471,309 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
           <p className="mt-2 text-xs text-gray-500">
             AI가 이 키워드들을 오프닝에 자연스럽게 녹여서 작성합니다. 비워두면 시나리오 키워드를 사용합니다.
           </p>
+        </CardContent>
+      </Card>
+
+      <Separator className="my-8" />
+
+      {/* 2025 Enhanced Features Header */}
+      <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-indigo-700">
+            <Sparkles className="h-5 w-5" />
+            2025 Enhanced Features
+          </CardTitle>
+          <CardDescription className="text-indigo-600">
+            최신 인터랙티브 픽션 패턴을 적용한 고급 몰입감 향상 기능입니다.
+            <br />
+            <strong>핵심 변화:</strong> 1:1 캐릭터 소개 &bull; NPC 관계 숨김 &bull; 점진적 정보 공개
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* [2025 Enhanced] NPC 관계 노출 모드 */}
+      <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+            <Link2 className="h-5 w-5" />
+            NPC 관계 노출 설정
+          </CardTitle>
+          <CardDescription>
+            NPC들 간의 관계를 플레이어에게 어떻게 노출할지 설정합니다.
+            <br />
+            <strong className="text-indigo-600">&apos;숨김&apos;</strong>을 권장: 플레이어가 행동(대화, 탐색)을 통해 관계를 발견하면 몰입감이 높아집니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {NPC_RELATIONSHIP_EXPOSURE_OPTIONS.map((option) => (
+              <div
+                key={option.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                  (storyOpening.npcRelationshipExposure || 'hidden') === option.value
+                    ? 'border-indigo-400 bg-indigo-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => updateStoryOpening({ npcRelationshipExposure: option.value })}
+              >
+                <div className="flex h-5 w-5 items-center justify-center">
+                  {option.icon === 'hidden' && <EyeOff className="h-4 w-4 text-indigo-600" />}
+                  {option.icon === 'partial' && <Eye className="h-4 w-4 text-yellow-600" />}
+                  {option.icon === 'visible' && <Eye className="h-4 w-4 text-green-600" />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{option.label}</span>
+                    {option.value === 'hidden' && (
+                      <Badge variant="outline" className="bg-indigo-100 text-indigo-700 text-xs">
+                        권장
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">{option.description}</p>
+                </div>
+                <div className={`h-4 w-4 rounded-full border-2 ${
+                  (storyOpening.npcRelationshipExposure || 'hidden') === option.value
+                    ? 'border-indigo-500 bg-indigo-500'
+                    : 'border-gray-300'
+                }`}>
+                  {(storyOpening.npcRelationshipExposure || 'hidden') === option.value && (
+                    <div className="m-0.5 h-2 w-2 rounded-full bg-white" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 */}
+      <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+            <ListOrdered className="h-5 w-5" />
+            1:1 캐릭터 소개 시퀀스
+          </CardTitle>
+          <CardDescription>
+            주인공이 각 NPC를 개별적으로 만나는 순서와 상황을 정의합니다.
+            <br />
+            활성화하면 기존 &apos;캐릭터 소개 방식&apos; 설정 대신 이 시퀀스가 사용됩니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* 활성화 토글 */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div>
+              <Label className="font-medium">1:1 소개 시퀀스 사용</Label>
+              <p className="text-sm text-gray-500">
+                캐릭터들을 개별적으로 1:1로 만나도록 설정
+              </p>
+            </div>
+            <Switch
+              checked={useIntroSequence}
+              onCheckedChange={(checked) => {
+                setUseIntroSequence(checked);
+                if (!checked) {
+                  updateStoryOpening({ characterIntroductionSequence: undefined });
+                } else if (!storyOpening.characterIntroductionSequence?.length) {
+                  // 첫 번째 캐릭터 자동 추가
+                  if (characterOptions.length > 0) {
+                    updateCharacterIntroSequence([{
+                      characterName: characterOptions[0].value,
+                      order: 1,
+                      encounterContext: '',
+                      expectedTiming: 'opening',
+                    }]);
+                  }
+                }
+              }}
+            />
+          </div>
+
+          {/* 시퀀스 목록 */}
+          {useIntroSequence && (
+            <div className="space-y-3">
+              {(storyOpening.characterIntroductionSequence || []).map((item, index) => (
+                <div
+                  key={index}
+                  className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-indigo-100 text-indigo-700">
+                        {item.order}번째
+                      </Badge>
+                      <span className="font-medium text-indigo-800">만남</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCharacterFromSequence(index)}
+                      className="h-8 w-8 p-0 text-red-500 hover:bg-red-100 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <Label className="text-sm text-indigo-700">캐릭터</Label>
+                      <Select
+                        value={item.characterName}
+                        onValueChange={(value) => updateSequenceItem(index, { characterName: value })}
+                      >
+                        <SelectTrigger className="mt-1 border-indigo-200 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {characterOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-indigo-700">만남 시점</Label>
+                      <Select
+                        value={item.expectedTiming || 'day1'}
+                        onValueChange={(value) =>
+                          updateSequenceItem(index, {
+                            expectedTiming: value as CharacterIntroductionSequence['expectedTiming'],
+                          })
+                        }
+                      >
+                        <SelectTrigger className="mt-1 border-indigo-200 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXPECTED_TIMING_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <Label className="text-sm text-indigo-700">만남 상황</Label>
+                    <Textarea
+                      value={item.encounterContext}
+                      onChange={(e) => updateSequenceItem(index, { encounterContext: e.target.value })}
+                      placeholder="예: 혼란스러운 상황에서 우연히 마주침"
+                      className="mt-1 min-h-[60px] border-indigo-200 bg-white"
+                    />
+                  </div>
+
+                  <div className="mt-3">
+                    <Label className="text-sm text-indigo-700">첫인상 키워드 (쉼표로 구분)</Label>
+                    <Input
+                      value={item.firstImpressionKeywords?.join(', ') || ''}
+                      onChange={(e) => {
+                        const keywords = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                        updateSequenceItem(index, { firstImpressionKeywords: keywords });
+                      }}
+                      placeholder="예: 차분함, 신뢰감, 의심"
+                      className="mt-1 border-indigo-200 bg-white"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {/* 캐릭터 추가 버튼 */}
+              {characterOptions.length > (storyOpening.characterIntroductionSequence?.length || 0) && (
+                <Button
+                  variant="outline"
+                  onClick={addCharacterToSequence}
+                  className="w-full border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  캐릭터 만남 추가
+                </Button>
+              )}
+
+              {(storyOpening.characterIntroductionSequence?.length || 0) === 0 && (
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+                  <Users className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p>아직 추가된 캐릭터가 없습니다.</p>
+                  <p className="text-sm">위 버튼을 눌러 1:1 만남 순서를 추가하세요.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!useIntroSequence && (
+            <div className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-gray-500">
+              <EyeOff className="mx-auto mb-2 h-6 w-6 opacity-50" />
+              <p className="text-sm">
+                1:1 소개 시퀀스가 비활성화되어 있습니다.
+                <br />
+                기존 &apos;캐릭터 소개 방식&apos; 설정이 사용됩니다.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* [2025 Enhanced] 이머전트 내러티브 힌트 */}
+      <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+            <Sparkles className="h-5 w-5" />
+            이머전트 내러티브 (동적 스토리)
+          </CardTitle>
+          <CardDescription>
+            플레이어 행동 조합에 따라 동적으로 발생하는 스토리 이벤트를 위한 가이드라인입니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div>
+              <Label className="font-medium">이머전트 내러티브 활성화</Label>
+              <p className="text-sm text-gray-500">
+                플레이어 행동에서 자연스럽게 발생하는 동적 스토리 이벤트
+              </p>
+            </div>
+            <Switch
+              checked={storyOpening.emergentNarrative?.enabled || false}
+              onCheckedChange={(checked) => {
+                updateStoryOpening({
+                  emergentNarrative: {
+                    enabled: checked,
+                    triggers: storyOpening.emergentNarrative?.triggers || [],
+                    dynamicEventGuidelines: storyOpening.emergentNarrative?.dynamicEventGuidelines,
+                  },
+                });
+              }}
+            />
+          </div>
+
+          {storyOpening.emergentNarrative?.enabled && (
+            <div>
+              <Label className="text-sm font-medium text-gray-700">동적 이벤트 가이드라인 (AI용)</Label>
+              <Textarea
+                value={storyOpening.emergentNarrative?.dynamicEventGuidelines || ''}
+                onChange={(e) => {
+                  updateStoryOpening({
+                    emergentNarrative: {
+                      ...storyOpening.emergentNarrative,
+                      enabled: true,
+                      triggers: storyOpening.emergentNarrative?.triggers || [],
+                      dynamicEventGuidelines: e.target.value,
+                    },
+                  });
+                }}
+                placeholder="예: 캐릭터 A와 B가 모두 만난 후, 둘의 과거 관계에 대한 힌트를 자연스럽게 흘려주세요."
+                className="mt-1 min-h-[100px] border-socratic-grey bg-parchment-white"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                AI가 동적 이벤트를 생성할 때 참고할 가이드라인입니다.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

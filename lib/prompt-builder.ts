@@ -782,8 +782,11 @@ const CHARACTER_INTRO_GUIDELINES: Record<CharacterIntroductionStyle, string> = {
 };
 
 /**
- * 스토리 오프닝 생성을 위한 프롬프트 빌더
+ * 스토리 오프닝 생성을 위한 프롬프트 빌더 (2025 Enhanced)
  * 3단계 구조: 프롤로그 → 촉발 사건 → 첫 캐릭터 만남 → 첫 딜레마
+ * + 1:1 캐릭터 소개 시퀀스
+ * + 숨겨진 NPC 관계 인식 (AI가 숨겨진 관계를 노출하지 않도록)
+ * + 점진적 캐릭터 공개 가이드라인
  */
 export const buildStoryOpeningPrompt = (
   scenario: ScenarioData,
@@ -797,11 +800,112 @@ export const buildStoryOpeningPrompt = (
   const introStyle = storyOpening.characterIntroductionStyle || 'contextual';
   const timeOfDay = storyOpening.timeOfDay || 'morning';
   const protagonist = storyOpening.protagonistSetup || {};
+  const npcRelationshipExposure = storyOpening.npcRelationshipExposure || 'hidden';
 
-  // 첫 번째 만날 캐릭터 결정
-  const firstCharacter = storyOpening.firstCharacterToMeet
-    ? npcs.find((c) => c.characterName === storyOpening.firstCharacterToMeet) || npcs[0]
-    : npcs[0];
+  // [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 처리
+  const introSequence = storyOpening.characterIntroductionSequence;
+  let firstCharacter;
+  let introSequenceInfo = '';
+
+  if (introSequence && introSequence.length > 0) {
+    // 시퀀스가 있으면 order=1인 캐릭터를 첫 캐릭터로 설정
+    const firstInSequence = introSequence.find(s => s.order === 1);
+    if (firstInSequence) {
+      firstCharacter = npcs.find(c => c.characterName === firstInSequence.characterName);
+
+      // 1:1 소개 시퀀스 정보 생성
+      introSequenceInfo = `
+### [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 ###
+**중요**: 캐릭터들은 개별적으로, 1:1로 주인공과 만나야 합니다.
+- 여러 캐릭터가 동시에 등장하는 장면은 피하세요.
+- 오프닝에서는 첫 번째 캐릭터만 직접 등장합니다.
+- 다른 캐릭터들은 언급이나 암시만 가능합니다.
+
+첫 번째 만남:
+- 캐릭터: ${firstInSequence.characterName}
+- 상황: ${firstInSequence.encounterContext}
+${firstInSequence.firstImpressionKeywords ? `- 첫인상 키워드: ${firstInSequence.firstImpressionKeywords.join(', ')}` : ''}
+
+향후 만남 예정 (오프닝에서는 암시만):
+${introSequence.filter(s => s.order > 1).slice(0, 3).map(s =>
+  `- ${s.order}번째: ${s.characterName} (${s.expectedTiming || 'event-driven'})`
+).join('\n') || '없음'}
+`;
+    }
+  }
+
+  // 첫 캐릭터 결정 (시퀀스가 없는 경우 기존 로직)
+  if (!firstCharacter) {
+    firstCharacter = storyOpening.firstCharacterToMeet
+      ? npcs.find((c) => c.characterName === storyOpening.firstCharacterToMeet) || npcs[0]
+      : npcs[0];
+  }
+
+  // [2025 Enhanced] 숨겨진 NPC 관계 가이드라인
+  let hiddenRelationshipGuideline = '';
+  if (npcRelationshipExposure === 'hidden' || storyOpening.hiddenNPCRelationships) {
+    hiddenRelationshipGuideline = `
+### [2025 Enhanced] 숨겨진 NPC 관계 시스템 ###
+**매우 중요 - 반드시 준수**:
+1. NPC들 간의 관계는 주인공(플레이어)이 아직 모릅니다.
+2. 캐릭터들 사이의 관계를 직접적으로 언급하거나 암시하지 마세요.
+3. 각 캐릭터는 주인공에게 "처음 만나는 사람"처럼 소개되어야 합니다.
+4. NPC끼리 서로를 아는 듯한 대화나 눈짓을 묘사하지 마세요.
+5. 관계 발견은 플레이어의 행동(대화, 탐색)을 통해 점진적으로 이루어집니다.
+
+허용되는 것:
+- 각 캐릭터의 개인적인 성격, 외모, 첫인상 묘사
+- 주인공과 캐릭터 사이의 상호작용
+- 캐릭터가 자신에 대해 말하는 것
+
+금지되는 것:
+- "A와 B는 서로 알고 있는 것 같았다" ❌
+- "C의 눈빛이 D를 향해 흔들렸다" ❌
+- "E는 F와 무언가 비밀을 공유하는 듯했다" ❌
+`;
+  }
+
+  // [2025 Enhanced] 점진적 캐릭터 공개 가이드라인
+  let revelationGuideline = '';
+  if (storyOpening.characterRevelations && storyOpening.characterRevelations.length > 0) {
+    const firstCharRevelation = storyOpening.characterRevelations.find(
+      r => r.characterName === firstCharacter?.characterName
+    );
+    if (firstCharRevelation) {
+      // 가장 낮은 신뢰도 단계의 정보만 공개 가능
+      const lowestLayer = firstCharRevelation.revelationLayers
+        .sort((a, b) => a.trustThreshold - b.trustThreshold)[0];
+
+      revelationGuideline = `
+### [2025 Enhanced] 점진적 캐릭터 공개 ###
+${firstCharacter?.characterName}에 대해 공개 가능한 정보 (첫 만남):
+- 유형: ${lowestLayer?.revelationType || 'personality'}
+- 내용: ${lowestLayer?.content || '기본적인 성격만 드러남'}
+- 공개 방식: ${lowestLayer?.revelationStyle || 'subtle'}
+
+아직 숨겨야 할 정보:
+- 깊은 배경 스토리
+- 비밀이나 숨겨진 동기
+- 다른 캐릭터와의 관계
+
+첫 만남에서는 표면적인 인상만 주고, 깊은 정보는 신뢰도가 쌓인 후에 공개됩니다.
+`;
+    }
+  }
+
+  // [2025 Enhanced] 이머전트 내러티브 힌트
+  let emergentNarrativeHint = '';
+  if (storyOpening.emergentNarrative?.enabled) {
+    emergentNarrativeHint = `
+### [2025 Enhanced] 이머전트 내러티브 시스템 ###
+이 스토리는 플레이어의 행동에 따라 동적으로 전개됩니다.
+- 캐릭터 조합, 발견한 정보, 선택의 연쇄에 따라 새로운 이벤트가 발생합니다.
+- 오프닝에서는 향후 동적 이벤트의 씨앗을 심어두세요.
+- 미묘한 복선, 의미심장한 소품, 해결되지 않은 질문 등을 배치하세요.
+
+${storyOpening.emergentNarrative.dynamicEventGuidelines || ''}
+`;
+  }
 
   // 장르별 서사 스타일
   const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
@@ -813,7 +917,10 @@ export const buildStoryOpeningPrompt = (
 
   // 톤 가이드라인
   const toneGuideline = OPENING_TONE_GUIDELINES[openingTone];
-  const introGuideline = CHARACTER_INTRO_GUIDELINES[introStyle];
+  // 시퀀스가 있으면 시퀀스 정보 사용, 없으면 기존 introStyle 사용
+  const introGuideline = introSequence?.length
+    ? introSequenceInfo
+    : CHARACTER_INTRO_GUIDELINES[introStyle];
 
   // 캐릭터 정보 (첫 등장 캐릭터 상세 정보)
   const firstCharacterInfo = firstCharacter
@@ -839,7 +946,7 @@ ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
 `
     : '';
 
-  // 기존 캐릭터들 간략 정보 (관계 설정용)
+  // 기존 캐릭터들 간략 정보 (관계는 숨김 - 2025 Enhanced)
   const otherCharactersInfo = npcs
     .filter((c) => c !== firstCharacter)
     .slice(0, 3) // 최대 3명만
@@ -868,7 +975,7 @@ ${protagonistInfo}
 
 ${firstCharacterInfo}
 
-### 다른 주요 캐릭터들 (이번 오프닝에서는 암시만) ###
+### 다른 주요 캐릭터들 (이번 오프닝에서는 암시만, 직접 등장 금지) ###
 ${otherCharactersInfo || '없음'}
 
 ### 오프닝 설정 ###
@@ -879,6 +986,9 @@ ${otherCharactersInfo || '없음'}
 ${toneGuideline}
 
 ${introGuideline}
+${hiddenRelationshipGuideline}
+${revelationGuideline}
+${emergentNarrativeHint}
 
 ${genreGuide}
 
@@ -903,9 +1013,10 @@ ${storyOpening.incitingIncident
 - "이제 돌아갈 수 없다"는 느낌`}
 
 **3단계: 첫 캐릭터 만남 및 첫 딜레마 (100-150자)**
-- ${firstCharacter?.characterName || '첫 캐릭터'}의 등장
+- ${firstCharacter?.characterName || '첫 캐릭터'}의 등장 (1:1 만남)
 - 주인공과의 첫 대화 또는 상호작용
 - 이 만남으로 인해 발생하는 첫 번째 선택의 순간
+- **중요**: 이 장면에서는 오직 이 캐릭터만 직접 등장합니다
 
 ### CRITICAL KOREAN QUALITY REQUIREMENTS ###
 1. **순수 한국어**: 한글만 사용, 다른 언어 문자 절대 금지
@@ -914,11 +1025,18 @@ ${storyOpening.incitingIncident
 4. **줄바꿈으로 가독성**: 문단과 대화 사이에 \\n 사용
 5. **마크다운 강조**: **중요한 대사**, *감정 표현*
 
+### [2025 Enhanced] 몰입감 향상 규칙 ###
+6. **1:1 캐릭터 만남**: 첫 만남 장면에서는 오직 한 명의 캐릭터만 직접 등장
+7. **관계 비공개**: NPC들 간의 관계는 절대 언급하거나 암시하지 않음
+8. **미스터리 유지**: 캐릭터의 모든 정보를 한 번에 공개하지 않음
+9. **플레이어 에이전시**: 주인공이 알게 되는 정보는 플레이어 행동의 결과여야 함
+10. **복선 배치**: 향후 발견될 관계나 비밀의 미묘한 힌트만 배치
+
 ### OUTPUT FORMAT (JSON) ###
 {
   "prologue": "프롤로그 텍스트 (주인공의 일상, 100-150자, 줄바꿈 \\n 포함)",
   "incitingIncident": "촉발 사건 텍스트 (변화의 순간, 80-120자)",
-  "firstEncounter": "첫 캐릭터 만남 및 반응 (100-150자, 대화 포함)",
+  "firstEncounter": "첫 캐릭터와의 1:1 만남 (100-150자, 대화 포함, 다른 캐릭터 등장 금지)",
   "dilemma": {
     "prompt": "첫 번째 딜레마 상황 설명 (80-150자)",
     "choice_a": "적극적 선택 (15-50자, ~한다로 끝남)",
@@ -933,21 +1051,22 @@ ${storyOpening.incitingIncident
 - **빈 괄호 금지**: "()", "( )" 사용 금지
 - **JSON 외 텍스트 금지**: JSON 구조 외에 아무것도 출력하지 않음
 - **줄바꿈 표기**: 실제 줄바꿈은 \\n으로 표기
+- **NPC 관계 노출 금지**: A와 B의 관계를 암시하는 표현 금지
 
-### EXAMPLE OUTPUT ###
+### EXAMPLE OUTPUT (2025 Enhanced) ###
 {
   "prologue": "평범한 도시의 평범한 회사원 김민준.\\n\\n그의 삶은 어제까지 반복되는 서류 작업과 야근의 연속이었다. 매일 같은 지하철, 같은 커피, 같은 책상. *지루했지만 안정적이었다.*",
   "incitingIncident": "하지만 오늘, 모든 것이 변했다.\\n\\n손끝에서 푸른빛이 터져 나왔을 때, 그는 자신의 눈을 의심했다. **이게 대체 뭐지?** 억누를 수 없는 힘이 온몸을 휘감았다.",
-  "firstEncounter": "**\\"괜찮으세요, 민준 씨?\\"**\\n\\n최지혜가 조용히 다가왔다. 그녀의 눈빛에서 복잡한 감정을 읽을 수 있었다. 걱정인지, 아니면... 무언가를 알고 있는 듯한 눈빛인지.",
+  "firstEncounter": "**\\"괜찮으세요?\\"**\\n\\n낯선 여성이 조용히 다가왔다. 최지혜. 처음 보는 얼굴이었다. 그녀의 눈빛에서 복잡한 감정을 읽을 수 있었다. 걱정인지, 아니면... 호기심인지. *왜 이렇게 차분하지?* 민준은 의문을 품었다.",
   "dilemma": {
-    "prompt": "지혜가 무언가 알고 있는 것 같다. 이 이상한 힘에 대해 솔직하게 털어놓아야 할까, 아니면 아무 일 없는 척 해야 할까?",
-    "choice_a": "지혜에게 방금 일어난 일을 솔직하게 털어놓는다",
-    "choice_b": "아무 일 없는 척하며 화제를 돌린다",
-    "choice_c": "일단 그녀의 반응을 조용히 살펴본다"
+    "prompt": "처음 보는 사람이 다가왔다. 방금 일어난 이상한 일에 대해 어떻게 반응해야 할까?",
+    "choice_a": "솔직하게 방금 일어난 일에 대해 털어놓는다",
+    "choice_b": "아무 일 없는 척하며 대화를 피한다",
+    "choice_c": "일단 그녀의 의도를 파악하며 경계한다"
   }
 }
 
-Generate the opening scene following the 3-phase structure above. Make it emotionally engaging and establish character relationships naturally.`;
+Generate the opening scene following the 3-phase structure above. Make it emotionally engaging while respecting the 1:1 character introduction and hidden relationship rules.`;
 };
 
 /**
