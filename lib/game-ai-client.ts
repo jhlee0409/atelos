@@ -10,6 +10,11 @@ import {
   getGenericStatFilterPatterns,
   initScenarioMappingCache,
 } from './scenario-mapping-utils';
+import {
+  getTotalDays,
+  getGameplayConfig,
+  DEFAULT_GAMEPLAY_CONFIG,
+} from './gameplay-config';
 import type { ScenarioData, PlayerState, Character } from '@/types';
 
 // 언어 혼용 감지 및 정리 함수
@@ -612,6 +617,7 @@ export const generateGameResponse = async (
       saveState.context.currentDay || 1,
       remainingTokenBudget,
       undefined,
+      scenario,
     );
 
     // 최적화 v2 사용 여부 결정
@@ -645,6 +651,7 @@ export const generateGameResponse = async (
         saveState.context.currentDay || 1,
         'medium',
         sessionStats.totalTokensUsed,
+        scenario,
       );
 
       const promptComplexity: PromptComplexity = useLiteVersion
@@ -1242,11 +1249,18 @@ export const getOptimalAISettings = (
   currentDay: number = 1,
   gameComplexity: 'low' | 'medium' | 'high' = 'medium',
   sessionTokenUsage: number = 0,
+  scenario?: ScenarioData | null,
 ) => {
-  // 게임 진행도에 따른 프롬프트 복잡도 조절
-  const isEarlyGame = currentDay <= 2;
-  const isMidGame = currentDay >= 3 && currentDay <= 5;
-  const isEndGame = currentDay >= 6;
+  // 게임 진행도에 따른 프롬프트 복잡도 조절 (동적 계산)
+  const totalDays = getTotalDays(scenario);
+  const config = getGameplayConfig(scenario);
+  const ratios = config.narrativePhaseRatios ?? DEFAULT_GAMEPLAY_CONFIG.narrativePhaseRatios;
+  const dayRatio = currentDay / totalDays;
+
+  // 동적 단계 계산 (7일 기준: setup=0.3(Day2), rising=0.6(Day4), midpoint=0.75(Day5+))
+  const isEarlyGame = dayRatio <= ratios.setup; // 기본: Day 1-2
+  const isMidGame = dayRatio > ratios.setup && dayRatio < ratios.midpoint; // 기본: Day 3-5
+  const isEndGame = dayRatio >= ratios.midpoint; // 기본: Day 6+
 
   // 세션 토큰 사용량에 따른 자동 최적화
   const shouldUseLite = sessionTokenUsage > 12000; // 12K로 낮춰서 더 빨리 라이트 모드 활성화

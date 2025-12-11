@@ -1,5 +1,13 @@
-import { SaveState } from '@/types';
+import { SaveState, ScenarioData } from '@/types';
 import { Compass, Shield, Users, DoorOpen } from 'lucide-react';
+import {
+  isBeforeRouteActivation,
+  getTotalDays,
+  getEndingCheckDay,
+  calculateRouteScores,
+  getDominantRoute,
+  getRouteScores,
+} from '@/lib/gameplay-config';
 
 // 루트 타입 정의
 type RouteType = '탈출' | '항전' | '협상' | '미정';
@@ -11,20 +19,48 @@ interface RouteInfo {
   color: string;
 }
 
-// 루트 판정 로직
-const determineRoute = (saveState: SaveState): RouteInfo => {
+// 루트 타입에 따른 아이콘/컬러 매핑
+const ROUTE_DISPLAY_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+  '탈출': {
+    icon: <DoorOpen className="h-4 w-4" />,
+    color: 'text-blue-400',
+    label: '새로운 곳을 향해',
+  },
+  '항전': {
+    icon: <Shield className="h-4 w-4" />,
+    color: 'text-red-400',
+    label: '끝까지 지킨다',
+  },
+  '협상': {
+    icon: <Users className="h-4 w-4" />,
+    color: 'text-green-400',
+    label: '함께 살아남는다',
+  },
+  // 영문 매핑 (시나리오가 영문 루트 이름을 사용할 경우)
+  'escape': {
+    icon: <DoorOpen className="h-4 w-4" />,
+    color: 'text-blue-400',
+    label: '새로운 곳을 향해',
+  },
+  'defense': {
+    icon: <Shield className="h-4 w-4" />,
+    color: 'text-red-400',
+    label: '끝까지 지킨다',
+  },
+  'negotiation': {
+    icon: <Users className="h-4 w-4" />,
+    color: 'text-green-400',
+    label: '함께 살아남는다',
+  },
+};
+
+// 루트 판정 로직 (동적 점수 계산)
+const determineRoute = (saveState: SaveState, scenario?: ScenarioData | null): RouteInfo => {
   const { scenarioStats, flags } = saveState.context;
   const currentDay = saveState.context.currentDay ?? 1;
 
-  const communityCohesion = scenarioStats['communityCohesion'] ?? 50;
-
-  // 플래그 기반 루트 점수 계산
-  const escapeScore = calculateEscapeScore(flags);
-  const defenseScore = calculateDefenseScore(flags);
-  const negotiationScore = calculateNegotiationScore(flags, communityCohesion);
-
-  // Day 1-2: 아직 미정
-  if (currentDay <= 2) {
+  // 루트 활성화 전: 아직 미정 (동적 계산)
+  if (isBeforeRouteActivation(currentDay, scenario)) {
     return {
       type: '미정',
       label: '이야기가 시작됩니다',
@@ -33,10 +69,17 @@ const determineRoute = (saveState: SaveState): RouteInfo => {
     };
   }
 
-  // Day 3+: 루트 분기 시작
-  const maxScore = Math.max(escapeScore, defenseScore, negotiationScore);
+  // 동적 루트 점수 계산 (시나리오의 routeScores 설정 사용)
+  const routeScores = calculateRouteScores(
+    flags as Record<string, boolean | number>,
+    scenarioStats,
+    scenario
+  );
+  const dominantRoute = getDominantRoute(routeScores);
+  const maxScore = Math.max(...Object.values(routeScores));
 
-  if (maxScore < 20) {
+  // 점수가 너무 낮으면 아직 미정
+  if (maxScore < 20 || !dominantRoute) {
     return {
       type: '미정',
       label: '운명의 갈림길',
@@ -45,65 +88,36 @@ const determineRoute = (saveState: SaveState): RouteInfo => {
     };
   }
 
-  if (escapeScore >= defenseScore && escapeScore >= negotiationScore) {
+  // 루트별 표시 설정 가져오기 (한글/영문 모두 지원)
+  const displayConfig = ROUTE_DISPLAY_CONFIG[dominantRoute];
+  if (displayConfig) {
     return {
-      type: '탈출',
-      label: '새로운 곳을 향해',
-      icon: <DoorOpen className="h-4 w-4" />,
-      color: 'text-blue-400',
+      type: dominantRoute as RouteType,
+      label: displayConfig.label,
+      icon: displayConfig.icon,
+      color: displayConfig.color,
     };
   }
 
-  if (defenseScore >= negotiationScore) {
-    return {
-      type: '항전',
-      label: '끝까지 지킨다',
-      icon: <Shield className="h-4 w-4" />,
-      color: 'text-red-400',
-    };
-  }
-
+  // 설정에 없는 커스텀 루트의 경우 기본 스타일 적용
   return {
-    type: '협상',
-    label: '함께 살아남는다',
-    icon: <Users className="h-4 w-4" />,
-    color: 'text-green-400',
+    type: dominantRoute as RouteType,
+    label: dominantRoute,
+    icon: <Compass className="h-4 w-4" />,
+    color: 'text-yellow-400',
   };
 };
 
-// 탈출 루트 점수 (ZERO_HOUR.json 기준)
-const calculateEscapeScore = (flags: { [key: string]: boolean | number }): number => {
-  let score = 0;
-  if (flags['FLAG_ESCAPE_VEHICLE_SECURED']) score += 50; // route: 탈출
-  if (flags['FLAG_LEADER_SACRIFICE']) score += 30; // route: 탈출
-  return score;
-};
-
-// 항전 루트 점수 (ZERO_HOUR.json 기준)
-const calculateDefenseScore = (flags: { [key: string]: boolean | number }): number => {
-  let score = 0;
-  if (flags['FLAG_DEFENSES_COMPLETE']) score += 50; // route: 항전
-  if (flags['FLAG_RESOURCE_MONOPOLY']) score += 30; // route: 항전
-  if (flags['FLAG_IDEOLOGY_ESTABLISHED']) score += 20; // route: 항전
-  return score;
-};
-
-// 협상 루트 점수 (ZERO_HOUR.json 기준)
-const calculateNegotiationScore = (
-  flags: { [key: string]: boolean | number },
-  communityCohesion: number,
-): number => {
-  let score = 0;
-  if (flags['FLAG_ALLY_NETWORK_FORMED']) score += 50; // route: 협상
-  if (flags['FLAG_GOVERNMENT_CONTACT']) score += 30; // route: 협상
-  if (flags['FLAG_UNDERGROUND_HIDEOUT']) score += 20; // route: 협상
-  if (communityCohesion >= 70) score += 10;
-  else if (communityCohesion >= 50) score += 5;
-  return score;
-};
-
 // Day 진행 바 컴포넌트
-const DayProgressBar = ({ currentDay, maxDays = 7 }: { currentDay: number; maxDays?: number }) => {
+const DayProgressBar = ({
+  currentDay,
+  maxDays,
+  endingCheckDay,
+}: {
+  currentDay: number;
+  maxDays: number;
+  endingCheckDay: number;
+}) => {
   const progress = (currentDay / maxDays) * 100;
 
   return (
@@ -122,7 +136,7 @@ const DayProgressBar = ({ currentDay, maxDays = 7 }: { currentDay: number; maxDa
       </div>
       <div className="mt-1 flex justify-between text-[10px] text-zinc-600">
         <span>시작</span>
-        <span className="text-yellow-600">Day 5 엔딩 체크</span>
+        <span className="text-yellow-600">Day {endingCheckDay} 엔딩 체크</span>
         <span>종료</span>
       </div>
     </div>
@@ -131,13 +145,17 @@ const DayProgressBar = ({ currentDay, maxDays = 7 }: { currentDay: number; maxDa
 
 export const RouteIndicator = ({
   saveState,
+  scenario,
   isCompact = false,
 }: {
   saveState: SaveState;
+  scenario?: ScenarioData | null;
   isCompact?: boolean;
 }) => {
-  const routeInfo = determineRoute(saveState);
+  const routeInfo = determineRoute(saveState, scenario);
   const currentDay = saveState.context.currentDay ?? 1;
+  const totalDays = getTotalDays(scenario);
+  const endingCheckDay = getEndingCheckDay(scenario);
 
   if (isCompact) {
     // 컴팩트 모드: 기존 레이아웃 + 간단한 진행 바
@@ -149,14 +167,14 @@ export const RouteIndicator = ({
             <span className="text-xs text-zinc-400">{routeInfo.label}</span>
           </div>
           <span className="border border-red-900/50 bg-red-950/30 px-2 py-0.5 text-xs font-bold text-red-500">
-            Day {currentDay}/7
+            Day {currentDay}/{totalDays}
           </span>
         </div>
         {/* 컴팩트 진행 바 */}
         <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-800">
           <div
             className="h-full rounded-full bg-gradient-to-r from-red-900 to-red-600 transition-all duration-500"
-            style={{ width: `${(currentDay / 7) * 100}%` }}
+            style={{ width: `${(currentDay / totalDays) * 100}%` }}
           />
         </div>
       </div>
@@ -171,11 +189,11 @@ export const RouteIndicator = ({
           <span className={`text-sm ${routeInfo.color}`}>{routeInfo.label}</span>
         </div>
         <span className="border border-red-900/50 bg-red-950/30 px-2 py-0.5 text-xs font-bold text-red-500">
-          Day {currentDay}/7
+          Day {currentDay}/{totalDays}
         </span>
       </div>
       {/* 진행 바 추가 */}
-      <DayProgressBar currentDay={currentDay} maxDays={7} />
+      <DayProgressBar currentDay={currentDay} maxDays={totalDays} endingCheckDay={endingCheckDay} />
     </div>
   );
 };

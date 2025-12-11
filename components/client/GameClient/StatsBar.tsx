@@ -117,7 +117,7 @@ export const StatsBar = ({
       <div className="px-4 py-2">
         {/* 상단: 루트 인디케이터 + 행동 포인트 */}
         <div className="flex items-center justify-between gap-2">
-          <RouteIndicator saveState={saveState} isCompact={!isExpanded} />
+          <RouteIndicator saveState={saveState} scenario={scenario} isCompact={!isExpanded} />
           <ActionPointsDisplay
             current={currentAP}
             max={maxAP}

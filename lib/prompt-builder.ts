@@ -5,6 +5,11 @@ import {
   getNarrativeStyleFromGenres,
 } from './genre-narrative-styles';
 import { formatContextForPrompt } from './context-manager';
+import {
+  getTotalDays,
+  getGameplayConfig,
+  DEFAULT_GAMEPLAY_CONFIG,
+} from './gameplay-config';
 
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
@@ -28,11 +33,21 @@ export type PromptComplexity = 'minimal' | 'lite' | 'full' | 'detailed';
 // 3막 구조 서사 단계 정의
 export type NarrativePhase = 'setup' | 'rising_action' | 'midpoint' | 'climax';
 
-// 현재 일차에 따른 서사 단계 결정
-export const getNarrativePhase = (currentDay: number): NarrativePhase => {
-  if (currentDay <= 2) return 'setup';
-  if (currentDay <= 4) return 'rising_action';
-  if (currentDay === 5) return 'midpoint';
+/**
+ * 현재 일차에 따른 서사 단계 결정
+ * @param currentDay 현재 Day
+ * @param scenario 시나리오 데이터 (optional, 없으면 7일 기준 기본값 사용)
+ */
+export const getNarrativePhase = (currentDay: number, scenario?: ScenarioData | null): NarrativePhase => {
+  const totalDays = getTotalDays(scenario);
+  const config = getGameplayConfig(scenario);
+  const ratios = config.narrativePhaseRatios ?? DEFAULT_GAMEPLAY_CONFIG.narrativePhaseRatios;
+
+  const dayRatio = currentDay / totalDays;
+
+  if (dayRatio <= ratios.setup) return 'setup';
+  if (dayRatio <= ratios.rising_action) return 'rising_action';
+  if (dayRatio <= ratios.midpoint) return 'midpoint';
   return 'climax';
 };
 
@@ -259,7 +274,8 @@ const buildLitePrompt = (
   options: any,
 ): GamePromptData => {
   const currentDay = options.currentDay || 1;
-  const narrativePhase = getNarrativePhase(currentDay);
+  const totalDays = getTotalDays(scenario);
+  const narrativePhase = getNarrativePhase(currentDay, scenario);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
 
   // 장르별 서사 스타일 가져오기
@@ -312,7 +328,7 @@ Characters: ${characterInfo}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
 Active Flags: ${activeFlags || 'None'}
-Day: ${options.currentDay || 1}/7
+Day: ${options.currentDay || 1}/${totalDays}
 
 CRITICAL LANGUAGE REQUIREMENTS:
 1. **ONLY KOREAN**: Write exclusively in Korean. Never mix with Arabic, Thai, Hindi, or other languages.

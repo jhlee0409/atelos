@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils';
-import { EndingArchetype, SystemCondition } from '@/types';
+import { EndingArchetype, SystemCondition, ScenarioData } from '@/types';
 import { compareValues } from '@/constants/comparison-operators';
 import { getKoreanStatName, getKoreanFlagName } from '@/constants/korean-english-mapping';
 import { ChevronDown, ChevronUp, Target, Flag, Users, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { getRouteActivationDay, getEndingCheckDay } from '@/lib/gameplay-config';
 
 interface EndingProgressProps {
   endingArchetypes: EndingArchetype[];
@@ -11,6 +12,7 @@ interface EndingProgressProps {
   currentFlags: Record<string, boolean | number>;
   survivorCount: number;
   currentDay: number;
+  scenario?: ScenarioData | null;
   isExpanded?: boolean;
 }
 
@@ -249,12 +251,17 @@ export const EndingProgress = ({
   currentFlags,
   survivorCount,
   currentDay,
+  scenario,
   isExpanded: initialExpanded = false,
 }: EndingProgressProps) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
-  // Day 3 이전에는 표시하지 않음
-  if (currentDay < 3) {
+  // 동적 Day 계산
+  const routeActivationDay = getRouteActivationDay(scenario);
+  const endingCheckDay = getEndingCheckDay(scenario);
+
+  // 루트 활성화 전에는 표시하지 않음
+  if (currentDay < routeActivationDay) {
     return null;
   }
 
@@ -280,7 +287,7 @@ export const EndingProgress = ({
         <div className="flex items-center gap-2">
           <span className="text-sm">🎯</span>
           <span className="text-sm font-medium text-zinc-200">엔딩 진행도</span>
-          {currentDay >= 5 && (
+          {currentDay >= endingCheckDay && (
             <span className="rounded bg-yellow-900/50 px-1.5 py-0.5 text-[10px] text-yellow-400">
               엔딩 체크 활성
             </span>
@@ -317,10 +324,10 @@ export const EndingProgress = ({
         </div>
       )}
 
-      {/* Day 5 미만 안내 */}
-      {currentDay < 5 && (
+      {/* 엔딩 체크 시점 미만 안내 */}
+      {currentDay < endingCheckDay && (
         <div className="mt-2 text-center text-[10px] text-zinc-500">
-          Day 5부터 엔딩 조건이 체크됩니다
+          Day {endingCheckDay}부터 엔딩 조건이 체크됩니다
         </div>
       )}
     </div>

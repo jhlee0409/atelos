@@ -1,4 +1,5 @@
 import { ScenarioData, Character } from '@/types';
+import { isStatCritical, getFallbackChoices } from './gameplay-config';
 
 // 캐릭터 특성 표시명 가져오기 (시나리오 데이터 우선, 폴백으로 traitName 사용)
 const getTraitDisplayName = (char: Character): string => {
@@ -36,9 +37,10 @@ export const generateFallbackInitialChoices = (
   let choice_a = '';
   let choice_b = '';
 
+  // 동적 스탯 임계값 사용
   const criticalStats = scenario.scenarioStats.filter((stat) => {
     const percentage = (stat.current - stat.min) / (stat.max - stat.min);
-    return percentage < 0.4;
+    return isStatCritical(percentage, scenario);
   });
 
   const charactersByRole = characters.reduce(
@@ -111,17 +113,19 @@ export const generateFallbackInitialChoices = (
       choice_a = `${char1.characterName}의 의견에 따라, ${char1RoleKorean}의 역할을 우선시한다.`;
       choice_b = `${char2.characterName}의 말에 따라, ${char2RoleKorean}의 관점을 존중한다.`;
     } else {
-      // 이 조건에 맞는 NPC가 없으면 기본 폴백으로
-      prompt = `새로운 환경에서 첫 번째 중요한 결정을 내려야 한다. 동료들이 나의 결정을 기다리고 있다. 무엇부터 시작할까?`;
-      choice_a = '내가 직접 안전한 거주지부터 확보한다';
-      choice_b = '내가 직접 식량과 물자 수집을 시작한다';
+      // 이 조건에 맞는 NPC가 없으면 장르별 기본 폴백으로
+      const fallback = getFallbackChoices(scenario);
+      prompt = fallback.prompt;
+      choice_a = fallback.choice_a;
+      choice_b = fallback.choice_b;
     }
   }
-  // 3. 기본 폴백: 직접 행동 결정
+  // 3. 기본 폴백: 장르별 직접 행동 결정
   else {
-    prompt = `새로운 환경에서 첫 번째 중요한 결정을 내려야 한다. 동료들이 나의 결정을 기다리고 있다. 무엇부터 시작할까?`;
-    choice_a = '내가 직접 안전한 거주지부터 확보한다';
-    choice_b = '내가 직접 식량과 물자 수집을 시작한다';
+    const fallback = getFallbackChoices(scenario);
+    prompt = fallback.prompt;
+    choice_a = fallback.choice_a;
+    choice_b = fallback.choice_b;
   }
 
   return { prompt, choice_a, choice_b };

@@ -1,6 +1,7 @@
 import { ScenarioData, PlayerState, Character, KeyDecision, ActionContext } from '@/types';
 import { getCompactGenreStyle, getNarrativeStyleFromGenres } from './genre-narrative-styles';
 import { formatContextForPrompt } from './context-manager';
+import { getTotalDays, getGameplayConfig, DEFAULT_GAMEPLAY_CONFIG } from './gameplay-config';
 
 // ===========================================
 // 토큰 최적화 v2: 압축된 프롬프트 시스템
@@ -150,10 +151,15 @@ const summarizeRecentChat = (chatHistory: any[], maxLength: number = 100): strin
 };
 
 // 압축된 서사 단계 힌트 (토큰 최적화)
-const getCompactNarrativeHint = (currentDay: number): string => {
-  if (currentDay <= 2) return 'Phase: SETUP - Introduce characters, build tension';
-  if (currentDay <= 4) return 'Phase: RISING - Route branching, major conflicts';
-  if (currentDay === 5) return 'Phase: MIDPOINT - Route lock-in, point of no return';
+const getCompactNarrativeHint = (currentDay: number, scenario?: ScenarioData | null): string => {
+  const totalDays = getTotalDays(scenario);
+  const config = getGameplayConfig(scenario);
+  const ratios = config.narrativePhaseRatios ?? DEFAULT_GAMEPLAY_CONFIG.narrativePhaseRatios;
+  const dayRatio = currentDay / totalDays;
+
+  if (dayRatio <= ratios.setup) return 'Phase: SETUP - Introduce characters, build tension';
+  if (dayRatio <= ratios.rising_action) return 'Phase: RISING - Route branching, major conflicts';
+  if (dayRatio <= ratios.midpoint) return 'Phase: MIDPOINT - Route lock-in, point of no return';
   return 'Phase: CLIMAX - Final resolution, emotional payoff';
 };
 
@@ -249,7 +255,7 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
     + flagRules;
 
   // 서사 단계 힌트
-  const narrativeHint = getCompactNarrativeHint(currentDay);
+  const narrativeHint = getCompactNarrativeHint(currentDay, scenario);
 
   // 회상 시스템 - 주요 결정 (서사 연속성)
   const pastDecisions = formatKeyDecisionsCompact(keyDecisions, 3);
@@ -280,6 +286,7 @@ export const getDynamicComplexity = (
   currentDay: number,
   tokenBudget: number,
   qualityScore?: number,
+  scenario?: ScenarioData | null,
 ): {
   useUltraLite: boolean;
   includeRelationships: boolean;
@@ -303,14 +310,22 @@ export const getDynamicComplexity = (
     };
   }
 
-  // 게임 단계별 조절
-  if (currentDay <= 2) {
+  // 게임 단계별 조절 (동적 계산)
+  const totalDays = getTotalDays(scenario);
+  const config = getGameplayConfig(scenario);
+  const ratios = config.narrativePhaseRatios ?? DEFAULT_GAMEPLAY_CONFIG.narrativePhaseRatios;
+  const dayRatio = currentDay / totalDays;
+
+  // 초기 단계: setup 비율 이하 (기본 30% = Day 1-2 for 7일 게임)
+  if (dayRatio <= ratios.setup) {
     return {
       useUltraLite: false,
       includeRelationships: false,
       maxCharacters: 4,
     };
-  } else if (currentDay >= 6) {
+  }
+  // 후반 단계: climax 직전 이상 (기본 75% 이상 = Day 6+ for 7일 게임)
+  if (dayRatio >= ratios.midpoint) {
     // 엔딩은 고품질
     return {
       useUltraLite: false,

@@ -456,6 +456,108 @@ export interface StoryOpening {
   initialProtagonistKnowledge?: Partial<ProtagonistKnowledge>;
 }
 
+// ============================================================================
+// 게임플레이 설정 타입 (Phase 8: 하드코딩 동적화)
+// ============================================================================
+
+/**
+ * 루트 분기 점수 설정
+ * 각 플래그가 특정 루트에 기여하는 점수를 정의
+ */
+export type RouteScoreConfig = {
+  /** 루트 이름 (예: '탈출', '항전', '협상') */
+  routeName: string;
+  /** 이 루트에 기여하는 플래그와 점수 */
+  flagScores: {
+    flagName: string;
+    score: number;
+  }[];
+  /** 이 루트에 기여하는 스탯 조건 */
+  statScores?: {
+    statId: string;
+    /** 비교 연산자 */
+    comparison: '>=' | '<=' | '>' | '<' | '==';
+    /** 임계값 */
+    threshold: number;
+    /** 조건 만족 시 점수 */
+    score: number;
+  }[];
+};
+
+/**
+ * 게임플레이 설정 - 하드코딩된 값들을 시나리오별로 커스터마이징
+ */
+export type GameplayConfig = {
+  // === Day 기반 설정 ===
+  /**
+   * 루트 분기가 활성화되는 시점 (전체 일수 대비 비율, 기본값: 0.4)
+   * 예: 7일 게임에서 0.4 = Day 3부터 루트 표시
+   */
+  routeActivationRatio?: number;
+
+  /**
+   * 엔딩 체크가 시작되는 시점 (전체 일수 대비 비율, 기본값: 0.7)
+   * 예: 7일 게임에서 0.7 = Day 5부터 엔딩 체크
+   */
+  endingCheckRatio?: number;
+
+  /**
+   * 서사 단계별 Day 비율 (setup, rising_action, midpoint, climax)
+   * 기본값: { setup: 0.3, rising_action: 0.6, midpoint: 0.75, climax: 1.0 }
+   */
+  narrativePhaseRatios?: {
+    setup: number;      // 이 비율까지 setup (기본: 0.3 → Day 1-2)
+    rising_action: number; // 이 비율까지 rising_action (기본: 0.6 → Day 3-4)
+    midpoint: number;   // 이 비율까지 midpoint (기본: 0.75 → Day 5)
+    climax: number;     // 이후 climax (기본: 1.0 → Day 6-7)
+  };
+
+  // === Action Points 설정 ===
+  /**
+   * 하루당 행동 포인트 (기본값: 3)
+   */
+  actionPointsPerDay?: number;
+
+  // === 스탯 임계값 설정 ===
+  /**
+   * 위험 상태로 간주하는 스탯 비율 (기본값: 0.4 = 40% 미만)
+   */
+  criticalStatThreshold?: number;
+
+  /**
+   * 경고 상태로 간주하는 스탯 비율 (기본값: 0.5 = 50% 미만)
+   */
+  warningStatThreshold?: number;
+
+  // === 루트 분기 설정 ===
+  /**
+   * 루트 점수 설정 (없으면 기본 점수 시스템 사용)
+   */
+  routeScores?: RouteScoreConfig[];
+
+  // === AI 토큰 설정 ===
+  /**
+   * 토큰 예산 승수 (기본값: 1.0)
+   * 짧은 게임은 0.7, 긴 게임은 1.5 등으로 조절 가능
+   */
+  tokenBudgetMultiplier?: number;
+
+  // === Fallback 설정 ===
+  /**
+   * 장르별 Fallback 선택지 사용 여부 (기본값: true)
+   */
+  useGenreFallback?: boolean;
+
+  /**
+   * 커스텀 Fallback 선택지 (지정 시 장르 Fallback 대신 사용)
+   */
+  customFallbackChoices?: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+  };
+};
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -475,6 +577,8 @@ export type ScenarioData = {
   status: 'in_progress' | 'testing' | 'active';
   /** 스토리 오프닝 설정 (Phase 7) */
   storyOpening?: StoryOpening;
+  /** 게임플레이 설정 (Phase 8: 하드코딩 동적화) */
+  gameplayConfig?: GameplayConfig;
 };
 
 // --- Game-specific state types, not part of scenario definition ---

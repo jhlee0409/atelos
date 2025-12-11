@@ -245,28 +245,58 @@ Key files:
 - `lib/ai-scenario-generator.ts`: Scenario generation client
 - `lib/synopsis-generator.ts`: Synopsis generation
 - `lib/genre-narrative-styles.ts`: Genre-specific narrative guidance
+- `lib/gameplay-config.ts`: Dynamic gameplay configuration utilities (Day calculation, route scores, action points, stat thresholds)
 
 Language validation features:
 - Detects and removes Arabic, Thai, Hindi, Cyrillic characters
 - Validates Korean content ratio (>30% required)
 - Cleans weird Unicode characters
 
+#### Gameplay Configuration System (`lib/gameplay-config.ts`)
+
+시나리오별로 게임플레이 설정을 동적으로 조정할 수 있는 시스템입니다.
+
+**주요 함수:**
+- `getTotalDays(scenario)`: 시나리오의 총 일수 가져오기
+- `getRouteActivationDay(scenario)`: 루트 분기 활성화 Day 계산
+- `getEndingCheckDay(scenario)`: 엔딩 체크 시작 Day 계산
+- `getNarrativePhase(currentDay, scenario)`: 서사 단계 계산 (setup/rising_action/midpoint/climax)
+- `canCheckEnding(currentDay, scenario)`: 엔딩 체크 가능 여부
+- `getActionPointsPerDay(scenario)`: 하루당 Action Points 가져오기
+- `isStatCritical(percentage, scenario)`: 스탯 위험 상태 체크
+- `isStatWarning(percentage, scenario)`: 스탯 경고 상태 체크
+- `calculateRouteScores(flags, stats, scenario)`: 동적 루트 점수 계산
+- `getFallbackChoices(scenario)`: 장르별 Fallback 선택지
+
+**설정 가능 항목 (ScenarioData.gameplayConfig):**
+```typescript
+gameplayConfig?: {
+  routeActivationRatio?: number;     // 루트 활성화 비율 (기본: 0.4 = Day 3 for 7일)
+  endingCheckRatio?: number;         // 엔딩 체크 비율 (기본: 0.7 = Day 5 for 7일)
+  narrativePhaseRatios?: { setup, rising_action, midpoint, climax };
+  actionPointsPerDay?: number;       // 하루당 AP (기본: 3)
+  criticalStatThreshold?: number;    // 위험 스탯 임계값 (기본: 0.4)
+  warningStatThreshold?: number;     // 경고 스탯 임계값 (기본: 0.5)
+  routeScores?: RouteScoreConfig[];  // 커스텀 루트 점수 설정
+  customFallbackChoices?: { prompt, choice_a, choice_b };
+};
+```
+
 #### Ending System (`lib/ending-checker.ts`)
 
 - Checks stat conditions with comparison operators (>=, <=, ==, >, <, !=)
 - Checks flag conditions (boolean true or count > 0)
-- Only checks endings after Day 5
+- Only checks endings after `endingCheckDay` (동적 계산, 기본: Day 5 for 7일 게임)
 - Time limit ending triggers after configured days (ENDING_TIME_UP)
 - Falls back to default "결단의 시간" ending if no conditions met
 
 #### Route System (`RouteIndicator.tsx`)
 
-Determines narrative path based on flags:
-- **탈출 (Escape)**: FLAG_ESCAPE_VEHICLE_SECURED, FLAG_LEADER_SACRIFICE
-- **항전 (Defense)**: FLAG_DEFENSES_COMPLETE, FLAG_RESOURCE_MONOPOLY, FLAG_IDEOLOGY_ESTABLISHED
-- **협상 (Negotiation)**: FLAG_ALLY_NETWORK_FORMED, FLAG_GOVERNMENT_CONTACT, FLAG_UNDERGROUND_HIDEOUT
+Determines narrative path based on scenario's `routeScores` configuration:
+- Default routes: 탈출 (Escape), 항전 (Defense), 협상 (Negotiation)
+- Route scores calculated from flags and stats defined in `gameplayConfig.routeScores`
 
-Route is "미정" (undetermined) until Day 3, then calculated based on accumulated flag scores.
+Route is "미정" (undetermined) until `routeActivationDay` (동적 계산, 기본: Day 3 for 7일 게임), then calculated based on accumulated flag scores.
 
 #### Character Arc System (`CharacterArcPanel.tsx`)
 

@@ -55,6 +55,7 @@ import {
   getLocationsForUI,
   updateLocationStatus,
 } from '@/lib/world-state-manager';
+import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
 import type { WorldState, WorldLocation } from '@/types';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
@@ -73,7 +74,7 @@ const LEGACY_STAT_MAPPING: Record<string, string> = {
 // 행동 게이지 시스템 상수 및 함수
 // =============================================================================
 
-/** 일일 기본 행동 포인트 */
+/** 일일 기본 행동 포인트 (폴백용 - 시나리오별 설정은 getActionPointsPerDay 사용) */
 const ACTION_POINTS_PER_DAY = 3;
 
 /** 행동 유형별 비용 (Phase 1: 모든 행동 1 AP) */
@@ -131,8 +132,9 @@ const consumeActionPoint = (
   if (shouldAdvanceDay) {
     const newDay = currentDay + 1;
     newState.context.currentDay = newDay;
-    newState.context.actionPoints = ACTION_POINTS_PER_DAY;
-    newState.context.maxActionPoints = ACTION_POINTS_PER_DAY;
+    // Day 전환 시 maxAP로 충전 (시나리오별 설정 값 사용)
+    newState.context.actionPoints = maxAP;
+    // maxActionPoints는 유지 (초기화 시 설정된 시나리오별 값)
     newState.context.actionsThisDay = [];
     newState.context.turnsInCurrentDay = 0; // 하위 호환성
 
@@ -251,6 +253,9 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     return char;
   });
 
+  // 시나리오별 Action Points 설정 가져오기
+  const actionPointsPerDay = getActionPointsPerDay(scenario);
+
   // 초기 ActionContext 생성 (맥락 연결 시스템)
   const initialActionContext = createInitialContext(scenario, {
     context: {
@@ -260,8 +265,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
       turnsInCurrentDay: 0,
-      actionPoints: ACTION_POINTS_PER_DAY,
-      maxActionPoints: ACTION_POINTS_PER_DAY,
+      actionPoints: actionPointsPerDay,
+      maxActionPoints: actionPointsPerDay,
       actionsThisDay: [],
     },
     community: {
@@ -284,9 +289,9 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
       turnsInCurrentDay: 0, // @deprecated - 하위 호환성 유지
-      // 행동 게이지 시스템 초기화
-      actionPoints: ACTION_POINTS_PER_DAY,
-      maxActionPoints: ACTION_POINTS_PER_DAY,
+      // 행동 게이지 시스템 초기화 (시나리오별 설정 사용)
+      actionPoints: actionPointsPerDay,
+      maxActionPoints: actionPointsPerDay,
       actionsThisDay: [],
       // 맥락 연결 시스템 초기화
       actionContext: initialActionContext,
@@ -1025,7 +1030,7 @@ export default function GameClient({ scenario }: GameClientProps) {
       setError(null);
       try {
         const initialState = createInitialSaveState(scenario);
-        const aiSettings = getOptimalAISettings(1, 'medium', 0);
+        const aiSettings = getOptimalAISettings(1, 'medium', 0, scenario);
 
         // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
         const result = await generateInitialDilemmaWithOpening(
@@ -1213,6 +1218,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         newSaveState.context.currentDay || 1,
         'medium',
         0, // 초기 토큰 사용량
+        scenario,
       );
 
       // 제미나이 API를 통한 게임 응답 생성
@@ -1382,9 +1388,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       let ending: EndingArchetype | null = null;
       const currentDay = stateAfterAP.context.currentDay || 1;
 
-      // Day 5 이후에만 엔딩 조건 체크
+      // 엔딩 체크 시점 이후에만 엔딩 조건 체크 (동적 계산)
       const survivorCount = stateAfterAP.community.survivors.length;
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
@@ -1398,7 +1404,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
       } else {
         console.log(
-          `⏸️ Day ${currentDay} - 엔딩 체크 대기 중 (Day 5 이후 체크)`,
+          `⏸️ Day ${currentDay} - 엔딩 체크 대기 중 (엔딩 체크 시점 이후 체크)`,
         );
       }
 
@@ -1586,11 +1592,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -1624,10 +1630,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
@@ -1841,11 +1848,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -1879,10 +1886,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
@@ -1934,6 +1942,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         newSaveState.context.currentDay || 1,
         'medium',
         0,
+        scenario,
       );
 
       const aiResponse = await generateGameResponse(
@@ -1998,11 +2007,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -2036,10 +2045,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
