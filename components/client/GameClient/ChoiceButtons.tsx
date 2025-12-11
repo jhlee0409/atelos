@@ -1,7 +1,9 @@
 import { cn } from '@/lib/utils';
 import { SaveState, GameMode, ActionType } from '@/types';
-import { AlertTriangle, MessageCircle, Pencil, MapPin } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Pencil, MapPin, Zap, ArrowLeft } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+
+type ExpandedPanel = 'none' | 'choice' | 'freeText';
 
 /** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
 const DEFAULT_ACTION_POINTS = 3;
@@ -43,7 +45,7 @@ export const ChoiceButtons = ({
   enableExploration?: boolean;
   enableFreeText?: boolean;
 }) => {
-  const [showFreeTextInput, setShowFreeTextInput] = useState(false);
+  const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>('none');
   const [freeText, setFreeText] = useState('');
   const freeTextRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,17 +64,27 @@ export const ChoiceButtons = ({
 
   // 자유 입력 필드 포커스
   useEffect(() => {
-    if (showFreeTextInput && freeTextRef.current) {
+    if (expandedPanel === 'freeText' && freeTextRef.current) {
       freeTextRef.current.focus();
     }
-  }, [showFreeTextInput]);
+  }, [expandedPanel]);
 
   const handleFreeTextSubmit = () => {
     if (freeText.trim() && onFreeTextSubmit) {
       onFreeTextSubmit(freeText.trim());
       setFreeText('');
-      setShowFreeTextInput(false);
+      setExpandedPanel('none');
     }
+  };
+
+  const handleChoiceSelect = (choice: string) => {
+    handlePlayerChoice(choice);
+    setExpandedPanel('none');
+  };
+
+  const handleBack = () => {
+    setExpandedPanel('none');
+    setFreeText('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -160,93 +172,108 @@ export const ChoiceButtons = ({
             {saveState.dilemma.prompt}
           </p>
 
-          {/* 모든 행동 옵션들 */}
-          <div className={cn("space-y-2", isAPDepleted && "opacity-40 pointer-events-none")}>
-            {/* AI 생성 선택지들 */}
-            <ActionButton
-              onClick={() => handlePlayerChoice(saveState.dilemma.choice_a)}
-              disabled={isLoading || !canDoChoice}
-              label={saveState.dilemma.choice_a}
-            />
-            {saveState.dilemma.choice_b && (
-              <ActionButton
-                onClick={() => handlePlayerChoice(saveState.dilemma.choice_b)}
-                disabled={isLoading || !canDoChoice}
-                label={saveState.dilemma.choice_b}
-              />
-            )}
-            {saveState.dilemma.choice_c && (
-              <ActionButton
-                onClick={() => handlePlayerChoice(saveState.dilemma.choice_c!)}
-                disabled={isLoading || !canDoChoice}
-                label={saveState.dilemma.choice_c}
-              />
+          {/* 액션 영역 */}
+          <div className={cn(isAPDepleted && "opacity-40 pointer-events-none")}>
+            {/* 기본 상태: 액션 버튼 한 줄 */}
+            {expandedPanel === 'none' && (
+              <div className="flex gap-2">
+                <ActionIconButton
+                  onClick={() => setExpandedPanel('choice')}
+                  disabled={isLoading || !canDoChoice}
+                  icon={<Zap className="h-4 w-4" />}
+                  label="선택"
+                  primary
+                />
+                {enableDialogue && onOpenDialogue && (
+                  <ActionIconButton
+                    onClick={onOpenDialogue}
+                    disabled={isLoading || !canDoDialogue}
+                    icon={<MessageCircle className="h-4 w-4" />}
+                    label="대화"
+                  />
+                )}
+                {enableExploration && onOpenExploration && (
+                  <ActionIconButton
+                    onClick={onOpenExploration}
+                    disabled={isLoading || !canDoExploration}
+                    icon={<MapPin className="h-4 w-4" />}
+                    label="탐색"
+                  />
+                )}
+                {enableFreeText && onFreeTextSubmit && (
+                  <ActionIconButton
+                    onClick={() => setExpandedPanel('freeText')}
+                    disabled={isLoading || !canDoFreeText}
+                    icon={<Pencil className="h-4 w-4" />}
+                    label="기타"
+                  />
+                )}
+              </div>
             )}
 
-            {/* 보조 액션 (한 줄 아이콘 버튼) */}
-            {(enableDialogue || enableExploration || enableFreeText) && (
-              <>
-                {!showFreeTextInput ? (
-                  <div className="flex gap-2 pt-2 border-t border-zinc-800/50 mt-3">
-                    {enableDialogue && onOpenDialogue && (
-                      <SecondaryActionButton
-                        onClick={onOpenDialogue}
-                        disabled={isLoading || !canDoDialogue}
-                        icon={<MessageCircle className="h-4 w-4" />}
-                        label="대화"
-                      />
-                    )}
-                    {enableExploration && onOpenExploration && (
-                      <SecondaryActionButton
-                        onClick={onOpenExploration}
-                        disabled={isLoading || !canDoExploration}
-                        icon={<MapPin className="h-4 w-4" />}
-                        label="탐색"
-                      />
-                    )}
-                    {enableFreeText && onFreeTextSubmit && (
-                      <SecondaryActionButton
-                        onClick={() => setShowFreeTextInput(true)}
-                        disabled={isLoading || !canDoFreeText}
-                        icon={<Pencil className="h-4 w-4" />}
-                        label="기타"
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 mt-3">
-                    <textarea
-                      ref={freeTextRef}
-                      value={freeText}
-                      onChange={(e) => setFreeText(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="어떤 행동을 할까?"
-                      className="w-full resize-none bg-transparent text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none"
-                      rows={2}
-                      maxLength={200}
-                      disabled={isLoading}
-                    />
-                    <div className="mt-2 flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setShowFreeTextInput(false);
-                          setFreeText('');
-                        }}
-                        className="rounded px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300"
-                      >
-                        취소
-                      </button>
-                      <button
-                        onClick={handleFreeTextSubmit}
-                        disabled={!freeText.trim() || isLoading}
-                        className="rounded bg-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        행동하기
-                      </button>
-                    </div>
-                  </div>
+            {/* 선택지 확장 패널 */}
+            {expandedPanel === 'choice' && (
+              <div className="space-y-2">
+                <ChoiceButton
+                  onClick={() => handleChoiceSelect(saveState.dilemma.choice_a)}
+                  disabled={isLoading}
+                  label={saveState.dilemma.choice_a}
+                />
+                {saveState.dilemma.choice_b && (
+                  <ChoiceButton
+                    onClick={() => handleChoiceSelect(saveState.dilemma.choice_b)}
+                    disabled={isLoading}
+                    label={saveState.dilemma.choice_b}
+                  />
                 )}
-              </>
+                {saveState.dilemma.choice_c && (
+                  <ChoiceButton
+                    onClick={() => handleChoiceSelect(saveState.dilemma.choice_c!)}
+                    disabled={isLoading}
+                    label={saveState.dilemma.choice_c}
+                  />
+                )}
+                <button
+                  onClick={handleBack}
+                  className="w-full flex items-center justify-center gap-1 py-2 text-xs text-zinc-500 hover:text-zinc-300"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  돌아가기
+                </button>
+              </div>
+            )}
+
+            {/* 자유 입력 확장 패널 */}
+            {expandedPanel === 'freeText' && (
+              <div className="space-y-3">
+                <textarea
+                  ref={freeTextRef}
+                  value={freeText}
+                  onChange={(e) => setFreeText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="어떤 행동을 할까?"
+                  className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                  rows={2}
+                  maxLength={200}
+                  disabled={isLoading}
+                />
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={handleBack}
+                    className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+                  >
+                    <ArrowLeft className="h-3 w-3" />
+                    돌아가기
+                  </button>
+                  <button
+                    onClick={handleFreeTextSubmit}
+                    disabled={!freeText.trim() || isLoading}
+                    className="rounded bg-zinc-700 px-4 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    행동하기
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -255,8 +282,41 @@ export const ChoiceButtons = ({
   );
 };
 
-/** 주요 선택지 버튼 */
-const ActionButton = ({
+/** 액션 아이콘 버튼 (메인 한 줄 버튼) */
+const ActionIconButton = ({
+  onClick,
+  disabled,
+  icon,
+  label,
+  primary = false,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  icon: React.ReactNode;
+  label: string;
+  primary?: boolean;
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2.5 px-3 transition-all",
+        disabled
+          ? "border-zinc-800/50 bg-zinc-950/30 text-zinc-600 cursor-not-allowed"
+          : primary
+            ? "border-zinc-600 bg-zinc-700/50 text-zinc-200 hover:bg-zinc-600/50 hover:border-zinc-500"
+            : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200 hover:border-zinc-600"
+      )}
+    >
+      {icon}
+      <span className="text-xs">{label}</span>
+    </button>
+  );
+};
+
+/** 선택지 버튼 (확장 패널용) */
+const ChoiceButton = ({
   onClick,
   disabled,
   label,
@@ -277,35 +337,6 @@ const ActionButton = ({
       )}
     >
       <span className="text-sm">{label}</span>
-    </button>
-  );
-};
-
-/** 보조 액션 버튼 (아이콘 + 짧은 라벨) */
-const SecondaryActionButton = ({
-  onClick,
-  disabled,
-  icon,
-  label,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  icon: React.ReactNode;
-  label: string;
-}) => {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 px-3 transition-all",
-        disabled
-          ? "border-zinc-800/50 bg-zinc-950/30 text-zinc-600 cursor-not-allowed"
-          : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200 hover:border-zinc-600"
-      )}
-    >
-      {icon}
-      <span className="text-xs">{label}</span>
     </button>
   );
 };
