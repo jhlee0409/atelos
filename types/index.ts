@@ -120,6 +120,342 @@ export type TraitPool = {
   debuffs: Trait[];
 };
 
+// =============================================================================
+// 스토리 오프닝 시스템 (Story Opening System)
+// Phase 7 Enhanced: 2025 Interactive Fiction Patterns
+// =============================================================================
+
+/**
+ * 주인공 설정 - AI가 자연스러운 오프닝을 생성하기 위한 정보
+ */
+export interface ProtagonistSetup {
+  /** 주인공 이름 (없으면 AI가 적절히 호칭) */
+  name?: string;
+  /** 주인공 직업/역할 */
+  occupation?: string;
+  /** 성격 특성 (한 줄 설명) */
+  personality?: string;
+  /** 일상 루틴 (평범한 삶 묘사용) */
+  dailyRoutine?: string;
+  /** 주인공의 약점 또는 고민 */
+  weakness?: string;
+}
+
+// =============================================================================
+// 2025 Enhanced: 1:1 캐릭터 소개 시스템
+// =============================================================================
+
+/**
+ * 캐릭터 소개 순서 정의 - 주인공이 각 NPC를 1:1로 만나는 순서
+ */
+export interface CharacterIntroductionSequence {
+  /** 캐릭터 이름 */
+  characterName: string;
+  /** 소개 순서 (1부터 시작) */
+  order: number;
+  /** 만남의 맥락 - 어떤 상황에서 만나는지 */
+  encounterContext: string;
+  /** 첫인상 키워드 (AI가 참조) */
+  firstImpressionKeywords?: string[];
+  /** 만남 예상 시점 */
+  expectedTiming?: 'opening' | 'day1' | 'day2' | 'event-driven';
+  /** 만남 트리거 조건 (플래그/스탯 기반, 없으면 순서대로) */
+  triggerCondition?: {
+    requiredFlag?: string;
+    requiredStat?: { statId: string; minValue: number };
+    afterCharacterMet?: string; // 특정 캐릭터를 만난 후
+  };
+}
+
+// =============================================================================
+// 2025 Enhanced: 숨겨진 NPC 관계 발견 시스템
+// =============================================================================
+
+/**
+ * NPC-NPC 관계의 가시성 상태
+ */
+export type RelationshipVisibility =
+  | 'hidden'      // 완전히 숨김 - 주인공이 모름
+  | 'hinted'      // 암시됨 - 힌트만 있음
+  | 'suspected'   // 의심됨 - 주인공이 추측 중
+  | 'revealed';   // 공개됨 - 완전히 알려짐
+
+/**
+ * 숨겨진 관계 정보 - NPC들 간의 관계
+ * 주인공은 게임 시작 시 이를 모르며, 행동을 통해 발견
+ */
+export interface HiddenNPCRelationship {
+  /** 관계 ID (자동 생성) */
+  relationId: string;
+  /** NPC A */
+  characterA: string;
+  /** NPC B */
+  characterB: string;
+  /** 실제 관계 값 (-100 ~ 100) */
+  actualValue: number;
+  /** 관계 성격 설명 (예: "과거 연인", "비밀 동료") */
+  relationshipType: string;
+  /** 상세 배경 (AI 참조용) */
+  backstory: string;
+  /** 현재 가시성 */
+  visibility: RelationshipVisibility;
+  /** 발견 방법들 */
+  discoveryMethods: RelationshipDiscoveryMethod[];
+}
+
+/**
+ * 관계 발견 방법
+ */
+export interface RelationshipDiscoveryMethod {
+  /** 발견 방법 타입 */
+  method: 'dialogue' | 'exploration' | 'observation' | 'event' | 'item';
+  /** 발견 대상 (캐릭터명, 장소명 등) */
+  target?: string;
+  /** 발견 조건 */
+  condition?: {
+    /** 필요한 대화 주제 */
+    dialogueTopic?: string;
+    /** 필요한 탐색 장소 */
+    explorationLocation?: string;
+    /** 필요한 플래그 */
+    requiredFlag?: string;
+    /** 필요한 신뢰도 (특정 캐릭터와의) */
+    requiredTrust?: { characterName: string; minTrust: number };
+  };
+  /** 발견 시 가시성 변화 */
+  revealsTo: RelationshipVisibility;
+  /** 발견 시 힌트 텍스트 (AI가 자연스럽게 녹여서 사용) */
+  hintText: string;
+}
+
+/**
+ * 주인공의 지식 상태 - 플레이어가 알고 있는 것들
+ */
+export interface ProtagonistKnowledge {
+  /** 만난 캐릭터들 */
+  metCharacters: string[];
+  /** 발견한 관계들 (relationId 배열) */
+  discoveredRelationships: string[];
+  /** 힌트를 얻은 관계들 */
+  hintedRelationships: string[];
+  /** 획득한 정보 조각들 */
+  informationPieces: {
+    id: string;
+    content: string;
+    source: string;
+    discoveredAt: { day: number; action: string };
+  }[];
+}
+
+// =============================================================================
+// 2025 Enhanced: 점진적 캐릭터 공개 시스템
+// =============================================================================
+
+/**
+ * 캐릭터의 공개 레이어 - 신뢰도에 따라 단계적 공개
+ */
+export interface CharacterRevelationLayer {
+  /** 신뢰도 임계값 (-100 ~ 100) */
+  trustThreshold: number;
+  /** 공개되는 정보 유형 */
+  revelationType: 'personality' | 'backstory' | 'secret' | 'motivation' | 'relationship';
+  /** 공개 내용 (AI가 자연스럽게 표현) */
+  content: string;
+  /** 공개 방식 힌트 */
+  revelationStyle: 'direct' | 'subtle' | 'accidental' | 'confession';
+}
+
+/**
+ * 캐릭터별 점진적 공개 설정
+ */
+export interface CharacterRevelationConfig {
+  /** 캐릭터 이름 */
+  characterName: string;
+  /** 공개 레이어들 (신뢰도 순) */
+  revelationLayers: CharacterRevelationLayer[];
+  /** 숨겨진 비밀 (가장 높은 신뢰도에서만 공개) */
+  ultimateSecret?: string;
+}
+
+// =============================================================================
+// 2025 Enhanced: 스토리 시프팅 (Story Sifting) 시스템
+// =============================================================================
+
+/**
+ * 스토리 트리거 - 특정 조건에서 동적 스토리 이벤트 생성
+ */
+export interface StorySiftingTrigger {
+  /** 트리거 ID */
+  triggerId: string;
+  /** 트리거 이름 (내부 식별용) */
+  name: string;
+  /** 트리거 조건 */
+  conditions: {
+    /** 만난 캐릭터 조합 */
+    charactersMetTogether?: string[];
+    /** 발견한 관계 */
+    relationshipsDiscovered?: string[];
+    /** 획득한 플래그 조합 */
+    flagCombination?: string[];
+    /** 스탯 조건 */
+    statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
+    /** 현재 일차 */
+    dayRange?: { min?: number; max?: number };
+    /** 이전 트리거 발동 필요 */
+    requiredTriggers?: string[];
+  };
+  /** 생성될 스토리 이벤트 */
+  generatedEvent: {
+    /** 이벤트 유형 */
+    eventType: 'revelation' | 'confrontation' | 'alliance' | 'betrayal' | 'discovery';
+    /** AI에게 전달할 이벤트 시드 */
+    eventSeed: string;
+    /** 관련 캐릭터들 */
+    involvedCharacters: string[];
+    /** 이벤트 톤 */
+    tone: 'dramatic' | 'subtle' | 'comedic' | 'tragic';
+  };
+  /** 발동 여부 */
+  triggered: boolean;
+  /** 1회성 여부 */
+  oneTime: boolean;
+}
+
+/**
+ * 이머전트 내러티브 설정 - 플레이어 행동에서 자연스럽게 발생하는 스토리
+ */
+export interface EmergentNarrativeConfig {
+  /** 활성화 여부 */
+  enabled: boolean;
+  /** 스토리 시프팅 트리거들 */
+  triggers: StorySiftingTrigger[];
+  /** 다이나믹 이벤트 생성 가이드라인 (AI용) */
+  dynamicEventGuidelines?: string;
+}
+
+/**
+ * 캐릭터 소개 방식 타입
+ */
+export type CharacterIntroductionStyle =
+  | 'gradual'    // 점진적 소개 - 스토리 진행에 따라 한 명씩
+  | 'immediate'  // 즉시 전체 소개 - 첫 장면에 모든 캐릭터 등장
+  | 'contextual'; // 맥락적 소개 - 상황에 따라 자연스럽게 등장
+
+/**
+ * 오프닝 톤 타입
+ */
+export type OpeningTone =
+  | 'mysterious'  // 신비로운 - 의문점을 남기며 시작
+  | 'urgent'      // 긴박한 - 위기 상황으로 바로 진입
+  | 'calm'        // 차분한 - 일상에서 시작하여 점진적으로 변화
+  | 'dramatic'    // 극적인 - 강렬한 사건으로 시작
+  | 'introspective'; // 내성적 - 주인공의 내면 묘사로 시작
+
+/**
+ * 스토리 오프닝 구조 (2025 Enhanced)
+ * 3단계 오프닝: 프롤로그 → 촉발 사건 → 첫 딜레마
+ * + 1:1 캐릭터 소개 시퀀스
+ * + 숨겨진 NPC 관계 시스템
+ * + 점진적 캐릭터 공개
+ * + 이머전트 내러티브 트리거
+ */
+export interface StoryOpening {
+  /**
+   * 프롤로그 - 주인공의 일상, 평범한 삶 묘사
+   * 예: "평범한 도시의 평범한 회사원 김민준. 그의 삶은 어제까지 반복되는 서류 작업과 야근의 연속이었다."
+   */
+  prologue?: string;
+
+  /**
+   * 촉발 사건 - 일상을 깨뜨리는 결정적 순간
+   * 예: "하지만 오늘, 그의 손끝에서 푸른빛이 터져 나왔다."
+   */
+  incitingIncident?: string;
+
+  /**
+   * 첫 번째 등장 캐릭터 - 촉발 사건 직후 만나는 인물
+   * 지정하지 않으면 시나리오의 첫 번째 캐릭터 사용
+   */
+  firstCharacterToMeet?: string;
+
+  /**
+   * 첫 대면 상황 - 첫 캐릭터와 어떤 상황에서 만나는지
+   * 예: "그녀는 주인공의 이상한 행동을 목격하고 조용히 다가왔다"
+   */
+  firstEncounterContext?: string;
+
+  /** 주인공 설정 */
+  protagonistSetup?: ProtagonistSetup;
+
+  /** 캐릭터 소개 방식 (기본값: contextual) */
+  characterIntroductionStyle?: CharacterIntroductionStyle;
+
+  /** 오프닝 톤 (기본값: calm) */
+  openingTone?: OpeningTone;
+
+  /**
+   * 오프닝에서 강조할 테마/키워드
+   * AI가 이 키워드들을 자연스럽게 녹여서 작성
+   */
+  thematicElements?: string[];
+
+  /**
+   * 시간대 설정 (기본값: morning)
+   * 오프닝 장면의 시간대
+   */
+  timeOfDay?: 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+
+  /**
+   * 오프닝 장소
+   * 구체적인 장소 설명 (예: "서울 강남의 한 오피스 빌딩")
+   */
+  openingLocation?: string;
+
+  // ==========================================================================
+  // 2025 Enhanced Features
+  // ==========================================================================
+
+  /**
+   * [2025 Enhanced] 1:1 캐릭터 소개 시퀀스
+   * 주인공이 각 NPC를 개별적으로 만나는 순서와 맥락 정의
+   * 설정 시 characterIntroductionStyle은 무시됨
+   */
+  characterIntroductionSequence?: CharacterIntroductionSequence[];
+
+  /**
+   * [2025 Enhanced] 숨겨진 NPC 관계들
+   * NPC들 간의 관계는 주인공이 모르며, 행동을 통해 발견
+   * initialRelationships와 별도로 관리됨
+   */
+  hiddenNPCRelationships?: HiddenNPCRelationship[];
+
+  /**
+   * [2025 Enhanced] 캐릭터별 점진적 공개 설정
+   * 신뢰도에 따라 캐릭터 정보가 단계적으로 공개
+   */
+  characterRevelations?: CharacterRevelationConfig[];
+
+  /**
+   * [2025 Enhanced] 이머전트 내러티브 설정
+   * 플레이어 행동 조합에서 동적으로 스토리 이벤트 생성
+   */
+  emergentNarrative?: EmergentNarrativeConfig;
+
+  /**
+   * [2025 Enhanced] NPC 관계 노출 모드
+   * 'hidden': 모든 NPC-NPC 관계 숨김 (기본값, 권장)
+   * 'partial': initialRelationships의 일부만 표시
+   * 'visible': 기존 방식 (모든 관계 표시)
+   */
+  npcRelationshipExposure?: 'hidden' | 'partial' | 'visible';
+
+  /**
+   * [2025 Enhanced] 주인공 초기 지식 상태
+   * 게임 시작 시 주인공이 알고 있는 정보
+   */
+  initialProtagonistKnowledge?: Partial<ProtagonistKnowledge>;
+}
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -137,6 +473,8 @@ export type ScenarioData = {
   goalCluster?: GoalCluster;
   endingArchetypes: EndingArchetype[];
   status: 'in_progress' | 'testing' | 'active';
+  /** 스토리 오프닝 설정 (Phase 7) */
+  storyOpening?: StoryOpening;
 };
 
 // --- Game-specific state types, not part of scenario definition ---
@@ -209,6 +547,16 @@ export interface SaveState {
     // --- 동적 월드 시스템 (Phase 6) ---
     /** 월드 상태 */
     worldState?: WorldState;
+    // --- 2025 Enhanced: 주인공 지식 시스템 (Phase 7) ---
+    /** 주인공이 알고 있는 정보 */
+    protagonistKnowledge?: ProtagonistKnowledge;
+    /** 숨겨진 NPC 관계 상태 (visibility 추적) */
+    npcRelationshipStates?: {
+      relationId: string;
+      visibility: RelationshipVisibility;
+    }[];
+    /** 발동된 스토리 트리거 */
+    triggeredStoryEvents?: string[];
   };
   community: {
     survivors: {

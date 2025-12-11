@@ -6,6 +6,8 @@ import {
   validateGameResponse,
   getOptimalAISettings,
   generateInitialDilemma,
+  generateInitialDilemmaWithOpening,
+  hasStoryOpening,
   cleanAndValidateAIResponse,
   createPlayerAction,
   resetSessionStats,
@@ -1010,7 +1012,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       try {
         const initialState = createInitialSaveState(scenario);
         const aiSettings = getOptimalAISettings(1, 'medium', 0);
-        const aiResponse = await generateInitialDilemma(
+
+        // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
+        const result = await generateInitialDilemmaWithOpening(
           initialState,
           scenario,
           aiSettings.useLiteVersion,
@@ -1018,7 +1022,7 @@ export default function GameClient({ scenario }: GameClientProps) {
 
         // 초기 딜레마도 언어 검증 및 정리
         const { cleanedResponse, hasLanguageIssues, languageIssues } =
-          cleanAndValidateAIResponse(aiResponse);
+          cleanAndValidateAIResponse(result.aiResponse);
 
         if (hasLanguageIssues) {
           console.warn('🌐 초기 딜레마 언어 문제 감지:', languageIssues);
@@ -1062,13 +1066,60 @@ export default function GameClient({ scenario }: GameClientProps) {
             dilemma: fallbackDilemma,
           });
         } else {
-          // Valid AI response
-          const updatedState = updateSaveState(
-            initialState,
-            cleanedResponse,
-            scenario,
-          );
-          setSaveState(updatedState);
+          // Valid AI response - 스토리 오프닝 사용 시 각 단계를 별도 메시지로 추가
+          if (result.usedStoryOpening && result.storyOpeningResult) {
+            console.log('📖 스토리 오프닝 3단계 구조 적용');
+            const storyOpening = result.storyOpeningResult;
+            const timestamp = Date.now();
+
+            // 각 단계를 별도의 chat message로 추가 (더 드라마틱한 표현)
+            const chatHistory: typeof initialState.chatHistory = [];
+
+            // 1단계: 프롤로그 (ai-narration 타입 사용)
+            if (storyOpening.prologue) {
+              chatHistory.push({
+                type: 'ai',
+                content: storyOpening.prologue,
+                timestamp: timestamp,
+              });
+            }
+
+            // 2단계: 촉발 사건 (ai 타입 사용)
+            if (storyOpening.incitingIncident) {
+              chatHistory.push({
+                type: 'ai',
+                content: storyOpening.incitingIncident,
+                timestamp: timestamp + 1,
+              });
+            }
+
+            // 3단계: 첫 캐릭터 만남 (ai-dialogue 스타일)
+            if (storyOpening.firstEncounter) {
+              chatHistory.push({
+                type: 'ai',
+                content: storyOpening.firstEncounter,
+                timestamp: timestamp + 2,
+              });
+            }
+
+            // 상태 업데이트 (log 대신 chatHistory 직접 설정)
+            const updatedState: SaveState = {
+              ...initialState,
+              log: storyOpening.fullLog,
+              chatHistory,
+              dilemma: storyOpening.dilemma,
+            };
+
+            setSaveState(updatedState);
+          } else {
+            // 기존 방식: 단일 메시지로 표시
+            const updatedState = updateSaveState(
+              initialState,
+              cleanedResponse,
+              scenario,
+            );
+            setSaveState(updatedState);
+          }
         }
 
         initialDilemmaGenerated.current = true; // 생성 완료 플래그 설정
