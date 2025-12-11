@@ -58,6 +58,7 @@ import {
   type CharacterIntroductionsResult,
   type HiddenRelationshipsResult,
   type CharacterRevelationsResult,
+  type GameplayConfigResult,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, SystemCondition, Trait } from '@/types';
 
@@ -175,6 +176,9 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [characterIntroductions, setCharacterIntroductions] = useState<CharacterIntroductionsResult['characterIntroductionSequence']>([]);
   const [hiddenRelationships, setHiddenRelationships] = useState<HiddenRelationshipsResult['hiddenNPCRelationships']>([]);
   const [characterRevelations, setCharacterRevelations] = useState<CharacterRevelationsResult['characterRevelations']>([]);
+
+  // 게임플레이 설정 (GameplayConfig)
+  const [gameplayConfig, setGameplayConfig] = useState<GameplayConfigResult | null>(null);
 
   // 아이디어 추천
   const [ideaSuggestions, setIdeaSuggestions] = useState<IdeaSuggestion[]>([]);
@@ -447,14 +451,17 @@ ${characterDetails}`;
         title: synopsisResult.title,
         synopsis: synopsisResult.synopsis,
         existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
+        existingStats: stats.map((s) => s.id),
+        existingFlags: flags.map((f) => f.flagName),
       };
 
-      // 병렬로 4개 카테고리 생성
+      // 병렬로 5개 카테고리 생성 (스토리 오프닝 + 게임플레이 설정)
       const [
         openingResponse,
         introductionsResponse,
         hiddenRelsResponse,
         revelationsResponse,
+        gameplayConfigResponse,
       ] = await Promise.all([
         generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
         characters.length >= 2
@@ -466,12 +473,19 @@ ${characterDetails}`;
         characters.length >= 1
           ? generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context)
           : Promise.resolve({ data: { characterRevelations: [] } }),
+        // 게임플레이 설정 생성 (플래그와 스탯 기반)
+        flags.length > 0
+          ? generateWithAI<GameplayConfigResult>('gameplay_config', scenarioInput, context)
+          : Promise.resolve({ data: null }),
       ]);
 
       setStoryOpening(openingResponse.data);
       setCharacterIntroductions(introductionsResponse.data.characterIntroductionSequence || []);
       setHiddenRelationships(hiddenRelsResponse.data.hiddenNPCRelationships || []);
       setCharacterRevelations(revelationsResponse.data.characterRevelations || []);
+      if (gameplayConfigResponse.data) {
+        setGameplayConfig(gameplayConfigResponse.data);
+      }
       setCurrentStep('story_opening');
     } catch (err) {
       setError(err instanceof Error ? err.message : '스토리 오프닝 생성에 실패했습니다.');
@@ -579,10 +593,23 @@ ${characterDetails}`;
           ultimateSecret: rev.ultimateSecret,
         })) : undefined,
       } : undefined,
+      // 게임플레이 설정 (GameplayConfig)
+      gameplayConfig: gameplayConfig ? {
+        routeActivationRatio: gameplayConfig.routeActivationRatio,
+        endingCheckRatio: gameplayConfig.endingCheckRatio,
+        narrativePhaseRatios: gameplayConfig.narrativePhaseRatios,
+        actionPointsPerDay: gameplayConfig.actionPointsPerDay,
+        criticalStatThreshold: gameplayConfig.criticalStatThreshold,
+        warningStatThreshold: gameplayConfig.warningStatThreshold,
+        routeScores: gameplayConfig.routeScores,
+        tokenBudgetMultiplier: gameplayConfig.tokenBudgetMultiplier,
+        useGenreFallback: gameplayConfig.useGenreFallback,
+        customFallbackChoices: gameplayConfig.customFallbackChoices,
+      } : undefined,
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
