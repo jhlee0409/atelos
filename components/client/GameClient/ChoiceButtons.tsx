@@ -1,6 +1,6 @@
-import { cn, escapeHtml } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { SaveState, GameMode, ActionType } from '@/types';
-import { AlertTriangle, MessageCircle, Send, MapPin, Zap } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Pencil, MapPin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 /** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
@@ -183,42 +183,38 @@ export const ChoiceButtons = ({
               />
             )}
 
-            {/* 구분선 */}
-            <div className="border-t border-zinc-800 my-3" />
-
-            {/* 캐릭터 대화 */}
-            {enableDialogue && onOpenDialogue && (
-              <ActionButton
-                onClick={onOpenDialogue}
-                disabled={isLoading || !canDoDialogue}
-                label="누군가와 이야기한다"
-                icon={<MessageCircle className="h-4 w-4 text-zinc-500" />}
-              />
-            )}
-
-            {/* 주변 탐색 */}
-            {enableExploration && onOpenExploration && (
-              <ActionButton
-                onClick={onOpenExploration}
-                disabled={isLoading || !canDoExploration}
-                label="주변을 살펴본다"
-                icon={<MapPin className="h-4 w-4 text-zinc-500" />}
-              />
-            )}
-
-            {/* 자유 텍스트 입력 */}
-            {enableFreeText && onFreeTextSubmit && (
+            {/* 보조 액션 (한 줄 아이콘 버튼) */}
+            {(enableDialogue || enableExploration || enableFreeText) && (
               <>
                 {!showFreeTextInput ? (
-                  <ActionButton
-                    onClick={() => setShowFreeTextInput(true)}
-                    disabled={isLoading || !canDoFreeText}
-                    label="다른 행동을 한다..."
-                    icon={<Send className="h-4 w-4 text-zinc-500" />}
-                    variant="dashed"
-                  />
+                  <div className="flex gap-2 pt-2 border-t border-zinc-800/50 mt-3">
+                    {enableDialogue && onOpenDialogue && (
+                      <SecondaryActionButton
+                        onClick={onOpenDialogue}
+                        disabled={isLoading || !canDoDialogue}
+                        icon={<MessageCircle className="h-4 w-4" />}
+                        label="대화"
+                      />
+                    )}
+                    {enableExploration && onOpenExploration && (
+                      <SecondaryActionButton
+                        onClick={onOpenExploration}
+                        disabled={isLoading || !canDoExploration}
+                        icon={<MapPin className="h-4 w-4" />}
+                        label="탐색"
+                      />
+                    )}
+                    {enableFreeText && onFreeTextSubmit && (
+                      <SecondaryActionButton
+                        onClick={() => setShowFreeTextInput(true)}
+                        disabled={isLoading || !canDoFreeText}
+                        icon={<Pencil className="h-4 w-4" />}
+                        label="기타"
+                      />
+                    )}
+                  </div>
                 ) : (
-                  <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                  <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 mt-3">
                     <textarea
                       ref={freeTextRef}
                       value={freeText}
@@ -259,34 +255,57 @@ export const ChoiceButtons = ({
   );
 };
 
-/** 통합 액션 버튼 컴포넌트 */
+/** 주요 선택지 버튼 */
 const ActionButton = ({
   onClick,
   disabled,
   label,
-  icon,
-  variant = 'solid',
 }: {
   onClick: () => void;
   disabled: boolean;
   label: string;
-  icon?: React.ReactNode;
-  variant?: 'solid' | 'dashed';
 }) => {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
-        variant === 'dashed' ? 'border-dashed' : '',
+        "w-full rounded-lg border p-3 text-left transition-all",
         disabled
           ? "border-zinc-800 bg-zinc-950/50 text-zinc-600 cursor-not-allowed"
           : "border-zinc-700 bg-zinc-800/50 text-zinc-200 hover:bg-zinc-700/50 hover:border-zinc-600"
       )}
     >
-      {icon}
       <span className="text-sm">{label}</span>
+    </button>
+  );
+};
+
+/** 보조 액션 버튼 (아이콘 + 짧은 라벨) */
+const SecondaryActionButton = ({
+  onClick,
+  disabled,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  icon: React.ReactNode;
+  label: string;
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 px-3 transition-all",
+        disabled
+          ? "border-zinc-800/50 bg-zinc-950/30 text-zinc-600 cursor-not-allowed"
+          : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200 hover:border-zinc-600"
+      )}
+    >
+      {icon}
+      <span className="text-xs">{label}</span>
     </button>
   );
 };
