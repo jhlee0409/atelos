@@ -161,49 +161,48 @@ const TopicSelection = ({
   const moodDisplay = getMoodDisplay(character.currentMood || 'anxious');
 
   return (
-    <div className="space-y-3">
-      {/* 헤더 */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
-        <button
-          onClick={onBack}
-          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
-          disabled={isLoading}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-zinc-200">{character.characterName}</span>
-          <span className={cn("text-sm", moodDisplay.color)}>
-            {moodDisplay.emoji} {moodDisplay.label}
-          </span>
-        </div>
+    <div className="space-y-2">
+      {/* 캐릭터 정보 */}
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-800">
+        <span className="font-medium text-zinc-200">{character.characterName}</span>
+        <span className={cn("text-sm", moodDisplay.color)}>
+          {moodDisplay.emoji}
+        </span>
       </div>
 
       {/* 대화 주제 목록 */}
-      <div className="space-y-2">
-        {topics.map((topic) => {
-          const TopicIcon = getTopicIcon(topic.category);
-          return (
-            <button
-              key={topic.topicId}
-              onClick={() => onSelect(topic)}
-              disabled={isLoading}
-              className={cn(
-                "w-full flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-left transition-all",
-                isLoading
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-zinc-800/50 hover:border-zinc-700"
-              )}
-            >
-              <TopicIcon className="h-4 w-4 text-zinc-500" />
-              <span className="text-sm text-zinc-300">{topic.label}</span>
-              {isLoading && (
-                <Loader2 className="ml-auto h-4 w-4 animate-spin text-zinc-500" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {topics.map((topic) => {
+        const TopicIcon = getTopicIcon(topic.category);
+        return (
+          <button
+            key={topic.topicId}
+            onClick={() => onSelect(topic)}
+            disabled={isLoading}
+            className={cn(
+              "w-full flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-left transition-all",
+              isLoading
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-zinc-700/50 hover:border-zinc-600"
+            )}
+          >
+            <TopicIcon className="h-4 w-4 text-zinc-500" />
+            <span className="text-sm text-zinc-200">{topic.label}</span>
+            {isLoading && (
+              <Loader2 className="ml-auto h-4 w-4 animate-spin text-zinc-500" />
+            )}
+          </button>
+        );
+      })}
+
+      {/* 돌아가기 버튼 */}
+      <button
+        onClick={onBack}
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-1 py-2 text-xs text-zinc-500 hover:text-zinc-300"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        돌아가기
+      </button>
     </div>
   );
 };
@@ -252,13 +251,14 @@ export const CharacterDialoguePanel = ({
   if (availableCharacters.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
-        <div className="text-center text-zinc-500">
-          대화할 수 있는 캐릭터가 없습니다.
+        <div className="text-center text-zinc-500 py-4">
+          대화할 수 있는 사람이 없다.
         </div>
         <button
           onClick={onClose}
-          className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
+          className="w-full flex items-center justify-center gap-1 py-2 text-xs text-zinc-500 hover:text-zinc-300"
         >
+          <ArrowLeft className="h-3 w-3" />
           돌아가기
         </button>
       </div>
@@ -267,18 +267,6 @@ export const CharacterDialoguePanel = ({
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
-      {/* 헤더 - 간소화 */}
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-200">누구와 이야기할까?</span>
-        <button
-          onClick={onClose}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-          disabled={isLoading}
-        >
-          돌아가기
-        </button>
-      </div>
-
       {/* 캐릭터 선택 또는 주제 선택 */}
       {selectedCharacter ? (
         <TopicSelection
@@ -298,11 +286,13 @@ export const CharacterDialoguePanel = ({
               onClick={() => handleCharacterSelect(character)}
             />
           ))}
+          {/* 돌아가기 버튼 */}
           <button
             onClick={onClose}
-            className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
+            className="w-full flex items-center justify-center gap-1 py-2 text-xs text-zinc-500 hover:text-zinc-300"
           >
-            다음으로
+            <ArrowLeft className="h-3 w-3" />
+            돌아가기
           </button>
         </div>
       )}

@@ -9,10 +9,10 @@ import {
   Bed,
   MapPin,
   Loader2,
-  Lock,
   Briefcase,
   Compass,
-  Ban
+  Ban,
+  ArrowLeft
 } from 'lucide-react';
 import { getLocationsForUI } from '@/lib/world-state-manager';
 
@@ -213,18 +213,6 @@ export const ExplorationPanel = ({
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
-      {/* 헤더 - 간소화 */}
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-200">어디를 살펴볼까?</span>
-        <button
-          onClick={onClose}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-          disabled={isLoading}
-        >
-          돌아가기
-        </button>
-      </div>
-
       {/* 접근 가능한 장소 */}
       <div className="space-y-2">
         {availableLocations.map((location) => (
@@ -253,13 +241,14 @@ export const ExplorationPanel = ({
         </div>
       )}
 
-      {/* 건너뛰기 버튼 */}
+      {/* 돌아가기 버튼 */}
       <button
         onClick={onClose}
-        className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
         disabled={isLoading}
+        className="w-full flex items-center justify-center gap-1 py-2 mt-3 text-xs text-zinc-500 hover:text-zinc-300"
       >
-        다음으로
+        <ArrowLeft className="h-3 w-3" />
+        돌아가기
       </button>
     </div>
   );
