@@ -889,30 +889,51 @@ export const getLocationsForUI = (
   icon: WorldLocation['icon'];
   available: boolean;
   statusReason?: string;
-  hint?: string;
+  wasDeactivated?: boolean; // 활성화됐다가 비활성화된 경우
 }[] => {
-  return worldState.locations.map((loc) => {
+  const results: {
+    locationId: string;
+    name: string;
+    description: string;
+    icon: WorldLocation['icon'];
+    available: boolean;
+    statusReason?: string;
+    wasDeactivated?: boolean;
+  }[] = [];
+
+  for (const loc of worldState.locations) {
     const { accessible, reason } = isLocationAccessible(loc, worldState, saveState);
 
-    // 발견 가능한 아이템 중 가장 높은 중요도의 힌트
-    const discoverables = getDiscoverableItems(worldState, loc.locationId, saveState);
-    const hint = discoverables.length > 0
-      ? discoverables.sort((a, b) => {
-          const importance = { critical: 4, major: 3, minor: 2, trivial: 1 };
-          return importance[b.importance] - importance[a.importance];
-        })[0].name
-      : undefined;
+    // 노출 규칙:
+    // 1. available인 경우 - 항상 노출
+    // 2. destroyed/blocked인 경우 - 사유와 함께 노출 (활성화됐다가 비활성화)
+    // 3. hidden, locked, explored, cooldown - 노출 안함
 
-    return {
-      locationId: loc.locationId,
-      name: loc.name,
-      description: loc.currentDescription,
-      icon: loc.icon,
-      available: accessible,
-      statusReason: reason,
-      hint: accessible ? hint : undefined,
-    };
-  });
+    if (accessible) {
+      // 접근 가능 - 노출
+      results.push({
+        locationId: loc.locationId,
+        name: loc.name,
+        description: loc.currentDescription,
+        icon: loc.icon,
+        available: true,
+      });
+    } else if (loc.status === 'destroyed' || loc.status === 'blocked') {
+      // 파괴/차단됨 - 사유와 함께 노출
+      results.push({
+        locationId: loc.locationId,
+        name: loc.name,
+        description: loc.currentDescription,
+        icon: loc.icon,
+        available: false,
+        statusReason: reason,
+        wasDeactivated: true,
+      });
+    }
+    // hidden, locked, explored, cooldown은 노출 안함
+  }
+
+  return results;
 };
 
 /**

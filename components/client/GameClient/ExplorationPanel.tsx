@@ -60,7 +60,7 @@ interface UILocation {
   icon: WorldLocation['icon'];
   available: boolean;
   statusReason?: string;
-  hint?: string;
+  wasDeactivated?: boolean; // 활성화됐다가 비활성화된 경우
 }
 
 // 시나리오에 따른 탐색 장소 생성 (WorldState 우선)
@@ -207,9 +207,9 @@ export const ExplorationPanel = ({
   const currentDay = saveState.context.currentDay || 1;
   const locations = generateLocationsForScenario(scenario, currentDay, saveState);
 
-  // 접근 가능한 위치와 불가능한 위치 분리
+  // 접근 가능한 장소와 비활성화된 장소 분리
   const availableLocations = locations.filter(loc => loc.available);
-  const unavailableLocations = locations.filter(loc => !loc.available);
+  const deactivatedLocations = locations.filter(loc => !loc.available && ('wasDeactivated' in loc && loc.wasDeactivated));
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
@@ -225,11 +225,11 @@ export const ExplorationPanel = ({
         ))}
       </div>
 
-      {/* 접근 불가능한 장소 - 간소화 */}
-      {unavailableLocations.length > 0 && (
+      {/* 비활성화된 장소 (파괴/차단됨) */}
+      {deactivatedLocations.length > 0 && (
         <div className="mt-3 pt-3 border-t border-zinc-800/50">
           <div className="space-y-1.5">
-            {unavailableLocations.map((location) => (
+            {deactivatedLocations.map((location) => (
               <LocationCard
                 key={location.locationId}
                 location={location}
