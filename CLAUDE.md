@@ -739,3 +739,98 @@ GameClient의 4개 주요 핸들러에 동일한 로직이 필요한 경우:
 | Key Decisions | N/A | `handlePlayerChoice` | `gemini-client.ts` | `KeyDecisionPanel` |
 | Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |
 | ProtagonistKnowledge | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | N/A |
+
+## 🧪 TDD 개발 프로세스 (MANDATORY)
+
+**모든 기능 구현 전에 반드시 TDD 방식을 따릅니다.**
+
+### TDD 워크플로우
+
+#### 1단계: 테스트 작성 (구현 전)
+
+기능 구현을 시작하기 전에 **반드시** 테스트 코드를 먼저 작성합니다:
+
+```typescript
+// tests/unit/new-feature.test.ts
+describe('새로운 기능', () => {
+  it('should handle expected input correctly', () => {
+    // 테스트 코드
+  });
+
+  it('should return error for invalid input', () => {
+    // 에러 케이스 테스트
+  });
+
+  it('should integrate with existing systems', () => {
+    // 통합 테스트
+  });
+});
+```
+
+#### 2단계: 테스트 리스트 검수
+
+작성한 테스트 목록을 사용자에게 **반드시 검수받습니다**:
+
+```
+📋 테스트 리스트 검수 요청:
+
+1. ✅ `should handle expected input correctly`
+   - 정상 입력에 대한 처리 검증
+
+2. ✅ `should return error for invalid input`
+   - 잘못된 입력에 대한 에러 처리 검증
+
+3. ✅ `should integrate with existing systems`
+   - 기존 시스템과의 통합 검증
+
+테스트 목록을 확인해주세요. 추가/수정이 필요하면 말씀해주세요.
+```
+
+#### 3단계: 구현 진행
+
+사용자 승인 후에만 실제 구현을 시작합니다:
+
+1. 테스트 실행 → 실패 확인 (Red)
+2. 최소한의 코드로 테스트 통과 (Green)
+3. 리팩토링 (Refactor)
+4. 모든 테스트 통과 확인
+
+#### 4단계: 검증
+
+```bash
+pnpm test:unit   # 단위 테스트 통과 확인
+pnpm build       # 빌드 성공 확인
+```
+
+### TDD 적용 예시
+
+```
+❌ 잘못된 패턴:
+"기능 구현 완료했습니다! 테스트도 추가할게요."
+
+✅ 올바른 패턴:
+"기능 구현 전에 테스트를 먼저 작성했습니다:
+
+📋 테스트 리스트:
+1. `handleStoryOpening()` - 스토리 오프닝 생성 검증
+2. `validatePrologue()` - 프롤로그 유효성 검증
+3. `integrateWithScenario()` - 시나리오 통합 검증
+
+검수해주세요. 승인 후 구현을 시작하겠습니다."
+```
+
+### 테스트 파일 위치
+
+| 테스트 유형 | 위치 | 용도 |
+|------------|------|------|
+| Unit Tests | `tests/unit/` | 개별 함수/모듈 테스트 |
+| Integration Tests | `tests/integration/` | 시스템 간 통합 테스트 |
+| AI Quality Tests | `tests/ai-quality/` | AI 응답 품질 테스트 |
+
+### 테스트 작성 가이드라인
+
+1. **테스트 이름은 명확하게**: `should [동작] when [조건]`
+2. **AAA 패턴 사용**: Arrange → Act → Assert
+3. **엣지 케이스 포함**: 빈 값, null, 경계값 등
+4. **Mock 적절히 사용**: 외부 의존성은 mock 처리
+5. **독립적인 테스트**: 테스트 간 의존성 없이 독립 실행 가능
