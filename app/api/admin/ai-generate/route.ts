@@ -661,7 +661,11 @@ ${baseContext}`,
 <characters>${input}</characters>
 ${baseContext}
 
-<note>각 캐릭터 쌍마다 양방향(A→B, B→A) 관계를 정의해주세요.</note>`,
+<important_instructions>
+- **반드시** 위 characters 목록에 있는 캐릭터 이름만 사용하세요.
+- 각 캐릭터 쌍마다 양방향(A→B, B→A) 관계를 정의해주세요.
+- personA와 personB의 이름 철자가 정확히 일치해야 합니다.
+</important_instructions>`,
     },
 
     stats: {
@@ -732,7 +736,13 @@ ${baseContext}
       userPrompt: `<request>다음 시나리오에 적합한 4-6개의 스탯을 제안해주세요.</request>
 
 <scenario>${input}</scenario>
-${baseContext}`,
+${baseContext}
+
+<design_tips>
+- 각 스탯은 엔딩 조건에서 사용될 수 있어야 합니다.
+- 플레이어 선택이 스탯 변화에 영향을 줄 수 있는 구조로 설계하세요.
+- positive/negative polarity를 명확히 하여 "높을수록 좋음" vs "낮을수록 좋음"을 구분하세요.
+</design_tips>`,
     },
 
     flags: {
@@ -766,13 +776,23 @@ ${baseContext}`,
 </route>
 </route_system>
 
-<other_flags>FLAG_SECRET_DISCOVERED, FLAG_BETRAYAL_REVEALED, FLAG_LEADER_CHOSEN, FLAG_CRITICAL_DECISION</other_flags>`,
+<other_flags>FLAG_SECRET_DISCOVERED, FLAG_BETRAYAL_REVEALED, FLAG_LEADER_CHOSEN, FLAG_CRITICAL_DECISION</other_flags>
+
+<design_tips>
+- 모든 플래그는 엔딩 조건에서 사용될 수 있어야 합니다.
+- 플래그명에서 의미를 명확히 알 수 있도록 작성하세요.
+- triggerCondition은 AI가 플래그를 부여할 시점을 판단하는 데 사용됩니다.
+</design_tips>`,
       userPrompt: `<request>다음 시나리오에 적합한 8-12개의 플래그를 제안해주세요.</request>
 
 <scenario>${input}</scenario>
 ${baseContext}
 
-<important>탈출/항전/협상 3가지 루트에 맞는 플래그를 각각 2개 이상 포함해주세요.</important>`,
+<important_instructions>
+- 탈출/항전/협상 3가지 루트에 맞는 플래그를 각각 2개 이상 포함해주세요.
+- 각 플래그는 엔딩 조건으로 사용될 수 있어야 합니다.
+- triggerCondition을 구체적으로 작성하여 AI가 부여 시점을 명확히 알 수 있게 하세요.
+</important_instructions>`,
     },
 
     endings: {
@@ -1043,12 +1063,14 @@ ${baseContext}
 <specific_requirements>
 - prologue: 주인공의 평범한 일상 묘사 (100-200자, 감각적 디테일 포함)
 - incitingIncident: 모든 것을 바꾸는 결정적 순간 (100-200자, 긴장감 있게)
-- firstCharacterToMeet: 시나리오 캐릭터 중 한 명
+- firstCharacterToMeet: **반드시** existing_characters 목록에 있는 캐릭터 이름 사용
 - firstEncounterContext: 첫 만남이 어떤 상황에서 이루어지는지
 - protagonistSetup: 플레이어가 투영할 수 있는 주인공 설정
 - openingTone: 시나리오 분위기에 맞는 톤 선택
 - thematicElements: 오프닝에서 암시할 핵심 테마 3-5개
-</specific_requirements>`,
+</specific_requirements>
+
+<critical>firstCharacterToMeet은 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다.</critical>`,
     },
 
     // ========================================================================
@@ -1085,10 +1107,12 @@ ${input}
 ${baseContext}
 
 <requirements>
+- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
 - 모든 캐릭터에 대해 소개 순서 지정 (order: 1, 2, 3...)
 - 각 만남의 구체적인 맥락 작성 (encounterContext)
 - 첫인상 키워드 2-3개 (성격, 외모, 분위기 등)
 - 만남 예상 시점 지정 (opening/day1/day2/event-driven)
+- characterName 철자가 existing_characters와 정확히 일치해야 함
 </requirements>`,
     },
 
@@ -1131,12 +1155,16 @@ ${input}
 ${baseContext}
 
 <requirements>
+- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
+- characterA와 characterB는 existing_characters와 정확히 일치해야 함
 - 캐릭터 수에 따라 2-4개의 숨겨진 관계 설계
 - 각 관계의 배경 스토리 상세히 작성
 - 발견 힌트와 발견 방법 지정
 - 초기 visibility는 hidden 또는 hinted로 설정
 - relationId는 REL_001, REL_002 형식으로
-</requirements>`,
+</requirements>
+
+<critical>characterA와 characterB에 사용하는 이름은 반드시 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다. 새로운 캐릭터 이름을 만들지 마세요.</critical>`,
     },
 
     // ========================================================================
@@ -1185,12 +1213,16 @@ ${input}
 ${baseContext}
 
 <requirements>
+- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
+- characterName은 existing_characters와 정확히 일치해야 함
 - 각 캐릭터마다 3-5개의 revelationLayers 설계
 - 신뢰도 임계값은 점진적으로 증가 (예: 20, 40, 60, 80)
 - 각 레이어의 공개 내용은 구체적으로 (50-100자)
 - ultimateSecret은 가장 높은 신뢰도에서만 공개되는 핵심 비밀
 - 공개 방식(revelationStyle)은 내용에 맞게 선택
-</requirements>`,
+</requirements>
+
+<critical>characterName에 사용하는 이름은 반드시 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다. 새로운 캐릭터 이름을 만들지 마세요.</critical>`,
     },
   };
 

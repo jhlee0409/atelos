@@ -141,6 +141,7 @@ atelos/
 │   ├── ending-checker.ts             # Ending condition evaluation
 │   ├── chat-history-manager.ts       # Chat history compression
 │   ├── simulation-utils.ts           # Stat calculations & dilemmas
+│   ├── scenario-validator.ts         # Scenario data consistency validation
 │   ├── validations.ts                # Form validation schemas
 │   ├── utils.ts                      # General utilities (cn, etc.)
 │   ├── firebase.ts                   # Firebase client initialization
@@ -517,6 +518,32 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 - `endCondition` (time_limit with days/hours)
 - `storyOpening` for 3-phase opening configuration
 
+### Scenario Data Validation (`lib/scenario-validator.ts`)
+
+시나리오 데이터의 일관성을 검증하는 유틸리티입니다. Admin 에디터의 StickySidebar에서 실시간으로 검증 결과를 표시합니다.
+
+**검증 항목:**
+
+| 검증 유형 | 심각도 | 설명 |
+|----------|--------|------|
+| 엔딩 스탯 참조 | error | 존재하지 않는 statId 참조 |
+| 엔딩 플래그 참조 | error | 존재하지 않는 flagName 참조 |
+| 관계 캐릭터 | error | 존재하지 않는 캐릭터 관계 설정 |
+| 스토리 오프닝 캐릭터 | error | firstCharacterToMeet 등이 캐릭터 목록에 없음 |
+| 스탯 범위 | error | initialValue가 min/max 범위 밖 |
+| 엔딩 조건 충돌 | warning | 같은 스탯에 충돌하는 조건 (>=80 AND <=20) |
+| 미사용 플래그 | warning | 정의되었지만 엔딩 조건에서 사용되지 않는 플래그 |
+
+**사용법:**
+```typescript
+import { validateScenario } from '@/lib/scenario-validator';
+
+const result = validateScenario(scenario);
+// result.isValid: boolean - 오류 없으면 true
+// result.issues: ValidationIssue[] - 발견된 이슈 목록
+// result.summary: { errors: number, warnings: number }
+```
+
 ## Testing
 
 ### Test Structure
@@ -819,4 +846,43 @@ pnpm test        # 기존 테스트 통과 확인
 ❌ 피해야 할 패턴:
 "모든 기능에 테스트 먼저 작성" (과도한 오버헤드)
 "테스트 없이 핵심 로직 수정" (위험)
+```
+
+## 📝 문서화 규칙 (Documentation Rules)
+
+**기능 구현/개선 후 반드시 관련 문서를 업데이트해야 합니다.**
+
+### 필수 업데이트 대상
+
+| 변경 유형 | 업데이트 대상 |
+|----------|---------------|
+| 새로운 시스템/기능 추가 | CLAUDE.md (Project Structure, High-Level Architecture) |
+| 새로운 유틸리티 함수 추가 | CLAUDE.md (lib/ 섹션에 파일 설명 추가) |
+| 타입 정의 변경 | CLAUDE.md (Type System 섹션) |
+| API 엔드포인트 추가 | CLAUDE.md (API Routes 테이블) |
+| 환경 변수 추가 | CLAUDE.md (Environment Setup) |
+| 디버깅 팁 발견 | CLAUDE.md (Common Debugging) |
+| 주요 기능 완성 | README.md (Features 섹션) |
+
+### 문서 업데이트 체크리스트
+
+기능 구현 완료 후 다음을 확인:
+
+- [ ] **CLAUDE.md**: 새 파일/함수가 Project Structure에 반영되었는가?
+- [ ] **CLAUDE.md**: 새 시스템이 High-Level Architecture에 설명되었는가?
+- [ ] **CLAUDE.md**: 핵심 통합 지점 테이블이 업데이트 되었는가?
+- [ ] **README.md**: 사용자에게 보이는 새 기능이 Features에 추가되었는가?
+
+### 문서화 예시
+
+```
+✅ 올바른 패턴:
+"시나리오 검증 시스템 구현 완료.
+- lib/scenario-validator.ts 추가
+- CLAUDE.md: lib/ 섹션에 scenario-validator.ts 설명 추가
+- CLAUDE.md: Admin 섹션에 검증 시스템 설명 추가"
+
+❌ 잘못된 패턴:
+"시나리오 검증 시스템 구현 완료. 빌드 성공!"
+(문서 업데이트 없음)
 ```

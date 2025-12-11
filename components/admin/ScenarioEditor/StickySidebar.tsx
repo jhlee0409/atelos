@@ -34,11 +34,36 @@ export default function StickySidebar({
 }: Props) {
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   const [isValidationExpanded, setIsValidationExpanded] = useState(true);
+  const [isWarningDialogOpen, setIsWarningDialogOpen] = useState(false);
 
   // 데이터 일관성 검증
   const validationResult: ValidationResult = useMemo(() => {
     return validateScenario(scenario);
   }, [scenario]);
+
+  // 저장 및 활성화 핸들러 (검증 포함)
+  const handleSaveWithValidation = () => {
+    // 데이터 일관성 오류가 있으면 차단
+    if (validationResult.summary.errors > 0) {
+      toast.error(`데이터 일관성 오류 ${validationResult.summary.errors}개를 먼저 해결해주세요.`);
+      return;
+    }
+
+    // 경고만 있으면 확인 다이얼로그 표시
+    if (validationResult.summary.warnings > 0) {
+      setIsWarningDialogOpen(true);
+      return;
+    }
+
+    // 문제 없으면 바로 저장
+    handleSaveAndActivate();
+  };
+
+  // 경고 무시하고 저장
+  const handleProceedWithWarnings = () => {
+    setIsWarningDialogOpen(false);
+    handleSaveAndActivate();
+  };
 
   // 카테고리별 이슈 그룹화
   const issuesByCategory = useMemo(() => {
@@ -105,7 +130,7 @@ export default function StickySidebar({
         {/* 저장 버튼들 */}
         <div className="space-y-3">
           <Button
-            onClick={handleSaveAndActivate}
+            onClick={handleSaveWithValidation}
             className="w-full bg-kairos-gold font-medium text-telos-black hover:bg-kairos-gold/90"
             size="lg"
             disabled={isSaving}
@@ -328,6 +353,48 @@ export default function StickySidebar({
           <pre className="max-h-[70vh] overflow-y-auto bg-gray-900 font-mono text-xs text-green-400">
             {JSON.stringify(scenario, null, 2)}
           </pre>
+        </DialogContent>
+      </Dialog>
+
+      {/* 검증 경고 확인 다이얼로그 */}
+      <Dialog open={isWarningDialogOpen} onOpenChange={setIsWarningDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+              <AlertTriangle className="h-5 w-5" />
+              검증 경고 확인
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              시나리오에 {validationResult.summary.warnings}개의 경고가 있습니다.
+              이대로 활성화하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 max-h-48 overflow-y-auto rounded border border-yellow-200 bg-yellow-50 p-3">
+            <ul className="space-y-1 text-xs text-yellow-700">
+              {validationResult.issues
+                .filter((i) => i.type === 'warning')
+                .map((issue, idx) => (
+                  <li key={idx} className="flex items-start gap-1">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                    <span>{issue.message}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsWarningDialogOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleProceedWithWarnings}
+              className="bg-yellow-500 text-white hover:bg-yellow-600"
+            >
+              경고 무시하고 활성화
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
