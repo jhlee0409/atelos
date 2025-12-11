@@ -12,6 +12,7 @@ import StoryOpeningContent from '@/components/admin/ScenarioEditor/StoryOpeningC
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
 import CoreStoryElementsContent from '@/components/admin/ScenarioEditor/CoreStoryElementsContent';
+import GameplayConfigContent from '@/components/admin/ScenarioEditor/GameplayConfigContent';
 import StickySidebar from '@/components/admin/ScenarioEditor/StickySidebar';
 import { toast } from 'sonner';
 import { VALIDATION_IDS } from '@/constants/scenario';
@@ -205,6 +206,12 @@ function ScenarioDetailContent() {
               scenario={scenario}
               setScenario={setScenario}
               errors={validationErrors}
+            />
+          </div>
+          <div id="section-gameplay">
+            <GameplayConfigContent
+              scenario={scenario}
+              setScenario={setScenario}
             />
           </div>
         </div>

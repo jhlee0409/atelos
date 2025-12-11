@@ -37,7 +37,8 @@ export type GenerationCategory =
   | 'story_opening'
   | 'character_introductions'
   | 'hidden_relationships'
-  | 'character_revelations';
+  | 'character_revelations'
+  | 'gameplay_config';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -471,6 +472,108 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['characterRevelations'],
   },
+
+  // ==========================================================================
+  // 게임플레이 설정 (GameplayConfig)
+  // ==========================================================================
+  gameplay_config: {
+    type: SchemaType.OBJECT,
+    properties: {
+      routeActivationRatio: {
+        type: SchemaType.NUMBER,
+        description: '루트 분기 활성화 시점 비율 (0.3~0.5 권장, 예: 0.4 = 총 일수의 40%)',
+      },
+      endingCheckRatio: {
+        type: SchemaType.NUMBER,
+        description: '엔딩 체크 시작 비율 (0.6~0.8 권장, 예: 0.7 = 총 일수의 70%)',
+      },
+      narrativePhaseRatios: {
+        type: SchemaType.OBJECT,
+        properties: {
+          setup: { type: SchemaType.NUMBER, description: '도입부 끝나는 비율 (0.2~0.4)' },
+          rising_action: { type: SchemaType.NUMBER, description: '전개부 끝나는 비율 (0.5~0.7)' },
+          midpoint: { type: SchemaType.NUMBER, description: '중반부 끝나는 비율 (0.7~0.85)' },
+          climax: { type: SchemaType.NUMBER, description: '클라이맥스 (항상 1.0)' },
+        },
+        required: ['setup', 'rising_action', 'midpoint', 'climax'],
+      },
+      actionPointsPerDay: {
+        type: SchemaType.INTEGER,
+        description: '하루당 행동 포인트 (2~5, 액션 많으면 높게)',
+      },
+      criticalStatThreshold: {
+        type: SchemaType.NUMBER,
+        description: '위험 스탯 임계값 비율 (0.3~0.5, 낮을수록 관대)',
+      },
+      warningStatThreshold: {
+        type: SchemaType.NUMBER,
+        description: '경고 스탯 임계값 비율 (criticalStatThreshold보다 높아야 함)',
+      },
+      routeScores: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            routeName: { type: SchemaType.STRING, description: '루트 이름 (예: 탈출, 항전, 협상)' },
+            flagScores: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  flagName: { type: SchemaType.STRING, description: '플래그 이름' },
+                  score: { type: SchemaType.INTEGER, description: '점수 (10~50)' },
+                },
+                required: ['flagName', 'score'],
+              },
+              description: '플래그별 점수',
+            },
+            statScores: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  statId: { type: SchemaType.STRING, description: '스탯 ID' },
+                  comparison: {
+                    type: SchemaType.STRING,
+                    format: 'enum',
+                    enum: ['>=', '<=', '>', '<', '=='],
+                  },
+                  threshold: { type: SchemaType.INTEGER, description: '임계값' },
+                  score: { type: SchemaType.INTEGER, description: '점수' },
+                },
+                required: ['statId', 'comparison', 'threshold', 'score'],
+              },
+              description: '스탯 조건별 점수 (선택)',
+            },
+          },
+          required: ['routeName', 'flagScores'],
+        },
+        description: '루트별 점수 설정',
+      },
+      tokenBudgetMultiplier: {
+        type: SchemaType.NUMBER,
+        description: 'AI 토큰 예산 배수 (0.8~1.5, 복잡한 시나리오는 높게)',
+      },
+      useGenreFallback: {
+        type: SchemaType.BOOLEAN,
+        description: '장르 기반 폴백 선택지 사용 여부',
+      },
+      customFallbackChoices: {
+        type: SchemaType.OBJECT,
+        properties: {
+          prompt: { type: SchemaType.STRING, description: '커스텀 폴백 프롬프트' },
+          choice_a: { type: SchemaType.STRING, description: '선택지 A' },
+          choice_b: { type: SchemaType.STRING, description: '선택지 B' },
+        },
+        required: ['prompt', 'choice_a', 'choice_b'],
+      },
+      reasoning: {
+        type: SchemaType.STRING,
+        description: '이 설정을 선택한 이유 설명',
+      },
+    },
+    required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'routeScores', 'tokenBudgetMultiplier', 'useGenreFallback', 'reasoning'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -491,6 +594,8 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   character_introductions: 0.65, // 중간 - 캐릭터 맥락에 맞는 소개
   hidden_relationships: 0.6, // 중간 - 흥미로우면서 논리적인 숨겨진 관계
   character_revelations: 0.65, // 중간 - 점진적 공개 레이어 설계
+  // 게임플레이 설정
+  gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -510,6 +615,8 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   character_introductions: 3000, // 캐릭터별 소개 시퀀스
   hidden_relationships: 4000, // 복잡한 숨겨진 관계 구조
   character_revelations: 4000, // 캐릭터별 다중 레이어 공개
+  // 게임플레이 설정
+  gameplay_config: 3000, // 루트 점수 설정 + 설명
 };
 
 interface AIGenerateRequestBody {
@@ -1224,6 +1331,90 @@ ${baseContext}
 
 <critical>characterName에 사용하는 이름은 반드시 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다. 새로운 캐릭터 이름을 만들지 마세요.</critical>`,
     },
+
+    // ========================================================================
+    // 게임플레이 설정 (GameplayConfig)
+    // ========================================================================
+    gameplay_config: {
+      systemPrompt: `<role>인터랙티브 게임 밸런스 설계자</role>
+
+<task>시나리오의 특성(장르, 총 일수, 플래그, 스탯)에 맞는 최적의 게임플레이 설정을 생성합니다.</task>
+
+<gameplay_config_parameters>
+1. **routeActivationRatio** (0.3~0.5): 전체 게임 일수 중 루트 분기가 활성화되는 시점
+   - 7일 게임에서 0.4 = Day 3
+   - 빠른 전개: 0.3, 느린 빌드업: 0.5
+
+2. **endingCheckRatio** (0.6~0.8): 엔딩 조건 체크가 시작되는 시점
+   - 7일 게임에서 0.7 = Day 5
+   - 조기 엔딩 가능: 0.6, 끝까지 긴장감: 0.8
+
+3. **narrativePhaseRatios**: 서사 단계 전환 비율
+   - setup: 도입부 (0.2~0.4)
+   - rising_action: 전개부 (0.5~0.7)
+   - midpoint: 중반 전환점 (0.7~0.85)
+   - climax: 클라이맥스 (항상 1.0)
+
+4. **actionPointsPerDay** (2~5): 하루에 사용할 수 있는 행동 포인트
+   - 액션 장르: 4-5 (많은 선택)
+   - 미스터리/드라마: 2-3 (신중한 선택)
+
+5. **criticalStatThreshold** (0.3~0.5): 스탯이 "위험" 상태로 표시되는 비율
+   - 관대한 게임: 0.3
+   - 긴장감 있는 게임: 0.4-0.5
+
+6. **warningStatThreshold**: 경고 표시 비율 (critical보다 높아야 함)
+
+7. **routeScores**: 루트별 점수 설정
+   - 각 루트에 관련된 플래그를 매핑
+   - 중요 플래그: 40-50점
+   - 보조 플래그: 20-30점
+   - 기본 플래그: 10-20점
+
+8. **tokenBudgetMultiplier** (0.8~1.5): AI 토큰 예산 배수
+   - 복잡한 시나리오: 1.2-1.5
+   - 단순한 시나리오: 0.8-1.0
+
+9. **useGenreFallback**: 장르 기반 폴백 선택지 사용 여부
+
+10. **customFallbackChoices** (선택): 시나리오 맞춤 폴백 선택지
+</gameplay_config_parameters>
+
+<route_design_principles>
+- 일반적으로 3개의 루트를 설계합니다: 탈출형, 방어형, 협상형
+- 각 루트는 2-4개의 관련 플래그로 구성됩니다
+- 플래그 점수 합계가 가장 높은 루트가 현재 루트로 표시됩니다
+- 시나리오 특성에 따라 루트 이름과 구성을 조정하세요
+</route_design_principles>
+
+<genre_specific_tips>
+- **액션/스릴러**: 높은 AP(4-5), 낮은 위험 임계값, 빠른 루트 활성화
+- **미스터리/추리**: 낮은 AP(2-3), 느린 서사 전개, 높은 엔딩 체크 비율
+- **호러/서바이벌**: 중간 AP, 높은 위험 임계값, 빠른 엔딩 체크
+- **드라마/로맨스**: 낮은 AP(2-3), 느린 전개, 캐릭터 관계 중심
+- **SF/판타지**: 높은 토큰 예산, 복잡한 루트 구조
+</genre_specific_tips>`,
+      userPrompt: `<request>다음 시나리오에 최적화된 게임플레이 설정을 생성해주세요.</request>
+
+<scenario_context>
+${input}
+</scenario_context>
+${baseContext}
+
+<requirements>
+- 시나리오의 장르, 분위기, 페이스에 맞는 설정 선택
+- **반드시** existing_flags에 있는 플래그만 routeScores에 사용
+- **반드시** existing_stats에 있는 스탯만 statScores에 사용 (사용하는 경우)
+- 플래그를 탈출/방어/협상 등의 루트로 분류
+- 각 설정값에 대한 이유를 reasoning에 설명
+- customFallbackChoices는 시나리오 특성이 기본 장르 폴백과 맞지 않을 때만 제공
+</requirements>
+
+<critical>
+- routeScores의 flagName은 existing_flags 목록에 있는 값만 사용
+- statScores를 사용할 경우 existing_stats 목록에 있는 statId만 사용
+</critical>`,
+    },
   };
 
   return prompts[category];
@@ -1234,8 +1425,9 @@ export async function POST(request: NextRequest) {
     const body: AIGenerateRequestBody = await request.json();
     const { category, input, context } = body;
 
-    // idea_suggestions는 빈 입력 허용 (다양한 장르로 자동 생성)
-    if (!category || (category !== 'idea_suggestions' && !input)) {
+    // idea_suggestions, gameplay_config는 빈 입력 허용 (컨텍스트 기반 자동 생성)
+    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config'];
+    if (!category || (!categoriesAllowingEmptyInput.includes(category) && !input)) {
       return NextResponse.json(
         { error: 'category와 input은 필수입니다.' },
         { status: 400 },

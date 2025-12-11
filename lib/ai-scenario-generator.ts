@@ -14,7 +14,8 @@ export type GenerationCategory =
   | 'story_opening'
   | 'character_introductions'
   | 'hidden_relationships'
-  | 'character_revelations';
+  | 'character_revelations'
+  | 'gameplay_config';
 
 export interface GenerationContext {
   genre?: string[];
@@ -201,6 +202,39 @@ export interface CharacterRevelationsResult {
   characterRevelations: CharacterRevelationResult[];
 }
 
+// =============================================================================
+// 게임플레이 설정 (GameplayConfig Generation)
+// =============================================================================
+
+export interface RouteScoreConfigResult {
+  routeName: string;
+  flagScores: { flagName: string; score: number }[];
+  statScores?: { statId: string; comparison: '>=' | '<=' | '>' | '<' | '=='; threshold: number; score: number }[];
+}
+
+export interface GameplayConfigResult {
+  routeActivationRatio: number;
+  endingCheckRatio: number;
+  narrativePhaseRatios: {
+    setup: number;
+    rising_action: number;
+    midpoint: number;
+    climax: number;
+  };
+  actionPointsPerDay: number;
+  criticalStatThreshold: number;
+  warningStatThreshold: number;
+  routeScores: RouteScoreConfigResult[];
+  tokenBudgetMultiplier: number;
+  useGenreFallback: boolean;
+  customFallbackChoices?: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+  };
+  reasoning: string; // AI가 왜 이렇게 설정했는지 설명
+}
+
 export interface AIGenerationResponse<T> {
   success: boolean;
   category: GenerationCategory;
@@ -319,5 +353,10 @@ export const CATEGORY_INFO: Record<
     label: '점진적 캐릭터 공개',
     description: '신뢰도에 따라 캐릭터 정보가 단계적으로 공개되도록 설계합니다.',
     placeholder: '캐릭터 목록이 자동으로 사용됩니다',
+  },
+  gameplay_config: {
+    label: '게임플레이 설정',
+    description: '시나리오 특성에 맞는 게임플레이 설정을 자동 생성합니다 (루트 점수, 액션 포인트 등).',
+    placeholder: '플래그, 스탯, 장르 정보가 자동으로 사용됩니다',
   },
 };
