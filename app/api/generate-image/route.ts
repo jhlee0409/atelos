@@ -32,10 +32,17 @@ interface GenerateImageRequestBody {
   genre?: string[];
   synopsis?: string;
   keywords?: string[];
+  // 시나리오 배경 정보 (다양성 향상용)
+  setting?: {
+    timePeriod?: string; // 예: '현대', '조선시대', '2150년', '중세'
+    location?: string; // 예: '서울', '뉴욕', '판타지 왕국', '우주정거장'
+    culture?: string; // 예: '한국', '서양', '다문화', '미래 다국적'
+  };
   // 캐릭터용 필드
   characterName?: string;
   roleName?: string;
   backstory?: string;
+  traits?: string[]; // 캐릭터 특성
   scenarioTitle?: string;
   scenarioGenre?: string[];
 }
@@ -192,6 +199,240 @@ const GENRE_STYLE_MAP: Record<
   },
 };
 
+// 장르/배경별 시각적 스타일 (미학) 매핑
+const AESTHETICS_MAP: Record<string, { visualStyle: string; characterStyle: string; diversity: string }> = {
+  // 한국 특화 장르
+  사극: {
+    visualStyle: 'traditional Korean historical drama (sageuk) aesthetics with Joseon-era grandeur',
+    characterStyle: 'Korean historical figures with traditional hanbok and period-appropriate styling',
+    diversity: 'Korean historical',
+  },
+  // SF - 글로벌/미래지향
+  SF: {
+    visualStyle: 'international sci-fi cinema aesthetics blending Eastern and Western influences',
+    characterStyle: 'diverse multinational cast reflecting a globalized future',
+    diversity: 'diverse international, mixed ethnicities',
+  },
+  // 판타지 - 다양한 스타일
+  판타지: {
+    visualStyle: 'high fantasy aesthetics inspired by both Western and Eastern mythology',
+    characterStyle: 'fantastical characters with varied appearances, from European medieval to Asian folklore',
+    diversity: 'fantasy diverse, varied skin tones and features',
+  },
+  // 포스트 아포칼립스 - 글로벌
+  '포스트 아포칼립스': {
+    visualStyle: 'gritty post-apocalyptic cinema with international survival aesthetics',
+    characterStyle: 'survivors from various backgrounds, weathered and diverse',
+    diversity: 'diverse survivors, mixed ethnicities',
+  },
+  // 액션/전쟁 - 국제적
+  액션: {
+    visualStyle: 'Hollywood-style action cinema with global appeal',
+    characterStyle: 'action heroes and characters of varied backgrounds',
+    diversity: 'international action cast',
+  },
+  전쟁: {
+    visualStyle: 'war film aesthetics, could be Korean War, WWII, or fictional conflict',
+    characterStyle: 'soldiers and civilians from the conflict period',
+    diversity: 'period-appropriate based on setting',
+  },
+  // 한국 현대물
+  드라마: {
+    visualStyle: 'contemporary Korean drama (K-drama) aesthetics',
+    characterStyle: 'modern Korean characters in contemporary settings',
+    diversity: 'primarily Korean with possible international characters',
+  },
+  로맨스: {
+    visualStyle: 'romantic drama aesthetics with soft, intimate visuals',
+    characterStyle: 'attractive leads appropriate to the setting',
+    diversity: 'based on story setting',
+  },
+  멜로: {
+    visualStyle: 'emotional melodrama with Korean cinematic sensibility',
+    characterStyle: 'expressive Korean characters with deep emotional range',
+    diversity: 'Korean melodrama cast',
+  },
+  // 서양 느낌
+  미스터리: {
+    visualStyle: 'noir and mystery cinema aesthetics, international detective style',
+    characterStyle: 'mysterious figures, could be any ethnicity based on setting',
+    diversity: 'diverse based on story setting',
+  },
+  범죄: {
+    visualStyle: 'crime thriller aesthetics blending Korean noir with international influences',
+    characterStyle: 'morally complex characters from urban environments',
+    diversity: 'urban diverse',
+  },
+  스릴러: {
+    visualStyle: 'psychological thriller cinema with suspenseful atmosphere',
+    characterStyle: 'tense characters revealing inner turmoil',
+    diversity: 'based on story setting',
+  },
+  호러: {
+    visualStyle: 'Asian horror aesthetics with supernatural elements',
+    characterStyle: 'characters facing the unknown, often Korean/Asian horror style',
+    diversity: 'Asian horror tradition',
+  },
+  // 기본값
+  default: {
+    visualStyle: 'cinematic aesthetics with international appeal',
+    characterStyle: 'diverse characters appropriate to the narrative',
+    diversity: 'diverse international',
+  },
+};
+
+// 배경 설정에서 미학 정보 추출
+function getAestheticsFromSetting(setting?: GenerateImageRequestBody['setting'], genres?: string[]): typeof AESTHETICS_MAP['default'] {
+  // 문화권 설정이 있으면 우선 사용
+  if (setting?.culture) {
+    const culture = setting.culture.toLowerCase();
+    if (culture.includes('한국') || culture.includes('korean')) {
+      return {
+        visualStyle: 'Korean cinematic aesthetics',
+        characterStyle: 'Korean characters with local styling',
+        diversity: 'Korean',
+      };
+    }
+    if (culture.includes('서양') || culture.includes('western') || culture.includes('유럽')) {
+      return {
+        visualStyle: 'Western cinematic aesthetics',
+        characterStyle: 'Western characters with varied European/American features',
+        diversity: 'Western diverse',
+      };
+    }
+    if (culture.includes('다문화') || culture.includes('다국적') || culture.includes('international')) {
+      return {
+        visualStyle: 'international cinematic aesthetics',
+        characterStyle: 'diverse multinational cast',
+        diversity: 'diverse international, mixed ethnicities',
+      };
+    }
+  }
+
+  // 시대/지역 설정 확인
+  if (setting?.timePeriod) {
+    const period = setting.timePeriod.toLowerCase();
+    if (period.includes('조선') || period.includes('고려') || period.includes('삼국')) {
+      return AESTHETICS_MAP['사극'];
+    }
+    if (period.includes('중세') || period.includes('medieval')) {
+      return {
+        visualStyle: 'medieval European fantasy aesthetics',
+        characterStyle: 'medieval European character designs',
+        diversity: 'European medieval',
+      };
+    }
+    if (period.includes('미래') || period.includes('21') || period.includes('22')) {
+      return AESTHETICS_MAP['SF'];
+    }
+  }
+
+  if (setting?.location) {
+    const location = setting.location.toLowerCase();
+    if (location.includes('서울') || location.includes('부산') || location.includes('한국')) {
+      return {
+        visualStyle: 'modern Korean urban aesthetics',
+        characterStyle: 'contemporary Korean characters',
+        diversity: 'Korean modern',
+      };
+    }
+    if (location.includes('뉴욕') || location.includes('런던') || location.includes('파리') || location.includes('미국') || location.includes('유럽')) {
+      return {
+        visualStyle: 'Western urban cinematic aesthetics',
+        characterStyle: 'diverse Western urban characters',
+        diversity: 'Western urban diverse',
+      };
+    }
+    if (location.includes('우주') || location.includes('space') || location.includes('행성')) {
+      return AESTHETICS_MAP['SF'];
+    }
+  }
+
+  // 장르에서 미학 추출
+  if (genres?.length) {
+    for (const genre of genres) {
+      if (AESTHETICS_MAP[genre]) {
+        return AESTHETICS_MAP[genre];
+      }
+    }
+  }
+
+  return AESTHETICS_MAP['default'];
+}
+
+// 캐릭터 배경에서 외모 힌트 추출
+function extractAppearanceHints(backstory?: string, roleName?: string, traits?: string[]): string {
+  const hints: string[] = [];
+
+  // backstory에서 나이 관련 힌트 추출
+  if (backstory) {
+    const text = backstory.toLowerCase();
+    // 나이대 추출
+    if (text.includes('젊은') || text.includes('청년') || text.includes('20대') || text.includes('대학')) {
+      hints.push('young adult in their 20s');
+    } else if (text.includes('중년') || text.includes('40대') || text.includes('50대') || text.includes('경험 많은')) {
+      hints.push('middle-aged, experienced');
+    } else if (text.includes('노인') || text.includes('노년') || text.includes('60대') || text.includes('원로')) {
+      hints.push('elderly, wise appearance');
+    } else if (text.includes('10대') || text.includes('학생') || text.includes('소년') || text.includes('소녀')) {
+      hints.push('teenager, youthful');
+    }
+
+    // 성별 힌트 (한국어 역할명에서)
+    if (text.includes('여성') || text.includes('그녀') || text.includes('딸') || text.includes('어머니') || text.includes('여자') || text.includes('아내')) {
+      hints.push('female');
+    } else if (text.includes('남성') || text.includes('그는') || text.includes('아들') || text.includes('아버지') || text.includes('남자') || text.includes('남편')) {
+      hints.push('male');
+    }
+
+    // 직업/외모 관련
+    if (text.includes('군인') || text.includes('병사') || text.includes('장교')) {
+      hints.push('military bearing, disciplined posture');
+    }
+    if (text.includes('과학자') || text.includes('연구원') || text.includes('박사')) {
+      hints.push('intellectual appearance, thoughtful expression');
+    }
+    if (text.includes('의사') || text.includes('간호사') || text.includes('의료')) {
+      hints.push('medical professional demeanor');
+    }
+    if (text.includes('무사') || text.includes('검객') || text.includes('전사')) {
+      hints.push('warrior physique, battle-hardened');
+    }
+  }
+
+  // 역할명에서 힌트
+  if (roleName) {
+    const role = roleName.toLowerCase();
+    if (role.includes('리더') || role.includes('지도자') || role.includes('대장')) {
+      hints.push('authoritative presence, leadership aura');
+    }
+    if (role.includes('조력자') || role.includes('보조')) {
+      hints.push('supportive and approachable demeanor');
+    }
+    if (role.includes('악역') || role.includes('적대자')) {
+      hints.push('intimidating or unsettling presence');
+    }
+  }
+
+  // 특성에서 힌트
+  if (traits?.length) {
+    for (const trait of traits) {
+      const t = trait.toLowerCase();
+      if (t.includes('강인') || t.includes('힘') || t.includes('체력')) {
+        hints.push('strong build, physically capable');
+      }
+      if (t.includes('지적') || t.includes('지능') || t.includes('전략')) {
+        hints.push('sharp, intelligent eyes');
+      }
+      if (t.includes('카리스마') || t.includes('매력')) {
+        hints.push('charismatic, magnetic presence');
+      }
+    }
+  }
+
+  return hints.length > 0 ? hints.join(', ') : 'distinctive and memorable appearance';
+}
+
 // 장르에서 스타일 정보 추출
 function getStyleFromGenres(genres: string[]): (typeof GENRE_STYLE_MAP)['default'] {
   // 첫 번째 매칭되는 장르의 스타일 사용
@@ -208,14 +449,21 @@ function getStyleFromGenres(genres: string[]): (typeof GENRE_STYLE_MAP)['default
 function buildPosterPrompt(data: GenerateImageRequestBody): string {
   const genres = data.genre || ['드라마'];
   const style = getStyleFromGenres(genres);
+  const aesthetics = getAestheticsFromSetting(data.setting, genres);
   const genreText = genres.join(', ');
   const keywordText = data.keywords?.join(', ') || '';
 
+  // 배경 설정 문자열 생성
+  const settingContext = data.setting
+    ? `Set in ${data.setting.location || 'an evocative location'}${data.setting.timePeriod ? ` during ${data.setting.timePeriod}` : ''}.`
+    : '';
+
   // 구조화된 자연어 프롬프트 (Google 권장 방식)
-  return `Create a cinematic movie poster for a Korean interactive narrative game titled "${data.title || 'Untitled'}".
+  return `Create a cinematic movie poster for an interactive narrative game titled "${data.title || 'Untitled'}".
 
 [SCENE DESCRIPTION]
 The poster should capture the essence of this story: ${data.synopsis || 'A dramatic tale of choices and consequences.'}
+${settingContext}
 The visual should immediately communicate the ${genreText} genre to viewers.
 
 [SUBJECT & COMPOSITION]
@@ -235,8 +483,12 @@ Use shallow depth of field to guide the viewer's eye to key elements.
 
 [COLOR & STYLE]
 Color palette: ${style.colorPalette}.
-Visual style: High-quality photorealistic rendering with Korean cinema aesthetics.
+Visual style: High-quality photorealistic rendering with ${aesthetics.visualStyle}.
 Include these visual elements where appropriate: ${style.visualElements}.
+
+[DIVERSITY & REPRESENTATION]
+Character representation: ${aesthetics.diversity}.
+${aesthetics.characterStyle}.
 
 [TECHNICAL REQUIREMENTS]
 - Professional movie poster quality
@@ -251,17 +503,24 @@ The final image should look like it belongs on a theater wall, immediately commu
 function buildCharacterPrompt(data: GenerateImageRequestBody): string {
   const genres = data.scenarioGenre || ['드라마'];
   const style = getStyleFromGenres(genres);
+  const aesthetics = getAestheticsFromSetting(data.setting, genres);
   const genreText = genres.join(', ');
 
-  // 캐릭터 배경에서 나이/성별 힌트 추출 시도
+  // 캐릭터 배경에서 나이/성별/외모 힌트 추출
   const backstory = data.backstory || '';
   const roleName = data.roleName || 'Supporting Character';
+  const appearanceHints = extractAppearanceHints(backstory, roleName, data.traits);
 
-  return `Create a character portrait for "${data.characterName || 'Unknown'}", a key figure in the Korean ${genreText} narrative game "${data.scenarioTitle || 'Untitled'}".
+  return `Create a character portrait for "${data.characterName || 'Unknown'}", a key figure in a ${genreText} narrative game "${data.scenarioTitle || 'Untitled'}".
 
 [CHARACTER IDENTITY]
 This character serves as the ${roleName} in the story.
 Their background: ${backstory || 'A complex individual shaped by the world around them, carrying both visible and hidden depths.'}
+
+[APPEARANCE GUIDANCE]
+Physical characteristics: ${appearanceHints}.
+Character style context: ${aesthetics.characterStyle}.
+Ethnicity/diversity context: ${aesthetics.diversity}.
 
 [PORTRAIT COMPOSITION]
 Frame as an upper body portrait shot in 1:1 square aspect ratio.
@@ -286,7 +545,7 @@ Add subtle rim lighting to separate the subject from the background.
 
 [COLOR & STYLE]
 Color treatment: ${style.colorPalette}.
-Visual style: Photorealistic Korean drama aesthetics with cinematic quality.
+Visual style: Photorealistic ${aesthetics.visualStyle} with cinematic quality.
 The overall mood should feel ${style.mood}.
 
 [TECHNICAL REQUIREMENTS]
