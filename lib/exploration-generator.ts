@@ -1,14 +1,32 @@
-import { ExplorationLocation, ExplorationResult, SaveState, ScenarioData } from '@/types';
+import {
+  ExplorationLocation,
+  ExplorationResult,
+  SaveState,
+  ScenarioData,
+  ActionContext,
+  WorldState,
+  ConcreteDiscovery,
+  WorldLocation,
+} from '@/types';
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { getKoreanStatName } from '@/constants/korean-english-mapping';
+import { buildContextSummary, buildCluesSummary } from './context-manager';
+import {
+  getDiscoverableItems,
+  processExploration,
+  summarizeWorldState,
+} from './world-state-manager';
 
-// 탐색 프롬프트 빌드
+// 탐색 프롬프트 빌드 (WorldState 활용)
 const buildExplorationPrompt = (
-  location: ExplorationLocation,
+  location: ExplorationLocation | WorldLocation | { locationId: string; name: string; description: string },
   saveState: SaveState,
-  scenario: ScenarioData
+  scenario: ScenarioData,
+  discoverableItems: ConcreteDiscovery[] = []
 ): string => {
   const currentDay = saveState.context.currentDay || 1;
+  const actionContext = saveState.context.actionContext;
+  const worldState = saveState.context.worldState;
 
   // 현재 스탯 상황
   const statsSummary = Object.entries(saveState.context.scenarioStats)
@@ -30,22 +48,57 @@ const buildExplorationPrompt = (
     .slice(0, 5)
     .map((f) => f.flagName);
 
+  // 오늘의 맥락 (이전 행동들)
+  const contextSummary = actionContext ? buildContextSummary(actionContext) : '첫 탐색';
+  const cluesSummary = actionContext ? buildCluesSummary(actionContext) : '없음';
+
+  // 월드 상태 요약
+  const worldSummary = worldState ? summarizeWorldState(worldState) : '정보 없음';
+
+  // 발견 가능한 구체적 아이템 목록
+  const discoverableItemsStr = discoverableItems.length > 0
+    ? discoverableItems.map((item) => `- ${item.name} (${item.type}): ${item.description}`).join('\n')
+    : '특별히 예정된 발견물 없음';
+
   const prompt = `당신은 ${scenario.title}의 게임 마스터입니다.
 
 ## 현재 상황
 - Day ${currentDay}/${scenario.endCondition.value || 7}
 - 주요 스탯: ${statsSummary}
 
+## 월드 상태
+${worldSummary}
+
+## 오늘의 맥락 (이전 행동과 연결할 것)
+${contextSummary}
+
+## 발견한 단서
+${cluesSummary}
+
 ## 탐색 장소
 - 장소: ${location.name}
-- 설명: ${location.description}
+- 설명: ${'currentDescription' in location ? location.currentDescription : location.description}
+
+## 발견 가능한 아이템 (구체적으로 사용할 것)
+${discoverableItemsStr}
 
 ## 요청
-플레이어가 "${location.name}"을(를) 탐색합니다. 짧은 탐색 결과 서사와 보상을 생성해주세요.
+플레이어가 "${location.name}"을(를) 탐색합니다.
+
+**중요 규칙:**
+1. 발견물은 반드시 구체적이어야 합니다:
+   - ✅ 좋은 예: "녹슨 서랍에서 응급 치료 키트를 발견했다"
+   - ✅ 좋은 예: "벽에 붙은 건물 도면을 발견했다. 지하로 가는 통로가 표시되어 있다"
+   - ❌ 나쁜 예: "도시 전체에 퍼져 있는 보이지 않는 위협을 감지했다"
+   - ❌ 나쁜 예: "뭔가 불길한 기운이 느껴진다"
+2. 정보도 구체적이어야 합니다:
+   - ✅ 좋은 예: "창문 너머로 동쪽 3블록 거리에서 연기가 피어오르는 것이 보인다"
+   - ❌ 나쁜 예: "상황이 좋지 않아 보인다"
+3. 아무것도 발견하지 못했다면 왜 그런지 구체적으로 설명하세요
 
 ## 응답 규칙
 1. 서사는 2-3문장으로 간결하게
-2. 보상은 선택적입니다 (없어도 됨)
+2. 발견물은 위 목록에서 선택하거나, 유사한 구체적 아이템 생성
 3. 스탯 변화는 -5 ~ +5 범위 내
 4. 반드시 한국어로만 응답
 5. 분위기는 ${scenario.genre?.join(', ') || '서바이벌'} 장르에 맞게
@@ -58,15 +111,19 @@ ${availableFlags.length > 0 ? availableFlags.join(', ') : '없음'}
 
 ## 출력 형식 (JSON만 출력)
 {
-  "narrative": "탐색 결과 서사 (2-3문장)",
+  "narrative": "탐색 결과 서사 (2-3문장, 구체적 발견물 포함)",
+  "discoveredItem": {
+    "name": "발견한 아이템/문서 이름" 또는 null,
+    "type": "item|document|equipment|clue|resource" 또는 null,
+    "description": "구체적 설명" 또는 null
+  },
   "rewards": {
     "statChanges": { "스탯ID": 변화량 } 또는 null,
     "flagsAcquired": ["플래그명"] 또는 null,
-    "infoGained": "획득한 정보" 또는 null
+    "infoGained": "구체적인 획득 정보 (예: '지하 통로가 창고 뒤편에 있다')" 또는 null
   }
 }
 
-rewards의 각 필드는 모두 null일 수 있습니다 (아무것도 발견하지 못한 경우).
 JSON만 출력하세요.`;
 
   return prompt;
@@ -126,20 +183,27 @@ const generateFallbackExplorationResult = (
   );
 };
 
-// 탐색 결과 생성
+// 탐색 결과 생성 (기본 버전 - 하위 호환성 유지)
 export const generateExplorationResult = async (
   location: ExplorationLocation,
   saveState: SaveState,
   scenario: ScenarioData
 ): Promise<ExplorationResult> => {
   try {
-    const prompt = buildExplorationPrompt(location, saveState, scenario);
+    const worldState = saveState.context.worldState;
+    const discoverableItems = worldState
+      ? getDiscoverableItems(worldState, location.locationId, saveState)
+      : [];
+
+    const userPrompt = buildExplorationPrompt(location, saveState, scenario, discoverableItems);
 
     console.log(`🔍 탐색 결과 생성 요청: ${location.name}`);
 
-    const response = await callGeminiAPI(prompt, {
+    const response = await callGeminiAPI({
+      systemPrompt: `당신은 ${scenario.title}의 게임 마스터입니다. 플레이어의 탐색 행동에 대한 결과를 JSON 형식으로 생성합니다. 발견물은 반드시 구체적인 아이템이나 정보여야 합니다.`,
+      userPrompt,
       temperature: 0.7,
-      maxTokens: 400,
+      maxTokens: 500,
     });
 
     if (!response) {
@@ -149,6 +213,11 @@ export const generateExplorationResult = async (
 
     const parsed = parseGeminiJsonResponse<{
       narrative: string;
+      discoveredItem?: {
+        name?: string | null;
+        type?: string | null;
+        description?: string | null;
+      } | null;
       rewards?: {
         statChanges?: { [key: string]: number } | null;
         flagsAcquired?: string[] | null;
@@ -163,19 +232,178 @@ export const generateExplorationResult = async (
 
     console.log(`🔍 탐색 결과 생성 완료: "${parsed.narrative.substring(0, 50)}..."`);
 
+    // discoveredItem이 있으면 infoGained에 추가
+    let infoGained = parsed.rewards?.infoGained || undefined;
+    if (parsed.discoveredItem?.name && parsed.discoveredItem?.description) {
+      const itemInfo = `${parsed.discoveredItem.name}: ${parsed.discoveredItem.description}`;
+      infoGained = infoGained ? `${infoGained}. ${itemInfo}` : itemInfo;
+    }
+
     return {
       locationId: location.locationId,
       narrative: parsed.narrative,
-      rewards: parsed.rewards
+      rewards: parsed.rewards || parsed.discoveredItem
         ? {
-            statChanges: parsed.rewards.statChanges || undefined,
-            flagsAcquired: parsed.rewards.flagsAcquired || undefined,
-            infoGained: parsed.rewards.infoGained || undefined,
+            statChanges: parsed.rewards?.statChanges || undefined,
+            flagsAcquired: parsed.rewards?.flagsAcquired || undefined,
+            infoGained,
           }
         : undefined,
     };
   } catch (error) {
     console.error('🔍 탐색 생성 오류:', error);
     return generateFallbackExplorationResult(location);
+  }
+};
+
+// =============================================================================
+// WorldState 통합 탐색 결과 생성
+// =============================================================================
+
+export interface EnhancedExplorationResult extends ExplorationResult {
+  /** 발견한 구체적 아이템 */
+  discoveredItems: ConcreteDiscovery[];
+  /** 트리거된 월드 이벤트 */
+  triggeredEvents: string[];
+  /** 상태가 변경된 위치들 */
+  locationChanges: { locationId: string; newStatus: string; reason?: string }[];
+  /** UI 알림 메시지 */
+  notifications: string[];
+}
+
+/**
+ * WorldState를 활용한 향상된 탐색 결과 생성
+ */
+export const generateEnhancedExplorationResult = async (
+  location: WorldLocation,
+  saveState: SaveState,
+  scenario: ScenarioData
+): Promise<EnhancedExplorationResult> => {
+  const worldState = saveState.context.worldState;
+
+  if (!worldState) {
+    // WorldState가 없으면 기본 결과 반환
+    const basicResult = await generateExplorationResult(
+      {
+        locationId: location.locationId,
+        name: location.name,
+        description: location.currentDescription,
+        icon: location.icon,
+        available: location.status === 'available',
+      },
+      saveState,
+      scenario
+    );
+    return {
+      ...basicResult,
+      discoveredItems: [],
+      triggeredEvents: [],
+      locationChanges: [],
+      notifications: [],
+    };
+  }
+
+  // WorldState를 사용한 탐색 처리
+  const explorationResult = processExploration(worldState, location.locationId, saveState);
+  const discoverableItems = getDiscoverableItems(worldState, location.locationId, saveState);
+
+  try {
+    // AI를 통한 서사 생성
+    const userPrompt = buildExplorationPrompt(location, saveState, scenario, discoverableItems);
+
+    const response = await callGeminiAPI({
+      systemPrompt: `당신은 ${scenario.title}의 게임 마스터입니다. 플레이어의 탐색 행동에 대한 결과를 JSON 형식으로 생성합니다. 발견물은 반드시 구체적인 아이템이나 정보여야 합니다.`,
+      userPrompt,
+      temperature: 0.7,
+      maxTokens: 500,
+    });
+
+    if (!response) {
+      throw new Error('AI 응답 없음');
+    }
+
+    const parsed = parseGeminiJsonResponse<{
+      narrative: string;
+      discoveredItem?: {
+        name?: string | null;
+        type?: string | null;
+        description?: string | null;
+      } | null;
+      rewards?: {
+        statChanges?: { [key: string]: number } | null;
+        flagsAcquired?: string[] | null;
+        infoGained?: string | null;
+      };
+    }>(response);
+
+    if (!parsed?.narrative) {
+      throw new Error('파싱 실패');
+    }
+
+    // 발견물 정보 구성
+    let infoGained = parsed.rewards?.infoGained || undefined;
+    if (parsed.discoveredItem?.name && parsed.discoveredItem?.description) {
+      const itemInfo = `${parsed.discoveredItem.name}: ${parsed.discoveredItem.description}`;
+      infoGained = infoGained ? `${infoGained}. ${itemInfo}` : itemInfo;
+    }
+
+    // 알림 메시지 구성
+    const notifications = [...explorationResult.notifications];
+    if (parsed.discoveredItem?.name) {
+      notifications.push(`발견: ${parsed.discoveredItem.name}`);
+    }
+
+    return {
+      locationId: location.locationId,
+      narrative: parsed.narrative,
+      rewards: {
+        statChanges: parsed.rewards?.statChanges || undefined,
+        flagsAcquired: [
+          ...(parsed.rewards?.flagsAcquired || []),
+          ...explorationResult.newDiscoveries.flatMap((d) => d.effects?.flagsAcquired || []),
+        ].filter((flag, index, self) => self.indexOf(flag) === index), // 중복 제거
+        infoGained,
+      },
+      discoveredItems: explorationResult.newDiscoveries,
+      triggeredEvents: explorationResult.triggeredEvents.map((e) => e.description),
+      locationChanges: explorationResult.changedLocations.map((c) => ({
+        locationId: c.locationId,
+        newStatus: c.newStatus,
+        reason: c.reason,
+      })),
+      notifications,
+    };
+  } catch (error) {
+    console.error('🔍 향상된 탐색 생성 오류:', error);
+
+    // 폴백: WorldState 결과만 사용
+    return {
+      locationId: location.locationId,
+      narrative: explorationResult.newDiscoveries.length > 0
+        ? `${location.name}을(를) 탐색하여 ${explorationResult.newDiscoveries.map((d) => d.name).join(', ')}을(를) 발견했다.`
+        : `${location.name}을(를) 탐색했지만 특별한 것은 발견하지 못했다.`,
+      rewards: explorationResult.newDiscoveries.length > 0
+        ? {
+            infoGained: explorationResult.newDiscoveries.map((d) => `${d.name}: ${d.description}`).join('. '),
+            statChanges: explorationResult.newDiscoveries.reduce((acc, d) => {
+              if (d.effects?.statChanges) {
+                Object.entries(d.effects.statChanges).forEach(([k, v]) => {
+                  acc[k] = (acc[k] || 0) + v;
+                });
+              }
+              return acc;
+            }, {} as Record<string, number>),
+            flagsAcquired: explorationResult.newDiscoveries.flatMap((d) => d.effects?.flagsAcquired || []),
+          }
+        : undefined,
+      discoveredItems: explorationResult.newDiscoveries,
+      triggeredEvents: explorationResult.triggeredEvents.map((e) => e.description),
+      locationChanges: explorationResult.changedLocations.map((c) => ({
+        locationId: c.locationId,
+        newStatus: c.newStatus,
+        reason: c.reason,
+      })),
+      notifications: explorationResult.notifications,
+    };
   }
 };

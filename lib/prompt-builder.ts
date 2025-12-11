@@ -1,9 +1,10 @@
-import { ScenarioData, PlayerState, Character } from '@/types';
+import { ScenarioData, PlayerState, Character, ActionContext } from '@/types';
 import { UniversalMasterSystemPrompt } from '@/mocks/UniversalMasterSystemPrompt';
 import {
   formatGenreStyleForPrompt,
   getNarrativeStyleFromGenres,
 } from './genre-narrative-styles';
+import { formatContextForPrompt } from './context-manager';
 
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
@@ -183,6 +184,7 @@ export const buildOptimizedGamePrompt = (
     includeDetailedStats?: boolean;
     currentDay?: number;
     keyDecisions?: KeyDecision[];
+    actionContext?: ActionContext; // 맥락 연결 시스템
   } = {},
 ): GamePromptData => {
   const {
@@ -400,8 +402,14 @@ ${genreGuide}
 ${phaseGuideline}
 ${keyDecisionsSection}`;
 
+  // 맥락 정보 추가 (Phase 5)
+  const contextSection = options.actionContext
+    ? `\n\n### 오늘의 맥락 (CONTEXT - 이전 행동과 연결할 것) ###\n${formatContextForPrompt(options.actionContext)}`
+    : '';
+
   const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
 Player chose: ${playerAction.actionDescription}
+${contextSection}
 
 Write the consequence in Korean (MINIMUM 200 characters). MUST include:
 1. **Character Reactions**: How each character responds with dialogue
@@ -411,6 +419,7 @@ Write the consequence in Korean (MINIMUM 200 characters). MUST include:
    - "마음이...", "가슴이..."
 3. **Vivid Scene Description**: Environment, atmosphere, tension
 4. **Next Challenge**: New dilemma that emerges from this choice
+5. **CONTEXT CONNECTION**: Reference today's explorations, dialogues, and discovered clues
 
 Write vividly with emotional depth. Character feelings are essential.`;
 

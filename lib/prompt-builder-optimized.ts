@@ -1,5 +1,6 @@
-import { ScenarioData, PlayerState, Character, KeyDecision } from '@/types';
+import { ScenarioData, PlayerState, Character, KeyDecision, ActionContext } from '@/types';
 import { getCompactGenreStyle, getNarrativeStyleFromGenres } from './genre-narrative-styles';
+import { formatContextForPrompt } from './context-manager';
 
 // ===========================================
 // 토큰 최적화 v2: 압축된 프롬프트 시스템
@@ -179,6 +180,7 @@ export const buildOptimizedGamePromptV2 = (
     currentDay?: number;
     includeRelationships?: boolean;
     keyDecisions?: KeyDecision[];
+    actionContext?: ActionContext;
   } = {},
 ): GamePromptData => {
   const {
@@ -186,6 +188,7 @@ export const buildOptimizedGamePromptV2 = (
     currentDay = 1,
     includeRelationships = false,
     keyDecisions,
+    actionContext,
   } = options;
 
   // 초경량 모드
@@ -251,13 +254,19 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
   // 회상 시스템 - 주요 결정 (서사 연속성)
   const pastDecisions = formatKeyDecisionsCompact(keyDecisions, 3);
 
+  // 맥락 연결 시스템 - 오늘의 행동과 발견한 단서 포함
+  const contextSection = actionContext
+    ? `\nTODAY'S CONTEXT (이전 행동과 연결하세요):\n${formatContextForPrompt(actionContext)}`
+    : '';
+
   // 사용자 프롬프트 압축
   const userPrompt = `Previous: "${lastLog.substring(0, 50)}..."
 Choice: ${playerAction.actionDescription}
 ${relationshipInfo ? `Relations: ${relationshipInfo}` : ''}
 ${pastDecisions ? `PastChoices: ${pastDecisions}` : ''}
+${contextSection}
 ${narrativeHint}
-Continue story with character reactions, referencing past choices for continuity.`;
+Continue story with character reactions, referencing past choices and today's context for continuity.`;
 
   return {
     systemPrompt,

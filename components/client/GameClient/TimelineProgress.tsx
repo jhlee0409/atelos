@@ -1,6 +1,9 @@
 import { cn } from '@/lib/utils';
 import { SaveState, ScenarioData } from '@/types';
-import { Sun, Sunset, Moon, Sunrise, Clock, Calendar, AlertTriangle } from 'lucide-react';
+import { Sun, Sunset, Moon, Sunrise, Clock, Calendar, AlertTriangle, Zap } from 'lucide-react';
+
+/** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
+const DEFAULT_ACTION_POINTS = 3;
 
 interface TimelineProgressProps {
   saveState: SaveState;
@@ -8,12 +11,23 @@ interface TimelineProgressProps {
   className?: string;
 }
 
-// 하루 시간대 결정 (턴 수 기반)
-const getTimeOfDay = (turnsInDay: number): 'morning' | 'afternoon' | 'evening' | 'night' => {
-  if (turnsInDay <= 1) return 'morning';
-  if (turnsInDay <= 2) return 'afternoon';
-  if (turnsInDay <= 3) return 'evening';
-  return 'night';
+/**
+ * 하루 시간대 결정 (AP 기반)
+ * - 3 AP → 아침 (하루 시작)
+ * - 2 AP → 낮 (행동 진행 중)
+ * - 1 AP → 저녁 (마지막 행동)
+ * - 0 AP → 밤 (하루 종료 대기)
+ */
+const getTimeOfDay = (
+  currentAP: number,
+  maxAP: number
+): 'morning' | 'afternoon' | 'evening' | 'night' => {
+  const apRatio = currentAP / maxAP;
+
+  if (apRatio >= 1) return 'morning';     // 100% AP
+  if (apRatio >= 0.67) return 'afternoon'; // ~67% AP (2/3)
+  if (apRatio >= 0.34) return 'evening';   // ~34% AP (1/3)
+  return 'night';                          // 0% AP
 };
 
 // 시간대별 설정
@@ -60,8 +74,11 @@ export const TimelineProgress = ({
 }: TimelineProgressProps) => {
   const currentDay = saveState.context.currentDay || 1;
   const totalDays = scenario.endCondition.value || 7;
-  const turnsInDay = saveState.context.turnsInCurrentDay || 0;
-  const timeOfDay = getTimeOfDay(turnsInDay);
+
+  // AP 기반 시간대 계산
+  const currentAP = saveState.context.actionPoints ?? DEFAULT_ACTION_POINTS;
+  const maxAP = saveState.context.maxActionPoints ?? DEFAULT_ACTION_POINTS;
+  const timeOfDay = getTimeOfDay(currentAP, maxAP);
   const config = timeOfDayConfig[timeOfDay];
   const TimeIcon = config.icon;
 
@@ -132,41 +149,66 @@ export const TimelineProgress = ({
         </div>
       </div>
 
-      {/* 하단: 시간대 진행 */}
+      {/* 하단: AP 기반 시간대 진행 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          {['morning', 'afternoon', 'evening', 'night'].map((time, i) => {
-            const isActive = time === timeOfDay;
-            const isPast = ['morning', 'afternoon', 'evening', 'night'].indexOf(time) <
-                          ['morning', 'afternoon', 'evening', 'night'].indexOf(timeOfDay);
-            const TimeOfDayIcon = timeOfDayConfig[time as keyof typeof timeOfDayConfig].icon;
-
-            return (
-              <div
-                key={time}
-                className={cn(
-                  "flex items-center justify-center w-6 h-6 rounded",
-                  isActive
-                    ? "bg-zinc-700 ring-1 ring-white/20"
-                    : isPast
-                      ? "bg-zinc-800/50"
-                      : "bg-zinc-900"
-                )}
-                title={timeOfDayConfig[time as keyof typeof timeOfDayConfig].label}
-              >
-                <TimeOfDayIcon
+        {/* AP 표시 */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Zap className={cn(
+              "h-3 w-3",
+              currentAP === 0 ? "text-zinc-600" : currentAP === 1 ? "text-orange-400" : "text-blue-400"
+            )} />
+            <div className="flex gap-0.5">
+              {Array.from({ length: maxAP }).map((_, i) => (
+                <div
+                  key={i}
                   className={cn(
-                    "h-3 w-3",
-                    isActive
-                      ? timeOfDayConfig[time as keyof typeof timeOfDayConfig].color
-                      : isPast
-                        ? "text-zinc-600"
-                        : "text-zinc-700"
+                    "w-2 h-2 rounded-full transition-all",
+                    i < currentAP
+                      ? currentAP === 1
+                        ? "bg-orange-400"
+                        : "bg-blue-400"
+                      : "bg-zinc-700"
                   )}
                 />
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
+          {/* 시간대 아이콘들 */}
+          <div className="flex items-center gap-1">
+            {['morning', 'afternoon', 'evening', 'night'].map((time) => {
+              const isActive = time === timeOfDay;
+              const isPast = ['morning', 'afternoon', 'evening', 'night'].indexOf(time) <
+                            ['morning', 'afternoon', 'evening', 'night'].indexOf(timeOfDay);
+              const TimeOfDayIcon = timeOfDayConfig[time as keyof typeof timeOfDayConfig].icon;
+
+              return (
+                <div
+                  key={time}
+                  className={cn(
+                    "flex items-center justify-center w-5 h-5 rounded",
+                    isActive
+                      ? "bg-zinc-700 ring-1 ring-white/20"
+                      : isPast
+                        ? "bg-zinc-800/50"
+                        : "bg-zinc-900"
+                  )}
+                  title={timeOfDayConfig[time as keyof typeof timeOfDayConfig].label}
+                >
+                  <TimeOfDayIcon
+                    className={cn(
+                      "h-2.5 w-2.5",
+                      isActive
+                        ? timeOfDayConfig[time as keyof typeof timeOfDayConfig].color
+                        : isPast
+                          ? "text-zinc-600"
+                          : "text-zinc-700"
+                    )}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* 남은 시간 경고 */}
@@ -206,14 +248,18 @@ export const TimelineProgressCompact = ({
 }: TimelineProgressProps) => {
   const currentDay = saveState.context.currentDay || 1;
   const totalDays = scenario.endCondition.value || 7;
-  const turnsInDay = saveState.context.turnsInCurrentDay || 0;
-  const timeOfDay = getTimeOfDay(turnsInDay);
+
+  // AP 기반 시간대 계산
+  const currentAP = saveState.context.actionPoints ?? DEFAULT_ACTION_POINTS;
+  const maxAP = saveState.context.maxActionPoints ?? DEFAULT_ACTION_POINTS;
+  const timeOfDay = getTimeOfDay(currentAP, maxAP);
   const config = timeOfDayConfig[timeOfDay];
   const TimeIcon = config.icon;
 
   const progress = calculateProgress(currentDay, totalDays);
   const remainingDays = totalDays - currentDay;
   const isEndingSoon = remainingDays <= 2;
+  const isLowAP = currentAP === 1;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -229,7 +275,7 @@ export const TimelineProgressCompact = ({
       </div>
 
       {/* 진행바 */}
-      <div className="w-16 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+      <div className="w-12 h-1.5 overflow-hidden rounded-full bg-zinc-800">
         <div
           className={cn(
             "h-full rounded-full transition-all",
@@ -237,6 +283,20 @@ export const TimelineProgressCompact = ({
           )}
           style={{ width: `${progress}%` }}
         />
+      </div>
+
+      {/* AP 표시 (컴팩트) */}
+      <div className="flex items-center gap-0.5">
+        <Zap className={cn(
+          "h-2.5 w-2.5",
+          currentAP === 0 ? "text-zinc-600" : isLowAP ? "text-orange-400" : "text-blue-400"
+        )} />
+        <span className={cn(
+          "text-[10px]",
+          currentAP === 0 ? "text-zinc-600" : isLowAP ? "text-orange-400" : "text-zinc-400"
+        )}>
+          {currentAP}
+        </span>
       </div>
 
       {/* 시간대 아이콘 */}

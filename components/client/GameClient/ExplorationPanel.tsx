@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { ExplorationLocation, SaveState, ScenarioData } from '@/types';
+import { ExplorationLocation, SaveState, ScenarioData, WorldLocation } from '@/types';
 import {
   Warehouse,
   DoorOpen,
@@ -9,10 +9,12 @@ import {
   Bed,
   MapPin,
   Loader2,
-  Lock,
-  Clock
+  Briefcase,
+  Compass,
+  Ban,
+  ArrowLeft
 } from 'lucide-react';
-import { useState } from 'react';
+import { getLocationsForUI } from '@/lib/world-state-manager';
 
 interface ExplorationPanelProps {
   scenario: ScenarioData;
@@ -22,8 +24,8 @@ interface ExplorationPanelProps {
   isLoading?: boolean;
 }
 
-// 장소 아이콘 매핑
-const getLocationIcon = (icon: ExplorationLocation['icon']) => {
+// 장소 아이콘 매핑 (WorldLocation 아이콘도 지원)
+const getLocationIcon = (icon: ExplorationLocation['icon'] | WorldLocation['icon']) => {
   switch (icon) {
     case 'warehouse':
       return Warehouse;
@@ -37,17 +39,44 @@ const getLocationIcon = (icon: ExplorationLocation['icon']) => {
       return ArrowDown;
     case 'quarters':
       return Bed;
+    case 'office':
+      return Briefcase;
+    case 'corridor':
+      return Compass;
+    case 'exterior':
+      return Compass;
+    case 'hidden':
+      return MapPin;
     default:
       return MapPin;
   }
 };
 
-// 시나리오에 따른 탐색 장소 생성
+// WorldState UI 위치 데이터 타입
+interface UILocation {
+  locationId: string;
+  name: string;
+  description: string;
+  icon: WorldLocation['icon'];
+  available: boolean;
+  statusReason?: string;
+  wasDeactivated?: boolean; // 활성화됐다가 비활성화된 경우
+}
+
+// 시나리오에 따른 탐색 장소 생성 (WorldState 우선)
 const generateLocationsForScenario = (
   scenario: ScenarioData,
-  currentDay: number
-): ExplorationLocation[] => {
-  // 기본 장소들
+  currentDay: number,
+  saveState?: SaveState
+): (ExplorationLocation | UILocation)[] => {
+  // WorldState가 있으면 동적 위치 사용
+  if (saveState?.context.worldState) {
+    const worldLocations = getLocationsForUI(saveState.context.worldState, saveState);
+    console.log(`🗺️ WorldState 위치 ${worldLocations.length}개 로드`);
+    return worldLocations;
+  }
+
+  // 폴백: 정적 위치 생성 (레거시)
   const baseLocations: ExplorationLocation[] = [
     {
       locationId: 'storage',
@@ -109,27 +138,28 @@ const generateLocationsForScenario = (
   return baseLocations;
 };
 
-// 장소 카드
+// 장소 카드 (UILocation 지원) - 몰입감을 위해 간소화
 const LocationCard = ({
   location,
   onExplore,
   isLoading,
 }: {
-  location: ExplorationLocation;
+  location: ExplorationLocation | UILocation;
   onExplore: (location: ExplorationLocation) => void;
   isLoading?: boolean;
 }) => {
   const Icon = getLocationIcon(location.icon);
   const isLocked = !location.available;
+  const statusReason = 'statusReason' in location ? location.statusReason : undefined;
 
   return (
     <button
-      onClick={() => !isLocked && onExplore(location)}
+      onClick={() => !isLocked && onExplore(location as ExplorationLocation)}
       disabled={isLocked || isLoading}
       className={cn(
         "w-full rounded-lg border p-3 text-left transition-all",
         isLocked
-          ? "border-zinc-800 bg-zinc-900/30 opacity-50 cursor-not-allowed"
+          ? "border-zinc-800 bg-zinc-900/30 opacity-40 cursor-not-allowed"
           : "border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-zinc-600",
         isLoading && "opacity-50 cursor-not-allowed"
       )}
@@ -137,34 +167,26 @@ const LocationCard = ({
       <div className="flex items-start gap-3">
         <div className={cn(
           "flex h-10 w-10 items-center justify-center rounded-lg",
-          isLocked ? "bg-zinc-800" : "bg-zinc-800/80"
+          isLocked ? "bg-zinc-800/50" : "bg-zinc-800/80"
         )}>
           {isLocked ? (
-            <Lock className="h-5 w-5 text-zinc-600" />
+            <Ban className="h-5 w-5 text-zinc-600" />
           ) : (
             <Icon className="h-5 w-5 text-zinc-400" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "font-medium",
-              isLocked ? "text-zinc-600" : "text-zinc-200"
-            )}>
-              {location.name}
-            </span>
-            {location.cooldownUntil && (
-              <span className="flex items-center gap-1 text-[10px] text-yellow-500">
-                <Clock className="h-2.5 w-2.5" />
-                Day {location.cooldownUntil}까지 대기
-              </span>
-            )}
-          </div>
+          <span className={cn(
+            "font-medium",
+            isLocked ? "text-zinc-600" : "text-zinc-200"
+          )}>
+            {location.name}
+          </span>
           <p className={cn(
             "text-xs mt-1",
-            isLocked ? "text-zinc-700" : "text-zinc-500"
+            isLocked ? "text-zinc-600" : "text-zinc-500"
           )}>
-            {location.description}
+            {isLocked && statusReason ? statusReason : location.description}
           </p>
         </div>
         {isLoading && (
@@ -183,36 +205,17 @@ export const ExplorationPanel = ({
   isLoading = false,
 }: ExplorationPanelProps) => {
   const currentDay = saveState.context.currentDay || 1;
-  const locations = generateLocationsForScenario(scenario, currentDay);
+  const locations = generateLocationsForScenario(scenario, currentDay, saveState);
+
+  // 접근 가능한 장소와 비활성화된 장소 분리
+  const availableLocations = locations.filter(loc => loc.available);
+  const deactivatedLocations = locations.filter(loc => !loc.available && ('wasDeactivated' in loc && loc.wasDeactivated));
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
-      {/* 헤더 */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-200">주변 탐색</span>
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            Day {currentDay}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-          disabled={isLoading}
-        >
-          닫기 ✕
-        </button>
-      </div>
-
-      {/* 설명 */}
-      <div className="mb-3 text-xs text-zinc-500">
-        탐색을 통해 자원이나 정보를 얻을 수 있습니다. 단, 시간이 소모될 수 있습니다.
-      </div>
-
-      {/* 장소 목록 */}
+      {/* 접근 가능한 장소 */}
       <div className="space-y-2">
-        {locations.map((location) => (
+        {availableLocations.map((location) => (
           <LocationCard
             key={location.locationId}
             location={location}
@@ -222,13 +225,30 @@ export const ExplorationPanel = ({
         ))}
       </div>
 
-      {/* 건너뛰기 버튼 */}
+      {/* 비활성화된 장소 (파괴/차단됨) */}
+      {deactivatedLocations.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-zinc-800/50">
+          <div className="space-y-1.5">
+            {deactivatedLocations.map((location) => (
+              <LocationCard
+                key={location.locationId}
+                location={location}
+                onExplore={onExplore}
+                isLoading={isLoading}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 돌아가기 버튼 */}
       <button
         onClick={onClose}
-        className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
         disabled={isLoading}
+        className="w-full flex items-center justify-center gap-1 py-2 mt-3 text-xs text-zinc-500 hover:text-zinc-300"
       >
-        건너뛰기 →
+        <ArrowLeft className="h-3 w-3" />
+        돌아가기
       </button>
     </div>
   );

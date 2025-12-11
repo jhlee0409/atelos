@@ -636,6 +636,7 @@ export const generateGameResponse = async (
           currentDay: saveState.context.currentDay || 1,
           includeRelationships: dynamicSettings.includeRelationships,
           keyDecisions: saveState.keyDecisions,
+          actionContext: saveState.context.actionContext,
         },
       );
     } else {
@@ -662,6 +663,7 @@ export const generateGameResponse = async (
           includeDetailedStats: aiSettings.includeDetailedStats,
           currentDay: saveState.context.currentDay || 1,
           keyDecisions: saveState.keyDecisions,
+          actionContext: saveState.context.actionContext,
         },
       );
     }
