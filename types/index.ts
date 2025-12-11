@@ -120,6 +120,101 @@ export type TraitPool = {
   debuffs: Trait[];
 };
 
+// =============================================================================
+// 스토리 오프닝 시스템 (Story Opening System)
+// =============================================================================
+
+/**
+ * 주인공 설정 - AI가 자연스러운 오프닝을 생성하기 위한 정보
+ */
+export interface ProtagonistSetup {
+  /** 주인공 이름 (없으면 AI가 적절히 호칭) */
+  name?: string;
+  /** 주인공 직업/역할 */
+  occupation?: string;
+  /** 성격 특성 (한 줄 설명) */
+  personality?: string;
+  /** 일상 루틴 (평범한 삶 묘사용) */
+  dailyRoutine?: string;
+  /** 주인공의 약점 또는 고민 */
+  weakness?: string;
+}
+
+/**
+ * 캐릭터 소개 방식 타입
+ */
+export type CharacterIntroductionStyle =
+  | 'gradual'    // 점진적 소개 - 스토리 진행에 따라 한 명씩
+  | 'immediate'  // 즉시 전체 소개 - 첫 장면에 모든 캐릭터 등장
+  | 'contextual'; // 맥락적 소개 - 상황에 따라 자연스럽게 등장
+
+/**
+ * 오프닝 톤 타입
+ */
+export type OpeningTone =
+  | 'mysterious'  // 신비로운 - 의문점을 남기며 시작
+  | 'urgent'      // 긴박한 - 위기 상황으로 바로 진입
+  | 'calm'        // 차분한 - 일상에서 시작하여 점진적으로 변화
+  | 'dramatic'    // 극적인 - 강렬한 사건으로 시작
+  | 'introspective'; // 내성적 - 주인공의 내면 묘사로 시작
+
+/**
+ * 스토리 오프닝 구조
+ * 3단계 오프닝: 프롤로그 → 촉발 사건 → 첫 딜레마
+ */
+export interface StoryOpening {
+  /**
+   * 프롤로그 - 주인공의 일상, 평범한 삶 묘사
+   * 예: "평범한 도시의 평범한 회사원 김민준. 그의 삶은 어제까지 반복되는 서류 작업과 야근의 연속이었다."
+   */
+  prologue?: string;
+
+  /**
+   * 촉발 사건 - 일상을 깨뜨리는 결정적 순간
+   * 예: "하지만 오늘, 그의 손끝에서 푸른빛이 터져 나왔다."
+   */
+  incitingIncident?: string;
+
+  /**
+   * 첫 번째 등장 캐릭터 - 촉발 사건 직후 만나는 인물
+   * 지정하지 않으면 시나리오의 첫 번째 캐릭터 사용
+   */
+  firstCharacterToMeet?: string;
+
+  /**
+   * 첫 대면 상황 - 첫 캐릭터와 어떤 상황에서 만나는지
+   * 예: "그녀는 주인공의 이상한 행동을 목격하고 조용히 다가왔다"
+   */
+  firstEncounterContext?: string;
+
+  /** 주인공 설정 */
+  protagonistSetup?: ProtagonistSetup;
+
+  /** 캐릭터 소개 방식 (기본값: contextual) */
+  characterIntroductionStyle?: CharacterIntroductionStyle;
+
+  /** 오프닝 톤 (기본값: calm) */
+  openingTone?: OpeningTone;
+
+  /**
+   * 오프닝에서 강조할 테마/키워드
+   * AI가 이 키워드들을 자연스럽게 녹여서 작성
+   */
+  thematicElements?: string[];
+
+  /**
+   * 시간대 설정 (기본값: morning)
+   * 오프닝 장면의 시간대
+   */
+  timeOfDay?: 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+
+  /**
+   * 오프닝 장소
+   * 구체적인 장소 설명 (예: "서울 강남의 한 오피스 빌딩")
+   */
+  openingLocation?: string;
+}
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -137,6 +232,8 @@ export type ScenarioData = {
   goalCluster?: GoalCluster;
   endingArchetypes: EndingArchetype[];
   status: 'in_progress' | 'testing' | 'active';
+  /** 스토리 오프닝 설정 (Phase 7) */
+  storyOpening?: StoryOpening;
 };
 
 // --- Game-specific state types, not part of scenario definition ---

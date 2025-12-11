@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { fetchScenario, updateScenario } from '@/lib/scenario-api';
 import type { ScenarioData } from '@/types';
 import BaseContent from '@/components/admin/ScenarioEditor/BaseContent';
+import StoryOpeningContent from '@/components/admin/ScenarioEditor/StoryOpeningContent';
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
 import CoreStoryElementsContent from '@/components/admin/ScenarioEditor/CoreStoryElementsContent';
@@ -176,6 +177,10 @@ function ScenarioDetailContent() {
             scenario={scenario}
             setScenario={setScenario}
             errors={validationErrors}
+          />
+          <StoryOpeningContent
+            scenario={scenario}
+            setScenario={setScenario}
           />
           <CharacterContent
             scenario={scenario}

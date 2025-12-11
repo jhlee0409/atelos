@@ -1,5 +1,5 @@
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
-import { buildOptimizedGamePrompt, PromptComplexity } from './prompt-builder';
+import { buildOptimizedGamePrompt, PromptComplexity, buildStoryOpeningPrompt, StoryOpeningResponse } from './prompt-builder';
 import {
   buildOptimizedGamePromptV2,
   getDynamicComplexity,
@@ -10,7 +10,7 @@ import {
   getGenericStatFilterPatterns,
   initScenarioMappingCache,
 } from './scenario-mapping-utils';
-import type { ScenarioData, PlayerState } from '@/types';
+import type { ScenarioData, PlayerState, Character } from '@/types';
 
 // 언어 혼용 감지 및 정리 함수
 export const detectAndCleanLanguageMixing = (
@@ -768,13 +768,188 @@ export const generateGameResponse = async (
   }
 };
 
-// 초기 딜레마 생성을 위한 함수
+// =============================================================================
+// Phase 7: 스토리 오프닝 시스템 (Story Opening System)
+// =============================================================================
+
+/**
+ * 스토리 오프닝 생성 결과 타입
+ * 게임 클라이언트에서 순차적으로 표시할 수 있도록 구성
+ */
+export interface StoryOpeningResult {
+  /** 프롤로그 - 주인공의 일상 묘사 */
+  prologue: string;
+  /** 촉발 사건 - 변화의 순간 */
+  incitingIncident: string;
+  /** 첫 캐릭터 만남 - 관계 설정 */
+  firstEncounter: string;
+  /** 첫 딜레마 - 선택지 포함 */
+  dilemma: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+    choice_c?: string;
+  };
+  /** 전체 로그 (이전 방식과 호환성 유지) */
+  fullLog: string;
+}
+
+/**
+ * 스토리 오프닝 생성 함수
+ * 3단계 구조: 프롤로그 → 촉발 사건 → 첫 캐릭터 만남 → 첫 딜레마
+ */
+export const generateStoryOpening = async (
+  scenario: ScenarioData,
+  characters: Character[],
+): Promise<StoryOpeningResult> => {
+  console.log('📖 스토리 오프닝 AI 생성 시작...');
+  console.log(`📚 시나리오: ${scenario.title}`);
+  console.log(`🎭 오프닝 톤: ${scenario.storyOpening?.openingTone || 'calm'}`);
+
+  try {
+    // 스토리 오프닝 전용 프롬프트 빌드
+    const openingPrompt = buildStoryOpeningPrompt(scenario, characters);
+
+    // AI 호출
+    const aiResponse = await callGeminiAPI({
+      systemPrompt: openingPrompt,
+      userPrompt: 'Generate the story opening following the 3-phase structure.',
+      model: 'gemini-2.5-flash-lite',
+      temperature: 0.7, // 창의적인 오프닝을 위해 약간 높은 temperature
+      maxTokens: 2500,
+    });
+
+    // JSON 파싱
+    const parsedResponse = parseGeminiJsonResponse<StoryOpeningResponse>(aiResponse);
+
+    // 응답 검증 및 정리
+    const cleanedPrologue = cleanNarrativeFormatting(parsedResponse.prologue || '', scenario);
+    const cleanedIncident = cleanNarrativeFormatting(parsedResponse.incitingIncident || '', scenario);
+    const cleanedEncounter = cleanNarrativeFormatting(parsedResponse.firstEncounter || '', scenario);
+    const cleanedPrompt = cleanNarrativeFormatting(parsedResponse.dilemma?.prompt || '', scenario);
+
+    // 전체 로그 구성 (3단계 연결)
+    const fullLog = [
+      cleanedPrologue,
+      cleanedIncident,
+      cleanedEncounter,
+    ].filter(Boolean).join('\n\n');
+
+    console.log('✅ 스토리 오프닝 AI 생성 성공!');
+
+    return {
+      prologue: cleanedPrologue,
+      incitingIncident: cleanedIncident,
+      firstEncounter: cleanedEncounter,
+      dilemma: {
+        prompt: cleanedPrompt,
+        choice_a: parsedResponse.dilemma?.choice_a || '신중하게 상황을 살펴본다',
+        choice_b: parsedResponse.dilemma?.choice_b || '즉시 행동에 나선다',
+        choice_c: parsedResponse.dilemma?.choice_c || '일단 상황을 지켜본다',
+      },
+      fullLog,
+    };
+  } catch (error) {
+    console.error('❌ 스토리 오프닝 AI 생성 실패:', error);
+
+    // 시나리오 데이터 기반 폴백 오프닝 생성
+    const storyOpening = scenario.storyOpening || {};
+    const firstCharacter = scenario.characters.find(c => c.characterName !== '(플레이어)');
+
+    const fallbackPrologue = storyOpening.prologue || `${scenario.synopsis.substring(0, 150)}...`;
+    const fallbackIncident = storyOpening.incitingIncident || '그리고 모든 것이 변했다.';
+    const fallbackEncounter = firstCharacter
+      ? `${firstCharacter.characterName}이(가) 다가왔다. "${firstCharacter.backstory.substring(0, 50)}..."`
+      : '누군가가 다가왔다.';
+
+    return {
+      prologue: fallbackPrologue,
+      incitingIncident: fallbackIncident,
+      firstEncounter: fallbackEncounter,
+      dilemma: {
+        prompt: '중요한 결정의 순간이 다가왔다. 어떻게 하겠는가?',
+        choice_a: '적극적으로 행동한다',
+        choice_b: '신중하게 접근한다',
+        choice_c: '일단 상황을 지켜본다',
+      },
+      fullLog: `${fallbackPrologue}\n\n${fallbackIncident}\n\n${fallbackEncounter}`,
+    };
+  }
+};
+
+/**
+ * 스토리 오프닝 사용 여부 확인
+ */
+export const hasStoryOpening = (scenario: ScenarioData): boolean => {
+  return !!(scenario.storyOpening && (
+    scenario.storyOpening.prologue ||
+    scenario.storyOpening.incitingIncident ||
+    scenario.storyOpening.protagonistSetup
+  ));
+};
+
+/**
+ * 확장된 초기 딜레마 생성 결과 타입
+ * 스토리 오프닝이 있는 경우 3단계 구조로 반환
+ */
+export interface InitialDilemmaResult {
+  /** 기본 AI 응답 */
+  aiResponse: AIResponse;
+  /** 스토리 오프닝 사용 여부 */
+  usedStoryOpening: boolean;
+  /** 스토리 오프닝 결과 (3단계 구조) */
+  storyOpeningResult?: StoryOpeningResult;
+}
+
+// 초기 딜레마 생성을 위한 함수 (스토리 오프닝 시스템 통합)
 export const generateInitialDilemma = async (
   saveState: SaveState,
   scenario: ScenarioData,
   useLiteVersion = false,
 ): Promise<AIResponse> => {
   console.log('🤖 초기 딜레마 AI 생성 시작...');
+
+  // 시나리오에 storyOpening이 설정되어 있으면 새로운 3단계 오프닝 시스템 사용
+  if (hasStoryOpening(scenario)) {
+    console.log('📖 스토리 오프닝 시스템 사용');
+
+    try {
+      // 캐릭터 정보 구성
+      const characters = saveState.community.survivors.map(s => {
+        const originalChar = scenario.characters.find(c => c.characterName === s.name);
+        return originalChar || {
+          roleId: s.role,
+          roleName: s.role,
+          characterName: s.name,
+          backstory: '',
+          imageUrl: '',
+          weightedTraitTypes: [],
+          currentTrait: null,
+        };
+      });
+
+      // 스토리 오프닝 생성
+      const storyOpening = await generateStoryOpening(scenario, characters);
+
+      // AIResponse 형식으로 변환
+      return {
+        log: storyOpening.fullLog,
+        dilemma: storyOpening.dilemma,
+        statChanges: {
+          scenarioStats: {},
+          survivorStatus: [],
+          hiddenRelationships_change: [],
+          flags_acquired: [],
+        },
+      };
+    } catch (error) {
+      console.warn('⚠️ 스토리 오프닝 생성 실패, 기존 방식으로 폴백');
+      // 실패 시 기존 방식으로 폴백
+    }
+  }
+
+  // 기존 방식 (storyOpening이 없거나 실패 시)
+  console.log('📜 기존 초기 딜레마 생성 방식 사용');
 
   const initialPlayerAction: PlayerAction = {
     actionId: 'START_GAME',
@@ -789,6 +964,84 @@ export const generateInitialDilemma = async (
     scenario,
     useLiteVersion,
   );
+};
+
+/**
+ * 3단계 스토리 오프닝을 생성하고 구조화된 결과 반환 (GameClient용)
+ * GameClient에서 각 단계를 순차적으로 표시할 수 있도록 함
+ */
+export const generateInitialDilemmaWithOpening = async (
+  saveState: SaveState,
+  scenario: ScenarioData,
+  useLiteVersion = false,
+): Promise<InitialDilemmaResult> => {
+  console.log('🤖 초기 딜레마 AI 생성 시작 (확장)...');
+
+  // 시나리오에 storyOpening이 설정되어 있으면 새로운 3단계 오프닝 시스템 사용
+  if (hasStoryOpening(scenario)) {
+    console.log('📖 스토리 오프닝 시스템 사용 (확장 모드)');
+
+    try {
+      // 캐릭터 정보 구성
+      const characters = saveState.community.survivors.map(s => {
+        const originalChar = scenario.characters.find(c => c.characterName === s.name);
+        return originalChar || {
+          roleId: s.role,
+          roleName: s.role,
+          characterName: s.name,
+          backstory: '',
+          imageUrl: '',
+          weightedTraitTypes: [],
+          currentTrait: null,
+        };
+      });
+
+      // 스토리 오프닝 생성
+      const storyOpeningResult = await generateStoryOpening(scenario, characters);
+
+      // AIResponse 형식으로 변환
+      const aiResponse: AIResponse = {
+        log: storyOpeningResult.fullLog,
+        dilemma: storyOpeningResult.dilemma,
+        statChanges: {
+          scenarioStats: {},
+          survivorStatus: [],
+          hiddenRelationships_change: [],
+          flags_acquired: [],
+        },
+      };
+
+      return {
+        aiResponse,
+        usedStoryOpening: true,
+        storyOpeningResult,
+      };
+    } catch (error) {
+      console.warn('⚠️ 스토리 오프닝 생성 실패, 기존 방식으로 폴백');
+      // 실패 시 기존 방식으로 폴백
+    }
+  }
+
+  // 기존 방식 (storyOpening이 없거나 실패 시)
+  console.log('📜 기존 초기 딜레마 생성 방식 사용');
+
+  const initialPlayerAction: PlayerAction = {
+    actionId: 'START_GAME',
+    actionDescription: '게임 시작',
+    playerFeedback: '플레이어가 게임을 시작했습니다.',
+  };
+
+  const aiResponse = await generateGameResponse(
+    saveState,
+    initialPlayerAction,
+    scenario,
+    useLiteVersion,
+  );
+
+  return {
+    aiResponse,
+    usedStoryOpening: false,
+  };
 };
 
 // 품질 모니터링을 위한 응답 분석
