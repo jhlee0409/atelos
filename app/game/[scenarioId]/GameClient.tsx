@@ -292,6 +292,20 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
+      // [2025 Enhanced] 주인공 지식 시스템 초기화
+      protagonistKnowledge: {
+        metCharacters: [],
+        discoveredRelationships: [],
+        hintedRelationships: [],
+        informationPieces: [],
+      },
+      // [2025 Enhanced] 숨겨진 NPC 관계 상태 초기화
+      npcRelationshipStates: scenario.storyOpening?.hiddenNPCRelationships?.map((rel) => ({
+        relationId: rel.relationId,
+        visibility: rel.visibility || 'hidden',
+      })) || [],
+      // [2025 Enhanced] 발동된 스토리 트리거 초기화
+      triggeredStoryEvents: [],
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({

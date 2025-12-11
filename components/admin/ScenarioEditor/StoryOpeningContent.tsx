@@ -211,17 +211,28 @@ ${characterDetails}`;
       const response = await generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context);
 
       if (response.data?.characterIntroductionSequence) {
+        const sequence = response.data.characterIntroductionSequence.map((intro) => ({
+          characterName: intro.characterName,
+          order: intro.order,
+          encounterContext: intro.encounterContext,
+          firstImpressionKeywords: intro.firstImpressionKeywords,
+          expectedTiming: intro.expectedTiming,
+        }));
+
+        // 첫 번째 캐릭터 찾기 (order=1)
+        const firstInSequence = sequence.find((s) => s.order === 1);
+
+        // firstCharacterToMeet 자동 동기화
         updateStoryOpening({
-          characterIntroductionSequence: response.data.characterIntroductionSequence.map((intro) => ({
-            characterName: intro.characterName,
-            order: intro.order,
-            encounterContext: intro.encounterContext,
-            firstImpressionKeywords: intro.firstImpressionKeywords,
-            expectedTiming: intro.expectedTiming,
-          })),
+          characterIntroductionSequence: sequence,
+          // 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
+          ...(firstInSequence && {
+            firstCharacterToMeet: firstInSequence.characterName,
+            firstEncounterContext: firstInSequence.encounterContext,
+          }),
         });
         setUseIntroSequence(true);
-        toast.success('캐릭터 소개 시퀀스가 생성되었습니다');
+        toast.success('캐릭터 소개 시퀀스가 생성되었습니다 (첫 캐릭터 자동 동기화됨)');
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '캐릭터 소개 시퀀스 생성에 실패했습니다');
@@ -331,6 +342,13 @@ ${characterDetails}`;
       if (introRes.data?.characterIntroductionSequence) {
         updates.characterIntroductionSequence = introRes.data.characterIntroductionSequence;
         setUseIntroSequence(true);
+
+        // [일관성 보장] 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
+        const firstInSequence = introRes.data.characterIntroductionSequence.find((s) => s.order === 1);
+        if (firstInSequence) {
+          updates.firstCharacterToMeet = firstInSequence.characterName;
+          updates.firstEncounterContext = firstInSequence.encounterContext;
+        }
       }
 
       if (hiddenRes.data?.hiddenNPCRelationships) {
