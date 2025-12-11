@@ -33,7 +33,11 @@ export type GenerationCategory =
   | 'traits'
   | 'keywords'
   | 'genre'
-  | 'idea_suggestions';
+  | 'idea_suggestions'
+  | 'story_opening'
+  | 'character_introductions'
+  | 'hidden_relationships'
+  | 'character_revelations';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -293,6 +297,180 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['ideas'],
   },
+
+  // ==========================================================================
+  // 스토리 오프닝 시스템 (Phase 7)
+  // ==========================================================================
+  story_opening: {
+    type: SchemaType.OBJECT,
+    properties: {
+      prologue: { type: SchemaType.STRING, description: '프롤로그 - 주인공의 일상, 평범한 삶 묘사 (100-200자)' },
+      incitingIncident: { type: SchemaType.STRING, description: '촉발 사건 - 일상을 깨뜨리는 결정적 순간 (100-200자)' },
+      firstCharacterToMeet: { type: SchemaType.STRING, description: '첫 번째 만나는 캐릭터 이름' },
+      firstEncounterContext: { type: SchemaType.STRING, description: '첫 대면 상황 설명 (50-100자)' },
+      protagonistSetup: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: { type: SchemaType.STRING, description: '주인공 이름 (선택적)' },
+          occupation: { type: SchemaType.STRING, description: '직업/역할' },
+          personality: { type: SchemaType.STRING, description: '성격 특성 (한 줄)' },
+          dailyRoutine: { type: SchemaType.STRING, description: '일상 루틴 설명' },
+          weakness: { type: SchemaType.STRING, description: '약점 또는 고민' },
+        },
+        required: ['occupation', 'personality'],
+      },
+      openingTone: {
+        type: SchemaType.STRING,
+        format: 'enum',
+        description: '오프닝 톤',
+        enum: ['calm', 'mysterious', 'urgent', 'dramatic', 'introspective'],
+      },
+      characterIntroductionStyle: {
+        type: SchemaType.STRING,
+        format: 'enum',
+        description: '캐릭터 소개 방식',
+        enum: ['gradual', 'immediate', 'contextual'],
+      },
+      timeOfDay: {
+        type: SchemaType.STRING,
+        format: 'enum',
+        description: '오프닝 시간대',
+        enum: ['dawn', 'morning', 'afternoon', 'evening', 'night'],
+      },
+      openingLocation: { type: SchemaType.STRING, description: '오프닝 장소 구체 설명' },
+      thematicElements: {
+        type: SchemaType.ARRAY,
+        items: { type: SchemaType.STRING },
+        description: '강조할 테마/키워드 (3-5개)',
+      },
+      npcRelationshipExposure: {
+        type: SchemaType.STRING,
+        format: 'enum',
+        description: 'NPC 관계 노출 모드',
+        enum: ['hidden', 'partial', 'visible'],
+      },
+    },
+    required: ['prologue', 'incitingIncident', 'firstCharacterToMeet', 'firstEncounterContext', 'protagonistSetup', 'openingTone', 'thematicElements'],
+  },
+
+  // ==========================================================================
+  // 2025 Enhanced: 1:1 캐릭터 소개 시퀀스
+  // ==========================================================================
+  character_introductions: {
+    type: SchemaType.OBJECT,
+    properties: {
+      characterIntroductionSequence: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            characterName: { type: SchemaType.STRING, description: '캐릭터 이름' },
+            order: { type: SchemaType.INTEGER, description: '소개 순서 (1부터 시작)' },
+            encounterContext: { type: SchemaType.STRING, description: '만남의 맥락 (50-100자)' },
+            firstImpressionKeywords: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING },
+              description: '첫인상 키워드 (2-3개)',
+            },
+            expectedTiming: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              description: '만남 예상 시점',
+              enum: ['opening', 'day1', 'day2', 'event-driven'],
+            },
+          },
+          required: ['characterName', 'order', 'encounterContext', 'firstImpressionKeywords', 'expectedTiming'],
+        },
+        description: '캐릭터별 1:1 소개 시퀀스',
+      },
+    },
+    required: ['characterIntroductionSequence'],
+  },
+
+  // ==========================================================================
+  // 2025 Enhanced: 숨겨진 NPC 관계 시스템
+  // ==========================================================================
+  hidden_relationships: {
+    type: SchemaType.OBJECT,
+    properties: {
+      hiddenNPCRelationships: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            relationId: { type: SchemaType.STRING, description: '관계 ID (예: REL_001)' },
+            characterA: { type: SchemaType.STRING, description: 'NPC A 이름' },
+            characterB: { type: SchemaType.STRING, description: 'NPC B 이름' },
+            actualValue: { type: SchemaType.INTEGER, description: '실제 관계 값 (-100~100)' },
+            relationshipType: { type: SchemaType.STRING, description: '관계 성격 (예: 과거 연인, 비밀 동료)' },
+            backstory: { type: SchemaType.STRING, description: '상세 배경 (100-200자)' },
+            visibility: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              description: '초기 가시성',
+              enum: ['hidden', 'hinted'],
+            },
+            discoveryHint: { type: SchemaType.STRING, description: '발견 힌트 텍스트' },
+            discoveryMethod: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              description: '주요 발견 방법',
+              enum: ['dialogue', 'exploration', 'observation', 'event', 'item'],
+            },
+          },
+          required: ['relationId', 'characterA', 'characterB', 'actualValue', 'relationshipType', 'backstory', 'visibility', 'discoveryHint', 'discoveryMethod'],
+        },
+        description: 'NPC들 간의 숨겨진 관계',
+      },
+    },
+    required: ['hiddenNPCRelationships'],
+  },
+
+  // ==========================================================================
+  // 2025 Enhanced: 점진적 캐릭터 공개 시스템
+  // ==========================================================================
+  character_revelations: {
+    type: SchemaType.OBJECT,
+    properties: {
+      characterRevelations: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            characterName: { type: SchemaType.STRING, description: '캐릭터 이름' },
+            revelationLayers: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  trustThreshold: { type: SchemaType.INTEGER, description: '신뢰도 임계값 (-100~100)' },
+                  revelationType: {
+                    type: SchemaType.STRING,
+                    format: 'enum',
+                    description: '공개 정보 유형',
+                    enum: ['personality', 'backstory', 'secret', 'motivation', 'relationship'],
+                  },
+                  content: { type: SchemaType.STRING, description: '공개 내용 (50-100자)' },
+                  revelationStyle: {
+                    type: SchemaType.STRING,
+                    format: 'enum',
+                    description: '공개 방식',
+                    enum: ['direct', 'subtle', 'accidental', 'confession'],
+                  },
+                },
+                required: ['trustThreshold', 'revelationType', 'content', 'revelationStyle'],
+              },
+              description: '신뢰도별 공개 레이어',
+            },
+            ultimateSecret: { type: SchemaType.STRING, description: '최고 신뢰도에서만 공개되는 비밀' },
+          },
+          required: ['characterName', 'revelationLayers'],
+        },
+        description: '캐릭터별 점진적 공개 설정',
+      },
+    },
+    required: ['characterRevelations'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -308,6 +486,11 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   keywords: 0.6, // 중간 - 적절한 키워드
   genre: 0.4, // 구조적 - 정확한 장르 분류
   idea_suggestions: 0.9, // 매우 창의적 - 다양하고 독특한 아이디어
+  // 스토리 오프닝 시스템 (Phase 7)
+  story_opening: 0.75, // 창의적 - 몰입감 있는 오프닝 생성
+  character_introductions: 0.65, // 중간 - 캐릭터 맥락에 맞는 소개
+  hidden_relationships: 0.6, // 중간 - 흥미로우면서 논리적인 숨겨진 관계
+  character_revelations: 0.65, // 중간 - 점진적 공개 레이어 설계
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -322,6 +505,11 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   keywords: 1000, // 간단한 목록
   genre: 1000, // 간단한 목록
   idea_suggestions: 2000, // 여러 아이디어
+  // 스토리 오프닝 시스템 (Phase 7)
+  story_opening: 3000, // 프롤로그, 촉발 사건, 주인공 설정 포함
+  character_introductions: 3000, // 캐릭터별 소개 시퀀스
+  hidden_relationships: 4000, // 복잡한 숨겨진 관계 구조
+  character_revelations: 4000, // 캐릭터별 다중 레이어 공개
 };
 
 interface AIGenerateRequestBody {
@@ -786,6 +974,205 @@ dark(어둡고 절망적), hopeful(희망적 성장), thriller(긴장감 서스�
   <requirement>플레이어가 주인공으로 선택을 내리는 상황</requirement>
   <requirement>각 아이디어에 어울리는 tone, targetLength, setting 포함</requirement>
   <requirement>다양한 tone을 골고루 사용</requirement>
+</requirements>`,
+    },
+
+    // ========================================================================
+    // 스토리 오프닝 시스템 (Phase 7)
+    // ========================================================================
+    story_opening: {
+      systemPrompt: `<role>인터랙티브 내러티브 오프닝 전문 작가</role>
+
+<task>시나리오의 몰입감 있는 스토리 오프닝을 설계합니다. 3단계 구조로 플레이어를 자연스럽게 세계관에 진입시킵니다.</task>
+
+<opening_structure>
+1. **프롤로그**: 주인공의 평범한 일상을 묘사합니다. 반복되는 루틴, 사소한 고민, 일상적인 관계를 통해 "변하기 전의 세계"를 보여줍니다.
+2. **촉발 사건 (Inciting Incident)**: 일상을 완전히 깨뜨리는 결정적 순간입니다. 되돌릴 수 없는 변화가 시작됩니다.
+3. **첫 만남**: 촉발 사건 직후, 주인공이 만나는 첫 번째 중요 인물입니다. 이 만남이 앞으로의 여정을 결정짓습니다.
+</opening_structure>
+
+<protagonist_guidelines>
+- 주인공은 플레이어의 아바타입니다. 너무 구체적인 성격보다는 플레이어가 투영할 수 있는 여지를 남겨주세요.
+- 직업과 일상 루틴은 구체적으로, 성격은 핵심 특징만 간결하게.
+- 약점이나 고민은 시나리오의 핵심 갈등과 연결되어야 합니다.
+</protagonist_guidelines>
+
+<tone_guidelines>
+- calm: 평화로운 일상에서 시작, 점진적 변화
+- mysterious: 처음부터 이상한 기운, 설명되지 않는 현상
+- urgent: 이미 위기 상황, 급박한 분위기
+- dramatic: 감정적으로 강렬한 시작
+- introspective: 주인공의 내면 묘사, 성찰적 시작
+</tone_guidelines>
+
+<introduction_styles>
+- gradual: 캐릭터들을 스토리 진행에 따라 한 명씩 자연스럽게 등장
+- immediate: 첫 장면에 주요 캐릭터 대부분 등장
+- contextual: 상황에 따라 필요할 때 등장
+</introduction_styles>
+
+<writing_principles>
+- 한국어로 자연스럽고 문학적인 문장을 사용하세요.
+- "보여주기"를 "말하기"보다 우선하세요. 주인공의 감정을 직접 설명하지 말고, 행동과 묘사로 보여주세요.
+- 감각적 디테일(시각, 청각, 촉각)을 활용하여 장면을 생생하게 만드세요.
+</writing_principles>`,
+      userPrompt: `<request>다음 시나리오에 어울리는 몰입감 있는 스토리 오프닝을 생성해주세요.</request>
+
+<scenario>
+${input}
+</scenario>
+${baseContext}
+
+<specific_requirements>
+- prologue: 주인공의 평범한 일상 묘사 (100-200자, 감각적 디테일 포함)
+- incitingIncident: 모든 것을 바꾸는 결정적 순간 (100-200자, 긴장감 있게)
+- firstCharacterToMeet: 시나리오 캐릭터 중 한 명
+- firstEncounterContext: 첫 만남이 어떤 상황에서 이루어지는지
+- protagonistSetup: 플레이어가 투영할 수 있는 주인공 설정
+- openingTone: 시나리오 분위기에 맞는 톤 선택
+- thematicElements: 오프닝에서 암시할 핵심 테마 3-5개
+</specific_requirements>`,
+    },
+
+    // ========================================================================
+    // 2025 Enhanced: 1:1 캐릭터 소개 시퀀스
+    // ========================================================================
+    character_introductions: {
+      systemPrompt: `<role>캐릭터 등장 시퀀스 디자이너</role>
+
+<task>각 캐릭터가 주인공을 1:1로 만나는 순서와 맥락을 설계합니다. 영화적 구성으로 각 만남을 기억에 남게 만들어주세요.</task>
+
+<principles>
+- 각 캐릭터의 첫 등장은 그 인물의 성격과 역할을 암시해야 합니다.
+- 만남의 순서는 스토리 전개상 자연스러워야 합니다.
+- 첫인상 키워드는 AI가 캐릭터를 묘사할 때 참조합니다.
+</principles>
+
+<timing_guidelines>
+- opening: 오프닝 시퀀스에서 만남 (촉발 사건 직후)
+- day1: 1일차 중 만남
+- day2: 2일차 이후 만남
+- event-driven: 특정 이벤트/조건 충족 시 만남
+</timing_guidelines>
+
+<encounter_context_tips>
+- 캐릭터의 역할에 맞는 상황에서 만나게 하세요 (의사는 치료 상황, 군인은 방어 상황 등)
+- 첫 만남에서 갈등이나 긴장감이 있으면 더 기억에 남습니다.
+- 단순한 소개보다 상호작용이 있는 만남이 좋습니다.
+</encounter_context_tips>`,
+      userPrompt: `<request>다음 캐릭터들의 1:1 소개 시퀀스를 설계해주세요.</request>
+
+<scenario_context>
+${input}
+</scenario_context>
+${baseContext}
+
+<requirements>
+- 모든 캐릭터에 대해 소개 순서 지정 (order: 1, 2, 3...)
+- 각 만남의 구체적인 맥락 작성 (encounterContext)
+- 첫인상 키워드 2-3개 (성격, 외모, 분위기 등)
+- 만남 예상 시점 지정 (opening/day1/day2/event-driven)
+</requirements>`,
+    },
+
+    // ========================================================================
+    // 2025 Enhanced: 숨겨진 NPC 관계 시스템
+    // ========================================================================
+    hidden_relationships: {
+      systemPrompt: `<role>숨겨진 관계 설계자</role>
+
+<task>NPC들 간의 비밀 관계를 설계합니다. 플레이어(주인공)는 게임 시작 시 이 관계들을 모르며, 탐색과 대화를 통해 점진적으로 발견합니다.</task>
+
+<relationship_types>
+- 과거 연인 / 전 배우자
+- 비밀 동료 / 공모자
+- 가족 관계 (숨겨진)
+- 원수 / 적대 관계
+- 빚진 관계 / 은혜
+- 비밀 협정 / 거래
+</relationship_types>
+
+<discovery_methods>
+- dialogue: 특정 캐릭터와의 대화에서 힌트
+- exploration: 특정 장소 탐색 시 단서 발견
+- observation: 두 캐릭터가 함께 있을 때 관찰
+- event: 특정 이벤트 발생 시 드러남
+- item: 아이템(편지, 사진 등) 발견 시
+</discovery_methods>
+
+<design_principles>
+- 숨겨진 관계는 스토리 전개에 영향을 주어야 합니다.
+- 발견했을 때 "아하!" 모먼트가 있어야 합니다.
+- 너무 쉽게 발견되어서도, 너무 어려워서도 안 됩니다.
+- 힌트는 미묘하지만 돌이켜보면 납득이 가는 수준으로.
+</design_principles>`,
+      userPrompt: `<request>다음 캐릭터들 간의 숨겨진 관계를 설계해주세요.</request>
+
+<scenario_context>
+${input}
+</scenario_context>
+${baseContext}
+
+<requirements>
+- 캐릭터 수에 따라 2-4개의 숨겨진 관계 설계
+- 각 관계의 배경 스토리 상세히 작성
+- 발견 힌트와 발견 방법 지정
+- 초기 visibility는 hidden 또는 hinted로 설정
+- relationId는 REL_001, REL_002 형식으로
+</requirements>`,
+    },
+
+    // ========================================================================
+    // 2025 Enhanced: 점진적 캐릭터 공개 시스템
+    // ========================================================================
+    character_revelations: {
+      systemPrompt: `<role>캐릭터 심층 설계자</role>
+
+<task>각 캐릭터의 숨겨진 면을 신뢰도에 따라 단계적으로 공개하도록 설계합니다. 플레이어와의 관계가 깊어질수록 더 깊은 비밀이 드러납니다.</task>
+
+<revelation_types>
+- personality: 겉으로 드러나지 않는 성격 측면
+- backstory: 과거 사연
+- secret: 숨기고 있는 비밀
+- motivation: 진짜 동기, 목적
+- relationship: 다른 인물과의 관계
+</revelation_types>
+
+<revelation_styles>
+- direct: 직접 말해줌 ("사실 나는...")
+- subtle: 행동이나 대화에서 자연스럽게 드러남
+- accidental: 실수로 드러남 (말실수, 물건 발견 등)
+- confession: 감정적 순간에 고백
+</revelation_styles>
+
+<trust_thresholds>
+- -50 이하: 적대적 - 숨기려 함
+- -20 ~ 20: 중립 - 표면적 정보만
+- 20 ~ 50: 우호적 - 일부 개인 정보 공개
+- 50 ~ 70: 친밀 - 과거사, 고민 공유
+- 70 ~ 90: 깊은 신뢰 - 비밀 공유
+- 90 이상: 완전한 신뢰 - 궁극의 비밀
+</trust_thresholds>
+
+<design_tips>
+- 각 캐릭터마다 3-5개의 공개 레이어 설계
+- 낮은 신뢰도에서 공개되는 정보는 표면적인 것
+- 높은 신뢰도의 비밀은 캐릭터의 핵심과 연결
+- ultimateSecret은 시나리오 전체에 영향을 줄 수 있는 중대한 비밀
+</design_tips>`,
+      userPrompt: `<request>다음 캐릭터들의 점진적 공개 레이어를 설계해주세요.</request>
+
+<scenario_context>
+${input}
+</scenario_context>
+${baseContext}
+
+<requirements>
+- 각 캐릭터마다 3-5개의 revelationLayers 설계
+- 신뢰도 임계값은 점진적으로 증가 (예: 20, 40, 60, 80)
+- 각 레이어의 공개 내용은 구체적으로 (50-100자)
+- ultimateSecret은 가장 높은 신뢰도에서만 공개되는 핵심 비밀
+- 공개 방식(revelationStyle)은 내용에 맞게 선택
 </requirements>`,
     },
   };

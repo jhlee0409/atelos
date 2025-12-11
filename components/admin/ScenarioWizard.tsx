@@ -33,6 +33,7 @@ import {
   Trophy,
   Sparkles,
   RotateCcw,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -53,6 +54,10 @@ import {
   type TraitResult,
   type IdeaSuggestionsResult,
   type IdeaSuggestion,
+  type StoryOpeningResult,
+  type CharacterIntroductionsResult,
+  type HiddenRelationshipsResult,
+  type CharacterRevelationsResult,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, SystemCondition, Trait } from '@/types';
 
@@ -129,7 +134,7 @@ const convertTraitResult = (
 });
 
 // 단계 정의
-type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'endings' | 'complete';
+type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'endings' | 'story_opening' | 'complete';
 
 const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
   { key: 'idea', label: '아이디어', icon: Lightbulb },
@@ -137,6 +142,7 @@ const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
   { key: 'characters', label: '캐릭터', icon: Users },
   { key: 'system', label: '시스템', icon: BarChart3 },
   { key: 'endings', label: '엔딩', icon: Trophy },
+  { key: 'story_opening', label: '오프닝', icon: BookOpen },
   { key: 'complete', label: '완료', icon: Check },
 ];
 
@@ -163,6 +169,12 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [stats, setStats] = useState<StatResult[]>([]);
   const [flags, setFlags] = useState<FlagResult[]>([]);
   const [endings, setEndings] = useState<EndingResult[]>([]);
+
+  // 스토리 오프닝 시스템 (Phase 7)
+  const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
+  const [characterIntroductions, setCharacterIntroductions] = useState<CharacterIntroductionsResult['characterIntroductionSequence']>([]);
+  const [hiddenRelationships, setHiddenRelationships] = useState<HiddenRelationshipsResult['hiddenNPCRelationships']>([]);
+  const [characterRevelations, setCharacterRevelations] = useState<CharacterRevelationsResult['characterRevelations']>([]);
 
   // 아이디어 추천
   const [ideaSuggestions, setIdeaSuggestions] = useState<IdeaSuggestion[]>([]);
@@ -406,6 +418,68 @@ ${flagDetails}
     }
   }, [synopsisResult, characters, stats, flags]);
 
+  // 스토리 오프닝 생성 (Phase 7)
+  const handleGenerateStoryOpening = useCallback(async () => {
+    if (!synopsisResult) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 캐릭터 정보 문자열 생성
+      const characterDetails = characters
+        .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory}`)
+        .join('\n');
+
+      // 스토리 오프닝, 캐릭터 소개 시퀀스, 숨겨진 관계, 캐릭터 공개를 병렬로 생성
+      const scenarioInput = `시나리오: ${synopsisResult.title}
+시놉시스: ${synopsisResult.synopsis}
+플레이어 목표: ${synopsisResult.playerGoal}
+장르: ${synopsisResult.genre.join(', ')}
+갈등: ${synopsisResult.conflictType}
+배경: ${synopsisResult.setting.place}, ${synopsisResult.setting.time}
+
+등장 캐릭터:
+${characterDetails}`;
+
+      const context = {
+        genre: synopsisResult.genre,
+        title: synopsisResult.title,
+        synopsis: synopsisResult.synopsis,
+        existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
+      };
+
+      // 병렬로 4개 카테고리 생성
+      const [
+        openingResponse,
+        introductionsResponse,
+        hiddenRelsResponse,
+        revelationsResponse,
+      ] = await Promise.all([
+        generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
+        characters.length >= 2
+          ? generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context)
+          : Promise.resolve({ data: { characterIntroductionSequence: [] } }),
+        characters.length >= 2
+          ? generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context)
+          : Promise.resolve({ data: { hiddenNPCRelationships: [] } }),
+        characters.length >= 1
+          ? generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context)
+          : Promise.resolve({ data: { characterRevelations: [] } }),
+      ]);
+
+      setStoryOpening(openingResponse.data);
+      setCharacterIntroductions(introductionsResponse.data.characterIntroductionSequence || []);
+      setHiddenRelationships(hiddenRelsResponse.data.hiddenNPCRelationships || []);
+      setCharacterRevelations(revelationsResponse.data.characterRevelations || []);
+      setCurrentStep('story_opening');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '스토리 오프닝 생성에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [synopsisResult, characters]);
+
   // 완료 및 적용
   const handleComplete = useCallback(() => {
     if (!synopsisResult) return;
@@ -464,10 +538,51 @@ ${flagDetails}
       })),
       endCondition: { type: 'time_limit', value: 7, unit: 'days' }, // 기본값 - 7일 제한
       status: 'in_progress',
+      // 스토리 오프닝 시스템 (Phase 7)
+      storyOpening: storyOpening ? {
+        prologue: storyOpening.prologue,
+        incitingIncident: storyOpening.incitingIncident,
+        firstCharacterToMeet: storyOpening.firstCharacterToMeet,
+        firstEncounterContext: storyOpening.firstEncounterContext,
+        protagonistSetup: storyOpening.protagonistSetup,
+        openingTone: storyOpening.openingTone,
+        characterIntroductionStyle: storyOpening.characterIntroductionStyle,
+        timeOfDay: storyOpening.timeOfDay,
+        openingLocation: storyOpening.openingLocation,
+        thematicElements: storyOpening.thematicElements,
+        npcRelationshipExposure: storyOpening.npcRelationshipExposure || 'hidden',
+        // 2025 Enhanced Features
+        characterIntroductionSequence: characterIntroductions.length > 0 ? characterIntroductions.map((intro) => ({
+          characterName: intro.characterName,
+          order: intro.order,
+          encounterContext: intro.encounterContext,
+          firstImpressionKeywords: intro.firstImpressionKeywords,
+          expectedTiming: intro.expectedTiming,
+        })) : undefined,
+        hiddenNPCRelationships: hiddenRelationships.length > 0 ? hiddenRelationships.map((rel) => ({
+          relationId: rel.relationId,
+          characterA: rel.characterA,
+          characterB: rel.characterB,
+          actualValue: rel.actualValue,
+          relationshipType: rel.relationshipType,
+          backstory: rel.backstory,
+          visibility: rel.visibility as 'hidden' | 'hinted',
+          discoveryMethods: [{
+            method: rel.discoveryMethod,
+            revealsTo: 'revealed' as const,
+            hintText: rel.discoveryHint,
+          }],
+        })) : undefined,
+        characterRevelations: characterRevelations.length > 0 ? characterRevelations.map((rev) => ({
+          characterName: rev.characterName,
+          revelationLayers: rev.revelationLayers,
+          ultimateSecret: rev.ultimateSecret,
+        })) : undefined,
+      } : undefined,
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -909,6 +1024,161 @@ ${flagDetails}
                 다시 생성
               </Button>
               <Button
+                onClick={handleGenerateStoryOpening}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-2" />
+                )}
+                오프닝 생성
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'story_opening':
+        return (
+          <div className="space-y-6">
+            {storyOpening && (
+              <>
+                {/* 프롤로그 & 촉발 사건 */}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-400 mb-2">프롤로그</h4>
+                    <p className="text-sm bg-zinc-800/30 p-3 rounded-lg">{storyOpening.prologue}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-400 mb-2">촉발 사건</h4>
+                    <p className="text-sm bg-zinc-800/30 p-3 rounded-lg">{storyOpening.incitingIncident}</p>
+                  </div>
+                </div>
+
+                {/* 주인공 설정 */}
+                {storyOpening.protagonistSetup && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      주인공 설정
+                    </h4>
+                    <Card className="bg-zinc-800/30">
+                      <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-zinc-500">직업: </span>
+                          <span>{storyOpening.protagonistSetup.occupation}</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500">성격: </span>
+                          <span>{storyOpening.protagonistSetup.personality}</span>
+                        </div>
+                        {storyOpening.protagonistSetup.dailyRoutine && (
+                          <div className="col-span-2">
+                            <span className="text-zinc-500">일상: </span>
+                            <span>{storyOpening.protagonistSetup.dailyRoutine}</span>
+                          </div>
+                        )}
+                        {storyOpening.protagonistSetup.weakness && (
+                          <div className="col-span-2">
+                            <span className="text-zinc-500">약점: </span>
+                            <span>{storyOpening.protagonistSetup.weakness}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* 첫 만남 */}
+                <div>
+                  <h4 className="text-sm font-medium text-zinc-400 mb-2">첫 만남</h4>
+                  <div className="bg-zinc-800/30 p-3 rounded-lg text-sm">
+                    <span className="font-medium">{storyOpening.firstCharacterToMeet}</span>
+                    <span className="text-zinc-500"> - {storyOpening.firstEncounterContext}</span>
+                  </div>
+                </div>
+
+                {/* 오프닝 설정 */}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">톤: {storyOpening.openingTone}</Badge>
+                  {storyOpening.timeOfDay && <Badge variant="outline">시간: {storyOpening.timeOfDay}</Badge>}
+                  {storyOpening.openingLocation && (
+                    <Badge variant="secondary" className="text-xs">{storyOpening.openingLocation}</Badge>
+                  )}
+                </div>
+
+                {/* 테마 */}
+                {storyOpening.thematicElements && storyOpening.thematicElements.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {storyOpening.thematicElements.map((theme, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">#{theme}</Badge>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 캐릭터 소개 시퀀스 */}
+            {characterIntroductions.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">캐릭터 소개 순서</h4>
+                <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                  {characterIntroductions
+                    .sort((a, b) => a.order - b.order)
+                    .map((intro, idx) => (
+                      <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm flex items-center gap-2">
+                        <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0">
+                          {intro.order}
+                        </Badge>
+                        <span className="font-medium">{intro.characterName}</span>
+                        <span className="text-zinc-500 text-xs">({intro.expectedTiming})</span>
+                        <span className="text-zinc-500 text-xs ml-auto">{intro.encounterContext.slice(0, 30)}...</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* 숨겨진 관계 */}
+            {hiddenRelationships.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">숨겨진 NPC 관계</h4>
+                <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                  {hiddenRelationships.map((rel, idx) => (
+                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{rel.characterA}</span>
+                        <span className="text-zinc-500">↔</span>
+                        <span className="font-medium">{rel.characterB}</span>
+                        <Badge variant={rel.visibility === 'hidden' ? 'destructive' : 'secondary'} className="text-xs ml-auto">
+                          {rel.visibility}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">{rel.relationshipType}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => goToStep('endings')}
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                이전
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleGenerateStoryOpening}
+                disabled={isLoading}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 생성
+              </Button>
+              <Button
                 onClick={() => setCurrentStep('complete')}
                 disabled={isLoading}
                 className="flex-1"
@@ -933,7 +1203,7 @@ ${flagDetails}
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-sm">
+            <div className="grid grid-cols-4 gap-2 text-center text-sm">
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{characters.length}</div>
                 <div className="text-xs text-zinc-500">캐릭터</div>
@@ -957,6 +1227,14 @@ ${flagDetails}
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{endings.length}</div>
                 <div className="text-xs text-zinc-500">엔딩</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{storyOpening ? '1' : '0'}</div>
+                <div className="text-xs text-zinc-500">오프닝</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{hiddenRelationships.length}</div>
+                <div className="text-xs text-zinc-500">숨겨진 관계</div>
               </div>
             </div>
 
