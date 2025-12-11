@@ -15,7 +15,8 @@ export type GenerationCategory =
   | 'character_introductions'
   | 'hidden_relationships'
   | 'character_revelations'
-  | 'gameplay_config';
+  | 'gameplay_config'
+  | 'emergent_narrative';
 
 export interface GenerationContext {
   genre?: string[];
@@ -235,6 +236,37 @@ export interface GameplayConfigResult {
   reasoning: string; // AI가 왜 이렇게 설정했는지 설명
 }
 
+// =============================================================================
+// 이머전트 내러티브 (EmergentNarrative Generation)
+// =============================================================================
+
+export interface StorySiftingTriggerResult {
+  triggerId: string;
+  name: string;
+  conditions: {
+    charactersMetTogether?: string[];
+    relationshipsDiscovered?: string[];
+    flagCombination?: string[];
+    statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
+    dayRange?: { min?: number; max?: number };
+    requiredTriggers?: string[];
+  };
+  generatedEvent: {
+    eventType: 'revelation' | 'confrontation' | 'alliance' | 'betrayal' | 'discovery';
+    eventSeed: string;
+    involvedCharacters: string[];
+    tone: 'dramatic' | 'subtle' | 'comedic' | 'tragic';
+  };
+  oneTime: boolean;
+}
+
+export interface EmergentNarrativeResult {
+  enabled: boolean;
+  triggers: StorySiftingTriggerResult[];
+  dynamicEventGuidelines: string;
+  reasoning: string;
+}
+
 export interface AIGenerationResponse<T> {
   success: boolean;
   category: GenerationCategory;
@@ -358,5 +390,10 @@ export const CATEGORY_INFO: Record<
     label: '게임플레이 설정',
     description: '시나리오 특성에 맞는 게임플레이 설정을 자동 생성합니다 (루트 점수, 액션 포인트 등).',
     placeholder: '플래그, 스탯, 장르 정보가 자동으로 사용됩니다',
+  },
+  emergent_narrative: {
+    label: '이머전트 내러티브',
+    description: '플레이어 행동 조합에서 자연스럽게 발생하는 동적 스토리 이벤트 트리거를 생성합니다.',
+    placeholder: '캐릭터, 플래그, 관계 정보가 자동으로 사용됩니다',
   },
 };

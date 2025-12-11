@@ -59,6 +59,7 @@ import {
   type HiddenRelationshipsResult,
   type CharacterRevelationsResult,
   type GameplayConfigResult,
+  type EmergentNarrativeResult,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, SystemCondition, Trait } from '@/types';
 
@@ -179,6 +180,9 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
 
   // 게임플레이 설정 (GameplayConfig)
   const [gameplayConfig, setGameplayConfig] = useState<GameplayConfigResult | null>(null);
+
+  // 이머전트 내러티브 (EmergentNarrative)
+  const [emergentNarrative, setEmergentNarrative] = useState<EmergentNarrativeResult | null>(null);
 
   // 아이디어 추천
   const [ideaSuggestions, setIdeaSuggestions] = useState<IdeaSuggestion[]>([]);
@@ -455,13 +459,14 @@ ${characterDetails}`;
         existingFlags: flags.map((f) => f.flagName),
       };
 
-      // 병렬로 5개 카테고리 생성 (스토리 오프닝 + 게임플레이 설정)
+      // 병렬로 6개 카테고리 생성 (스토리 오프닝 + 게임플레이 설정 + 이머전트 내러티브)
       const [
         openingResponse,
         introductionsResponse,
         hiddenRelsResponse,
         revelationsResponse,
         gameplayConfigResponse,
+        emergentNarrativeResponse,
       ] = await Promise.all([
         generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
         characters.length >= 2
@@ -477,6 +482,10 @@ ${characterDetails}`;
         flags.length > 0
           ? generateWithAI<GameplayConfigResult>('gameplay_config', scenarioInput, context)
           : Promise.resolve({ data: null }),
+        // 이머전트 내러티브 생성 (캐릭터와 플래그 기반)
+        characters.length >= 2 && flags.length > 0
+          ? generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context)
+          : Promise.resolve({ data: null }),
       ]);
 
       setStoryOpening(openingResponse.data);
@@ -485,6 +494,9 @@ ${characterDetails}`;
       setCharacterRevelations(revelationsResponse.data.characterRevelations || []);
       if (gameplayConfigResponse.data) {
         setGameplayConfig(gameplayConfigResponse.data);
+      }
+      if (emergentNarrativeResponse.data) {
+        setEmergentNarrative(emergentNarrativeResponse.data);
       }
       setCurrentStep('story_opening');
     } catch (err) {
@@ -592,6 +604,19 @@ ${characterDetails}`;
           revelationLayers: rev.revelationLayers,
           ultimateSecret: rev.ultimateSecret,
         })) : undefined,
+        // 이머전트 내러티브 (동적 스토리 이벤트)
+        emergentNarrative: emergentNarrative ? {
+          enabled: emergentNarrative.enabled,
+          triggers: emergentNarrative.triggers.map((trigger) => ({
+            triggerId: trigger.triggerId,
+            name: trigger.name,
+            conditions: trigger.conditions,
+            generatedEvent: trigger.generatedEvent,
+            triggered: false,
+            oneTime: trigger.oneTime,
+          })),
+          dynamicEventGuidelines: emergentNarrative.dynamicEventGuidelines,
+        } : undefined,
       } : undefined,
       // 게임플레이 설정 (GameplayConfig)
       gameplayConfig: gameplayConfig ? {
@@ -609,7 +634,7 @@ ${characterDetails}`;
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, gameplayConfig, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {

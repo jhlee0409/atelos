@@ -38,7 +38,8 @@ export type GenerationCategory =
   | 'character_introductions'
   | 'hidden_relationships'
   | 'character_revelations'
-  | 'gameplay_config';
+  | 'gameplay_config'
+  | 'emergent_narrative';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -574,6 +575,111 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'routeScores', 'tokenBudgetMultiplier', 'useGenreFallback', 'reasoning'],
   },
+
+  // ==========================================================================
+  // 이머전트 내러티브 (EmergentNarrative)
+  // ==========================================================================
+  emergent_narrative: {
+    type: SchemaType.OBJECT,
+    properties: {
+      enabled: {
+        type: SchemaType.BOOLEAN,
+        description: '이머전트 내러티브 활성화 여부',
+      },
+      triggers: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            triggerId: { type: SchemaType.STRING, description: '트리거 ID (영문, 예: trigger_alliance_reveal)' },
+            name: { type: SchemaType.STRING, description: '트리거 이름 (한글, 내부 식별용)' },
+            conditions: {
+              type: SchemaType.OBJECT,
+              properties: {
+                charactersMetTogether: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: '함께 만나야 하는 캐릭터 조합',
+                },
+                relationshipsDiscovered: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: '발견해야 하는 관계 (예: "캐릭터A-캐릭터B")',
+                },
+                flagCombination: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: '획득해야 하는 플래그 조합',
+                },
+                statConditions: {
+                  type: SchemaType.ARRAY,
+                  items: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                      statId: { type: SchemaType.STRING },
+                      comparison: { type: SchemaType.STRING, format: 'enum', enum: ['gte', 'lte', 'eq'] },
+                      value: { type: SchemaType.INTEGER },
+                    },
+                    required: ['statId', 'comparison', 'value'],
+                  },
+                  description: '스탯 조건',
+                },
+                dayRange: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    min: { type: SchemaType.INTEGER, description: '최소 일차' },
+                    max: { type: SchemaType.INTEGER, description: '최대 일차' },
+                  },
+                  description: '발동 가능 일차 범위',
+                },
+                requiredTriggers: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: '선행 트리거 ID 목록',
+                },
+              },
+            },
+            generatedEvent: {
+              type: SchemaType.OBJECT,
+              properties: {
+                eventType: {
+                  type: SchemaType.STRING,
+                  format: 'enum',
+                  enum: ['revelation', 'confrontation', 'alliance', 'betrayal', 'discovery'],
+                  description: '이벤트 유형',
+                },
+                eventSeed: { type: SchemaType.STRING, description: 'AI에게 전달할 이벤트 시드 (150자 이내)' },
+                involvedCharacters: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: '관련 캐릭터들',
+                },
+                tone: {
+                  type: SchemaType.STRING,
+                  format: 'enum',
+                  enum: ['dramatic', 'subtle', 'comedic', 'tragic'],
+                  description: '이벤트 톤',
+                },
+              },
+              required: ['eventType', 'eventSeed', 'involvedCharacters', 'tone'],
+            },
+            oneTime: { type: SchemaType.BOOLEAN, description: '1회성 여부 (true 권장)' },
+          },
+          required: ['triggerId', 'name', 'conditions', 'generatedEvent', 'oneTime'],
+        },
+        description: '스토리 시프팅 트리거 목록 (3-6개 권장)',
+      },
+      dynamicEventGuidelines: {
+        type: SchemaType.STRING,
+        description: 'AI가 동적 이벤트 생성 시 참고할 가이드라인',
+      },
+      reasoning: {
+        type: SchemaType.STRING,
+        description: '이 설정을 선택한 이유 설명',
+      },
+    },
+    required: ['enabled', 'triggers', 'dynamicEventGuidelines', 'reasoning'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -596,6 +702,8 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   character_revelations: 0.65, // 중간 - 점진적 공개 레이어 설계
   // 게임플레이 설정
   gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
+  // 이머전트 내러티브
+  emergent_narrative: 0.7, // 창의적 - 흥미로운 트리거 조합 생성
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -617,6 +725,8 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   character_revelations: 4000, // 캐릭터별 다중 레이어 공개
   // 게임플레이 설정
   gameplay_config: 3000, // 루트 점수 설정 + 설명
+  // 이머전트 내러티브
+  emergent_narrative: 4000, // 복잡한 트리거 조건 + 이벤트
 };
 
 interface AIGenerateRequestBody {
@@ -1415,6 +1525,78 @@ ${baseContext}
 - statScores를 사용할 경우 existing_stats 목록에 있는 statId만 사용
 </critical>`,
     },
+
+    // ========================================================================
+    // 이머전트 내러티브 (EmergentNarrative)
+    // ========================================================================
+    emergent_narrative: {
+      systemPrompt: `<role>이머전트 내러티브 설계자</role>
+
+<task>플레이어의 행동 조합에서 자연스럽게 발생하는 동적 스토리 이벤트 트리거를 설계합니다.</task>
+
+<concept>
+이머전트 내러티브는 개발자가 직접 작성하지 않은 스토리 이벤트가 플레이어의 선택 조합에서 자연스럽게 "창발"하는 시스템입니다.
+예: 플레이어가 캐릭터 A와 B를 모두 만나고, 특정 플래그를 획득하면 → A와 B의 과거 관계가 드러나는 이벤트 발생
+</concept>
+
+<trigger_design>
+각 트리거는 다음 요소로 구성됩니다:
+1. **triggerId**: 영문 식별자 (예: trigger_alliance_reveal, trigger_betrayal_hint)
+2. **name**: 한글 이름 (예: "동맹 관계 폭로", "배신의 조짐")
+3. **conditions**: 발동 조건들
+   - charactersMetTogether: 특정 캐릭터들을 모두 만났을 때
+   - relationshipsDiscovered: 특정 관계를 발견했을 때
+   - flagCombination: 특정 플래그들이 모두 활성화되었을 때
+   - statConditions: 스탯이 특정 조건을 만족할 때
+   - dayRange: 특정 일차 범위에서만 발동
+   - requiredTriggers: 선행 트리거가 발동된 후에만 발동
+4. **generatedEvent**: 발동 시 생성될 이벤트
+   - eventType: revelation(폭로), confrontation(대립), alliance(동맹), betrayal(배신), discovery(발견)
+   - eventSeed: AI가 이벤트 생성 시 참고할 시드 텍스트
+   - involvedCharacters: 관련 캐릭터들
+   - tone: dramatic(극적), subtle(은근), comedic(코믹), tragic(비극적)
+5. **oneTime**: 1회성 여부 (대부분 true 권장)
+</trigger_design>
+
+<event_types>
+- **revelation**: 숨겨진 정보가 드러남 (과거사, 비밀 관계)
+- **confrontation**: 캐릭터 간 대립/충돌 발생
+- **alliance**: 예상치 못한 협력 관계 형성
+- **betrayal**: 배신이나 이중 정체 폭로
+- **discovery**: 중요한 물건/정보/장소 발견
+</event_types>
+
+<design_principles>
+- 3-6개의 트리거 설계 (너무 많으면 복잡해짐)
+- 조건은 달성 가능하되 너무 쉽지 않게
+- 이벤트는 스토리에 영향을 주되 게임을 망치지 않게
+- 트리거 간 연쇄 가능하도록 설계 (requiredTriggers 활용)
+- 장르 톤에 맞는 이벤트 유형 선택
+</design_principles>`,
+      userPrompt: `<request>다음 시나리오에 맞는 이머전트 내러티브 트리거를 설계해주세요.</request>
+
+<scenario_context>
+${input}
+</scenario_context>
+${baseContext}
+
+<requirements>
+- enabled는 항상 true로 설정
+- 3-6개의 트리거 설계
+- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
+- **반드시** existing_flags 목록에 있는 플래그만 flagCombination에 사용
+- **반드시** existing_stats 목록에 있는 스탯만 statConditions에 사용
+- eventSeed는 구체적이고 AI가 이벤트 생성 시 참고할 수 있도록 작성 (150자 이내)
+- dynamicEventGuidelines는 전반적인 이벤트 생성 가이드라인 (200자 이내)
+- reasoning에 설계 의도 설명
+</requirements>
+
+<critical>
+- charactersMetTogether, involvedCharacters는 existing_characters에 있는 이름만 사용
+- flagCombination은 existing_flags에 있는 플래그만 사용
+- statConditions의 statId는 existing_stats에 있는 ID만 사용
+</critical>`,
+    },
   };
 
   return prompts[category];
@@ -1425,8 +1607,8 @@ export async function POST(request: NextRequest) {
     const body: AIGenerateRequestBody = await request.json();
     const { category, input, context } = body;
 
-    // idea_suggestions, gameplay_config는 빈 입력 허용 (컨텍스트 기반 자동 생성)
-    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config'];
+    // idea_suggestions, gameplay_config, emergent_narrative는 빈 입력 허용 (컨텍스트 기반 자동 생성)
+    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config', 'emergent_narrative'];
     if (!category || (!categoriesAllowingEmptyInput.includes(category) && !input)) {
       return NextResponse.json(
         { error: 'category와 input은 필수입니다.' },

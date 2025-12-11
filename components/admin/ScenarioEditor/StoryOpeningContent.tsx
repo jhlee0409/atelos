@@ -33,6 +33,7 @@ import {
   type CharacterIntroductionsResult,
   type HiddenRelationshipsResult,
   type CharacterRevelationsResult,
+  type EmergentNarrativeResult,
 } from '@/lib/ai-scenario-generator';
 
 type Props = {
@@ -109,6 +110,7 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
   const [isGeneratingIntroductions, setIsGeneratingIntroductions] = useState(false);
   const [isGeneratingHiddenRels, setIsGeneratingHiddenRels] = useState(false);
   const [isGeneratingRevelations, setIsGeneratingRevelations] = useState(false);
+  const [isGeneratingEmergent, setIsGeneratingEmergent] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   // 스토리 오프닝 업데이트 헬퍼
@@ -164,6 +166,8 @@ ${characterDetails}`;
       title: scenario.title,
       synopsis: scenario.synopsis,
       existingCharacters: scenario.characters.map((c) => `${c.characterName} (${c.roleName})`),
+      existingStats: scenario.scenarioStats?.map((s) => s.id) || [],
+      existingFlags: scenario.flagDictionary?.map((f) => f.flagName) || [],
     };
 
     return { scenarioInput, context };
@@ -306,6 +310,45 @@ ${characterDetails}`;
     }
   }, [buildScenarioContext, scenario.characters.length]);
 
+  // 이머전트 내러티브 AI 생성
+  const handleGenerateEmergentNarrative = useCallback(async () => {
+    if (scenario.characters.length < 2) {
+      toast.error('캐릭터가 2명 이상 필요합니다');
+      return;
+    }
+    if (!scenario.flagDictionary || scenario.flagDictionary.length === 0) {
+      toast.error('플래그가 1개 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingEmergent(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context);
+
+      if (response.data) {
+        updateStoryOpening({
+          emergentNarrative: {
+            enabled: response.data.enabled,
+            triggers: response.data.triggers.map((trigger) => ({
+              triggerId: trigger.triggerId,
+              name: trigger.name,
+              conditions: trigger.conditions,
+              generatedEvent: trigger.generatedEvent,
+              triggered: false, // 초기 상태
+              oneTime: trigger.oneTime,
+            })),
+            dynamicEventGuidelines: response.data.dynamicEventGuidelines,
+          },
+        });
+        toast.success('이머전트 내러티브 트리거가 생성되었습니다');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '이머전트 내러티브 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingEmergent(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length, scenario.flagDictionary]);
+
   // 모든 2025 Enhanced 기능 일괄 생성
   const handleGenerateAllEnhanced = useCallback(async () => {
     if (scenario.characters.length < 2) {
@@ -381,7 +424,7 @@ ${characterDetails}`;
     }
   }, [buildScenarioContext, scenario.characters.length]);
 
-  const isAnyGenerating = isGeneratingOpening || isGeneratingIntroductions || isGeneratingHiddenRels || isGeneratingRevelations || isGeneratingAll;
+  const isAnyGenerating = isGeneratingOpening || isGeneratingIntroductions || isGeneratingHiddenRels || isGeneratingRevelations || isGeneratingEmergent || isGeneratingAll;
 
   // 첫 번째 캐릭터 선택을 위한 옵션
   const characterOptions = scenario.characters
@@ -1219,14 +1262,35 @@ ${characterDetails}`;
 
       {/* [2025 Enhanced] 이머전트 내러티브 힌트 */}
       <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
-            <Sparkles className="h-5 w-5" />
-            이머전트 내러티브 (동적 스토리)
-          </CardTitle>
-          <CardDescription>
-            플레이어 행동 조합에 따라 동적으로 발생하는 스토리 이벤트를 위한 가이드라인입니다.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+              <Sparkles className="h-5 w-5" />
+              이머전트 내러티브 (동적 스토리)
+            </CardTitle>
+            <CardDescription>
+              플레이어 행동 조합에 따라 동적으로 발생하는 스토리 이벤트 트리거입니다.
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerateEmergentNarrative}
+            disabled={isAnyGenerating || scenario.characters.length < 2 || !scenario.flagDictionary?.length}
+            className="shrink-0 border-kairos-gold text-kairos-gold hover:bg-kairos-gold/10"
+          >
+            {isGeneratingEmergent ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-4 w-4" />
+                AI 자동 생성
+              </>
+            )}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
@@ -1251,26 +1315,73 @@ ${characterDetails}`;
           </div>
 
           {storyOpening.emergentNarrative?.enabled && (
-            <div>
-              <Label className="text-sm font-medium text-gray-700">동적 이벤트 가이드라인 (AI용)</Label>
-              <Textarea
-                value={storyOpening.emergentNarrative?.dynamicEventGuidelines || ''}
-                onChange={(e) => {
-                  updateStoryOpening({
-                    emergentNarrative: {
-                      ...storyOpening.emergentNarrative,
-                      enabled: true,
-                      triggers: storyOpening.emergentNarrative?.triggers || [],
-                      dynamicEventGuidelines: e.target.value,
-                    },
-                  });
-                }}
-                placeholder="예: 캐릭터 A와 B가 모두 만난 후, 둘의 과거 관계에 대한 힌트를 자연스럽게 흘려주세요."
-                className="mt-1 min-h-[100px] border-socratic-grey bg-parchment-white"
-              />
-              <p className="mt-2 text-xs text-gray-500">
-                AI가 동적 이벤트를 생성할 때 참고할 가이드라인입니다.
-              </p>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700">동적 이벤트 가이드라인 (AI용)</Label>
+                <Textarea
+                  value={storyOpening.emergentNarrative?.dynamicEventGuidelines || ''}
+                  onChange={(e) => {
+                    updateStoryOpening({
+                      emergentNarrative: {
+                        ...storyOpening.emergentNarrative,
+                        enabled: true,
+                        triggers: storyOpening.emergentNarrative?.triggers || [],
+                        dynamicEventGuidelines: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="예: 캐릭터 A와 B가 모두 만난 후, 둘의 과거 관계에 대한 힌트를 자연스럽게 흘려주세요."
+                  className="mt-1 min-h-[100px] border-socratic-grey bg-parchment-white"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  AI가 동적 이벤트를 생성할 때 참고할 가이드라인입니다.
+                </p>
+              </div>
+
+              {/* 생성된 트리거 목록 */}
+              {storyOpening.emergentNarrative?.triggers && storyOpening.emergentNarrative.triggers.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    생성된 트리거 ({storyOpening.emergentNarrative.triggers.length}개)
+                  </Label>
+                  <div className="mt-2 space-y-3">
+                    {storyOpening.emergentNarrative.triggers.map((trigger, idx) => (
+                      <div
+                        key={trigger.triggerId || idx}
+                        className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{trigger.name}</p>
+                            <p className="text-xs text-gray-500">{trigger.triggerId}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {trigger.generatedEvent.eventType}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {trigger.generatedEvent.tone}
+                            </Badge>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-700">{trigger.generatedEvent.eventSeed}</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {trigger.conditions.charactersMetTogether?.map((char) => (
+                            <Badge key={char} variant="outline" className="text-xs bg-blue-50">
+                              👤 {char}
+                            </Badge>
+                          ))}
+                          {trigger.conditions.flagCombination?.map((flag) => (
+                            <Badge key={flag} variant="outline" className="text-xs bg-green-50">
+                              🏴 {flag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
