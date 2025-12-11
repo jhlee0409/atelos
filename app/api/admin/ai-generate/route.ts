@@ -795,6 +795,19 @@ ${baseContext}
 루트별 엔딩(탈출 성공, 항전 승리, 협상 타결)과 실패 엔딩을 모두 고려하세요.
 </ending_balance>
 
+<critical_constraint>
+**중요**: suggestedConditions에 사용하는 statId와 flagName은 반드시 시나리오에 이미 정의된 것만 사용해야 합니다.
+- 존재하지 않는 스탯 ID를 사용하면 게임에서 엔딩 조건 검증이 실패합니다.
+- 존재하지 않는 플래그를 사용하면 해당 엔딩에 도달할 수 없습니다.
+- context에서 제공되는 existing_stats와 existing_flags 목록을 참조하여 해당 ID만 사용하세요.
+</critical_constraint>
+
+<condition_design_tips>
+- 하나의 엔딩에 스탯 조건 1-2개와 플래그 조건 0-2개가 적당합니다.
+- 동일 스탯에 상충되는 조건을 넣지 마세요 (예: >= 80 AND <= 20)
+- 좋은 엔딩은 높은 스탯 요구, 나쁜 엔딩은 낮은 스탯이나 특정 실패 플래그로 구분하세요.
+</condition_design_tips>
+
 <example>
 {
   "endings": [
@@ -816,7 +829,11 @@ ${baseContext}
 <scenario>${input}</scenario>
 ${baseContext}
 
-<note>좋은 엔딩과 나쁜 엔딩을 균형있게 포함해주세요.</note>`,
+<important_instructions>
+- 좋은 엔딩과 나쁜 엔딩을 균형있게 포함해주세요.
+- **반드시** existing_stats와 existing_flags에 있는 ID만 사용하세요. 새로운 ID를 만들지 마세요.
+- 조건이 논리적으로 충돌하지 않도록 설계하세요.
+</important_instructions>`,
     },
 
     traits: {

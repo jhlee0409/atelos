@@ -2,9 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Save, AlertCircle, Loader2 } from 'lucide-react';
+import { Save, AlertCircle, AlertTriangle, Loader2, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { ScenarioData } from '@/types';
-import { SetStateAction, useState } from 'react';
+import { SetStateAction, useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { validateScenario, type ValidationResult } from '@/lib/scenario-validator';
 
 type Props = {
   scenario: ScenarioData;
@@ -32,6 +33,33 @@ export default function StickySidebar({
   isSaving = false,
 }: Props) {
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
+  const [isValidationExpanded, setIsValidationExpanded] = useState(true);
+
+  // 데이터 일관성 검증
+  const validationResult: ValidationResult = useMemo(() => {
+    return validateScenario(scenario);
+  }, [scenario]);
+
+  // 카테고리별 이슈 그룹화
+  const issuesByCategory = useMemo(() => {
+    const grouped: Record<string, typeof validationResult.issues> = {};
+    validationResult.issues.forEach((issue) => {
+      if (!grouped[issue.category]) {
+        grouped[issue.category] = [];
+      }
+      grouped[issue.category].push(issue);
+    });
+    return grouped;
+  }, [validationResult.issues]);
+
+  const categoryLabels: Record<string, string> = {
+    ending: '엔딩 조건',
+    stat: '스탯',
+    flag: '플래그',
+    character: '캐릭터',
+    relationship: '관계',
+  };
+
   return (
     <div className="w-100 p-8">
       <div className="sticky top-8 space-y-6">
@@ -120,6 +148,99 @@ export default function StickySidebar({
             </CardContent>
           </Card>
         )}
+
+        {/* 데이터 일관성 검증 */}
+        <Card className={`border-socratic-grey/20 ${
+          validationResult.summary.errors > 0
+            ? 'border-red-200 bg-red-50/50'
+            : validationResult.summary.warnings > 0
+              ? 'border-yellow-200 bg-yellow-50/50'
+              : 'border-green-200 bg-green-50/50'
+        }`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-sm font-medium">
+              <div className="flex items-center gap-2">
+                {validationResult.summary.errors > 0 ? (
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                ) : validationResult.summary.warnings > 0 ? (
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                )}
+                <span className="text-gray-800">데이터 일관성 검사</span>
+              </div>
+              <button
+                onClick={() => setIsValidationExpanded(!isValidationExpanded)}
+                className="rounded p-1 hover:bg-black/5"
+              >
+                {isValidationExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {/* 요약 */}
+            <div className="flex items-center gap-3 text-xs">
+              {validationResult.summary.errors > 0 && (
+                <span className="text-red-600">
+                  오류 {validationResult.summary.errors}개
+                </span>
+              )}
+              {validationResult.summary.warnings > 0 && (
+                <span className="text-yellow-600">
+                  경고 {validationResult.summary.warnings}개
+                </span>
+              )}
+              {validationResult.isValid && validationResult.summary.warnings === 0 && (
+                <span className="text-green-600">문제 없음</span>
+              )}
+            </div>
+
+            {/* 상세 이슈 목록 */}
+            {isValidationExpanded && validationResult.issues.length > 0 && (
+              <div className="mt-3 space-y-3">
+                {Object.entries(issuesByCategory).map(([category, issues]) => (
+                  <div key={category}>
+                    <p className="mb-1 text-xs font-medium text-gray-600">
+                      {categoryLabels[category] || category}
+                    </p>
+                    <ul className="space-y-1">
+                      {issues.map((issue, idx) => (
+                        <li
+                          key={idx}
+                          className={`rounded px-2 py-1 text-xs ${
+                            issue.type === 'error'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}
+                        >
+                          <div className="flex items-start gap-1">
+                            {issue.type === 'error' ? (
+                              <AlertCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                            ) : (
+                              <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                            )}
+                            <div>
+                              <span>{issue.message}</span>
+                              {issue.suggestion && (
+                                <p className="mt-0.5 text-[10px] opacity-80">
+                                  {issue.suggestion}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* 진행률 및 통계 */}
         <Card className="border-socratic-grey/20 bg-parchment-white">
