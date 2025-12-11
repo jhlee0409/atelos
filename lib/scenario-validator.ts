@@ -7,10 +7,12 @@ import type { ScenarioData, EndingArchetype, SystemCondition } from '@/types';
 
 export interface ValidationIssue {
   type: 'error' | 'warning';
-  category: 'ending' | 'stat' | 'flag' | 'character' | 'relationship';
+  category: 'ending' | 'stat' | 'flag' | 'character' | 'relationship' | 'trait' | 'duplicate';
   field: string;
   message: string;
   suggestion?: string;
+  // 클릭하여 이동할 탭 정보
+  targetTab?: 'basic' | 'characters' | 'system' | 'story';
 }
 
 export interface ValidationResult {
@@ -39,6 +41,7 @@ function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[]
             field: `${ending.endingId}.systemConditions`,
             message: `엔딩 "${ending.title}"의 스탯 조건 "${condition.statId}"이(가) 존재하지 않습니다.`,
             suggestion: `사용 가능한 스탯: ${Array.from(validStatIds).join(', ')}`,
+            targetTab: 'system',
           });
         }
       }
@@ -70,6 +73,7 @@ function validateEndingFlagReferences(scenario: ScenarioData): ValidationIssue[]
             field: `${ending.endingId}.systemConditions`,
             message: `엔딩 "${ending.title}"의 플래그 조건 "${condition.flagName}"이(가) 존재하지 않습니다.`,
             suggestion: `사용 가능한 플래그: ${Array.from(validFlagNames).slice(0, 5).join(', ')}...`,
+            targetTab: 'system',
           });
         }
       }
@@ -93,6 +97,7 @@ function validateRelationshipCharacters(scenario: ScenarioData): ValidationIssue
         category: 'relationship',
         field: `relationship.${rel.id}`,
         message: `관계의 캐릭터 "${rel.personA}"이(가) 존재하지 않습니다.`,
+        targetTab: 'characters',
       });
     }
     if (!validCharacterNames.has(rel.personB)) {
@@ -101,6 +106,7 @@ function validateRelationshipCharacters(scenario: ScenarioData): ValidationIssue
         category: 'relationship',
         field: `relationship.${rel.id}`,
         message: `관계의 캐릭터 "${rel.personB}"이(가) 존재하지 않습니다.`,
+        targetTab: 'characters',
       });
     }
   });
@@ -127,6 +133,7 @@ function validateStoryOpeningCharacters(scenario: ScenarioData): ValidationIssue
         field: 'storyOpening.firstCharacterToMeet',
         message: `첫 만남 캐릭터 "${scenario.storyOpening.firstCharacterToMeet}"이(가) 존재하지 않습니다.`,
         suggestion: `사용 가능한 캐릭터: ${Array.from(validCharacterNames).join(', ')}`,
+        targetTab: 'story',
       });
     }
   }
@@ -140,6 +147,7 @@ function validateStoryOpeningCharacters(scenario: ScenarioData): ValidationIssue
           category: 'character',
           field: 'storyOpening.characterIntroductionSequence',
           message: `소개 시퀀스의 캐릭터 "${intro.characterName}"이(가) 존재하지 않습니다.`,
+          targetTab: 'story',
         });
       }
     });
@@ -154,6 +162,7 @@ function validateStoryOpeningCharacters(scenario: ScenarioData): ValidationIssue
           category: 'character',
           field: 'storyOpening.hiddenNPCRelationships',
           message: `숨겨진 관계의 캐릭터 "${rel.characterA}"이(가) 존재하지 않습니다.`,
+          targetTab: 'story',
         });
       }
       if (!validCharacterNames.has(rel.characterB)) {
@@ -162,6 +171,7 @@ function validateStoryOpeningCharacters(scenario: ScenarioData): ValidationIssue
           category: 'character',
           field: 'storyOpening.hiddenNPCRelationships',
           message: `숨겨진 관계의 캐릭터 "${rel.characterB}"이(가) 존재하지 않습니다.`,
+          targetTab: 'story',
         });
       }
     });
@@ -176,6 +186,7 @@ function validateStoryOpeningCharacters(scenario: ScenarioData): ValidationIssue
           category: 'character',
           field: 'storyOpening.characterRevelations',
           message: `캐릭터 공개 설정의 "${rev.characterName}"이(가) 존재하지 않습니다.`,
+          targetTab: 'story',
         });
       }
     });
@@ -199,6 +210,7 @@ function validateStatRanges(scenario: ScenarioData): ValidationIssue[] {
         category: 'stat',
         field: `stat.${stat.id}`,
         message: `스탯 "${stat.name}"의 초기값(${initialValue})이 범위(${stat.min}-${stat.max}) 밖입니다.`,
+        targetTab: 'system',
       });
     }
   });
@@ -246,6 +258,7 @@ function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIss
               field: `${ending.endingId}.systemConditions`,
               message: `엔딩 "${ending.title}"의 스탯 "${statId}" 조건이 충돌합니다 (>=${minGe} AND <=${maxLe}).`,
               suggestion: '이 엔딩은 달성 불가능할 수 있습니다.',
+              targetTab: 'system',
             });
           }
         }
@@ -281,6 +294,117 @@ function detectUnusedFlags(scenario: ScenarioData): ValidationIssue[] {
         field: `flag.${flag.flagName}`,
         message: `플래그 "${flag.flagName}"이(가) 어떤 엔딩 조건에서도 사용되지 않습니다.`,
         suggestion: '이 플래그를 엔딩 조건에 추가하거나 삭제를 고려하세요.',
+        targetTab: 'system',
+      });
+    }
+  });
+
+  return issues;
+}
+
+/**
+ * 중복 ID 검증 (스탯, 플래그, 엔딩)
+ */
+function validateDuplicateIds(scenario: ScenarioData): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  // 스탯 ID 중복 체크
+  const statIds = scenario.scenarioStats.map((s) => s.id);
+  const duplicateStatIds = statIds.filter((id, index) => statIds.indexOf(id) !== index);
+  duplicateStatIds.forEach((id) => {
+    issues.push({
+      type: 'error',
+      category: 'duplicate',
+      field: `stat.${id}`,
+      message: `스탯 ID "${id}"이(가) 중복됩니다.`,
+      suggestion: '각 스탯은 고유한 ID를 가져야 합니다.',
+      targetTab: 'system',
+    });
+  });
+
+  // 플래그 이름 중복 체크
+  const flagNames = scenario.flagDictionary.map((f) => f.flagName);
+  const duplicateFlagNames = flagNames.filter((name, index) => flagNames.indexOf(name) !== index);
+  duplicateFlagNames.forEach((name) => {
+    issues.push({
+      type: 'error',
+      category: 'duplicate',
+      field: `flag.${name}`,
+      message: `플래그 "${name}"이(가) 중복됩니다.`,
+      suggestion: '각 플래그는 고유한 이름을 가져야 합니다.',
+      targetTab: 'system',
+    });
+  });
+
+  // 엔딩 ID 중복 체크
+  const endingIds = scenario.endingArchetypes.map((e) => e.endingId);
+  const duplicateEndingIds = endingIds.filter((id, index) => endingIds.indexOf(id) !== index);
+  duplicateEndingIds.forEach((id) => {
+    issues.push({
+      type: 'error',
+      category: 'duplicate',
+      field: `ending.${id}`,
+      message: `엔딩 ID "${id}"이(가) 중복됩니다.`,
+      suggestion: '각 엔딩은 고유한 ID를 가져야 합니다.',
+      targetTab: 'system',
+    });
+  });
+
+  // 캐릭터 이름 중복 체크
+  const characterNames = scenario.characters.map((c) => c.characterName);
+  const duplicateCharacterNames = characterNames.filter(
+    (name, index) => characterNames.indexOf(name) !== index
+  );
+  duplicateCharacterNames.forEach((name) => {
+    issues.push({
+      type: 'error',
+      category: 'duplicate',
+      field: `character.${name}`,
+      message: `캐릭터 이름 "${name}"이(가) 중복됩니다.`,
+      suggestion: '각 캐릭터는 고유한 이름을 가져야 합니다.',
+      targetTab: 'characters',
+    });
+  });
+
+  return issues;
+}
+
+/**
+ * 캐릭터의 suggestedTraits가 traitPool에 존재하는지 검증
+ */
+function validateTraitPoolReferences(scenario: ScenarioData): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  // traitPool에서 유효한 trait ID 수집
+  const validTraitIds = new Set<string>();
+  if (scenario.traitPool) {
+    scenario.traitPool.buffs?.forEach((buff) => {
+      validTraitIds.add(buff.traitId);
+      validTraitIds.add(buff.traitName);
+    });
+    scenario.traitPool.debuffs?.forEach((debuff) => {
+      validTraitIds.add(debuff.traitId);
+      validTraitIds.add(debuff.traitName);
+    });
+  }
+
+  // traitPool이 비어있으면 검증 스킵
+  if (validTraitIds.size === 0) return issues;
+
+  // 각 캐릭터의 suggestedTraits 검증
+  scenario.characters.forEach((character) => {
+    if (character.suggestedTraits && character.suggestedTraits.length > 0) {
+      character.suggestedTraits.forEach((traitId) => {
+        if (!validTraitIds.has(traitId)) {
+          issues.push({
+            type: 'warning',
+            category: 'trait',
+            field: `character.${character.characterName}.suggestedTraits`,
+            message: `캐릭터 "${character.characterName}"의 특성 "${traitId}"이(가) 특성 풀에 없습니다.`,
+            suggestion: `사용 가능한 특성: ${Array.from(validTraitIds).slice(0, 5).join(', ')}...`,
+            targetTab: 'characters',
+          });
+        }
       });
     }
   });
@@ -293,6 +417,7 @@ function detectUnusedFlags(scenario: ScenarioData): ValidationIssue[] {
  */
 export function validateScenario(scenario: ScenarioData): ValidationResult {
   const issues: ValidationIssue[] = [
+    ...validateDuplicateIds(scenario),
     ...validateEndingStatReferences(scenario),
     ...validateEndingFlagReferences(scenario),
     ...validateRelationshipCharacters(scenario),
@@ -300,6 +425,7 @@ export function validateScenario(scenario: ScenarioData): ValidationResult {
     ...validateStatRanges(scenario),
     ...validateEndingConditionConflicts(scenario),
     ...detectUnusedFlags(scenario),
+    ...validateTraitPoolReferences(scenario),
   ];
 
   const errors = issues.filter((i) => i.type === 'error').length;
@@ -334,4 +460,29 @@ export function quickValidate(scenario: ScenarioData): { hasErrors: boolean; err
     hasErrors: result.summary.errors > 0,
     errorCount: result.summary.errors,
   };
+}
+
+/**
+ * 탭별 이슈 카운트 반환
+ */
+export function getIssueCountByTab(
+  result: ValidationResult
+): Record<'basic' | 'characters' | 'system' | 'story', { errors: number; warnings: number }> {
+  const counts = {
+    basic: { errors: 0, warnings: 0 },
+    characters: { errors: 0, warnings: 0 },
+    system: { errors: 0, warnings: 0 },
+    story: { errors: 0, warnings: 0 },
+  };
+
+  result.issues.forEach((issue) => {
+    const tab = issue.targetTab || 'basic';
+    if (issue.type === 'error') {
+      counts[tab].errors += 1;
+    } else {
+      counts[tab].warnings += 1;
+    }
+  });
+
+  return counts;
 }

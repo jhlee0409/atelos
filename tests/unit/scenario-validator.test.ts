@@ -481,3 +481,151 @@ describe('quickValidate', () => {
     expect(result.errorCount).toBeGreaterThan(0);
   });
 });
+
+describe('duplicate ID validation', () => {
+  it('should detect duplicate stat IDs', () => {
+    const scenario = createTestScenario({
+      scenarioStats: [
+        {
+          id: 'duplicateStat',
+          name: '스탯1',
+          description: '테스트',
+          current: 50,
+          initialValue: 50,
+          min: 0,
+          max: 100,
+          range: [0, 100],
+        },
+        {
+          id: 'duplicateStat', // 중복 ID
+          name: '스탯2',
+          description: '테스트',
+          current: 50,
+          initialValue: 50,
+          min: 0,
+          max: 100,
+          range: [0, 100],
+        },
+      ],
+    });
+
+    const result = validateScenario(scenario);
+    const duplicateIssues = result.issues.filter((i) => i.category === 'duplicate');
+
+    expect(duplicateIssues.some((i) => i.message.includes('duplicateStat'))).toBe(true);
+  });
+
+  it('should detect duplicate flag names', () => {
+    const scenario = createTestScenario({
+      flagDictionary: [
+        {
+          flagName: 'FLAG_DUPLICATE',
+          description: '테스트1',
+          type: 'boolean',
+          initial: false,
+        },
+        {
+          flagName: 'FLAG_DUPLICATE', // 중복
+          description: '테스트2',
+          type: 'boolean',
+          initial: false,
+        },
+      ],
+    });
+
+    const result = validateScenario(scenario);
+    const duplicateIssues = result.issues.filter((i) => i.category === 'duplicate');
+
+    expect(duplicateIssues.some((i) => i.message.includes('FLAG_DUPLICATE'))).toBe(true);
+  });
+
+  it('should detect duplicate character names', () => {
+    const scenario = createTestScenario({
+      characters: [
+        {
+          roleId: 'ROLE_A',
+          roleName: '역할A',
+          characterName: '홍길동',
+          backstory: '테스트',
+          suggestedTraits: [],
+        },
+        {
+          roleId: 'ROLE_B',
+          roleName: '역할B',
+          characterName: '홍길동', // 중복 이름
+          backstory: '테스트',
+          suggestedTraits: [],
+        },
+      ],
+    });
+
+    const result = validateScenario(scenario);
+    const duplicateIssues = result.issues.filter((i) => i.category === 'duplicate');
+
+    expect(duplicateIssues.some((i) => i.message.includes('홍길동'))).toBe(true);
+  });
+});
+
+describe('trait pool reference validation', () => {
+  it('should warn when character trait is not in trait pool', () => {
+    const scenario = createTestScenario({
+      characters: [
+        {
+          roleId: 'ROLE_TEST',
+          roleName: '테스트',
+          characterName: '테스트캐릭터',
+          backstory: '테스트',
+          suggestedTraits: ['nonExistentTrait'],
+        },
+      ],
+      traitPool: {
+        buffs: [
+          {
+            traitId: 'existingTrait',
+            traitName: 'existing_trait',
+            displayName: '존재하는 특성',
+            description: '테스트',
+            effect: '테스트',
+          },
+        ],
+        debuffs: [],
+      },
+    });
+
+    const result = validateScenario(scenario);
+    const traitIssues = result.issues.filter((i) => i.category === 'trait');
+
+    expect(traitIssues.some((i) => i.message.includes('nonExistentTrait'))).toBe(true);
+  });
+
+  it('should not warn when character trait exists in trait pool', () => {
+    const scenario = createTestScenario({
+      characters: [
+        {
+          roleId: 'ROLE_TEST',
+          roleName: '테스트',
+          characterName: '테스트캐릭터',
+          backstory: '테스트',
+          suggestedTraits: ['existingTrait'],
+        },
+      ],
+      traitPool: {
+        buffs: [
+          {
+            traitId: 'existingTrait',
+            traitName: 'existing_trait',
+            displayName: '존재하는 특성',
+            description: '테스트',
+            effect: '테스트',
+          },
+        ],
+        debuffs: [],
+      },
+    });
+
+    const result = validateScenario(scenario);
+    const traitIssues = result.issues.filter((i) => i.category === 'trait');
+
+    expect(traitIssues.length).toBe(0);
+  });
+});

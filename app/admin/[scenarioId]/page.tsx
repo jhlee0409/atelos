@@ -173,30 +173,40 @@ function ScenarioDetailContent() {
       <div className="mx-auto flex max-w-7xl gap-6 px-6 py-8">
         {/* Main Content */}
         <div className="flex-1 space-y-6">
-          <BaseContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <StoryOpeningContent
-            scenario={scenario}
-            setScenario={setScenario}
-          />
-          <CharacterContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <SystemRulesContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <CoreStoryElementsContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
+          <div id="section-basic">
+            <BaseContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-story">
+            <StoryOpeningContent
+              scenario={scenario}
+              setScenario={setScenario}
+            />
+          </div>
+          <div id="section-characters">
+            <CharacterContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-system">
+            <SystemRulesContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-core">
+            <CoreStoryElementsContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
         </div>
 
         {/* Sidebar */}
