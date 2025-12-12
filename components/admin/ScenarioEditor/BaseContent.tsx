@@ -10,7 +10,7 @@ import type { ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { VALIDATION_IDS } from '@/constants/scenario';
 import { cn } from '@/lib/utils';
-import { generatePosterImage, uploadImage } from '@/lib/image-generator';
+import { generatePosterImage, uploadImage, inferSettingFromScenario } from '@/lib/image-generator';
 import { updateScenario } from '@/lib/scenario-api';
 import { toast } from 'sonner';
 
@@ -43,11 +43,18 @@ export default function BaseContent({ scenario, setScenario, errors, onSave }: P
     setIsImageError(false);
 
     try {
+      // 시나리오 정보에서 배경 설정 추론 (다양성 향상)
+      const setting = inferSettingFromScenario({
+        synopsis: scenario.synopsis,
+        genre: scenario.genre,
+      });
+
       const result = await generatePosterImage({
         title: scenario.title,
         genre: scenario.genre,
         synopsis: scenario.synopsis,
         keywords: scenario.coreKeywords,
+        setting,
       });
 
       console.log('🎨 [BaseContent] 이미지 생성 결과:', result);

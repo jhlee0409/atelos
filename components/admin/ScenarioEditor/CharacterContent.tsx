@@ -16,7 +16,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
-import { generateCharacterImage, uploadImage } from '@/lib/image-generator';
+import { generateCharacterImage, uploadImage, inferSettingFromScenario } from '@/lib/image-generator';
 import { updateScenario } from '@/lib/scenario-api';
 import { toast } from 'sonner';
 
@@ -447,12 +447,20 @@ const CharacterCard = ({
     setIsImageError(false);
 
     try {
+      // 시나리오 정보에서 배경 설정 추론 (다양성 향상)
+      const setting = inferSettingFromScenario({
+        synopsis: scenario.synopsis,
+        genre: scenario.genre,
+      });
+
       const result = await generateCharacterImage({
         characterName: character.characterName,
         roleName: character.roleName || '',
         backstory: character.backstory || '',
+        traits: character.suggestedTraits || [],
         scenarioTitle: scenario.title || '',
         scenarioGenre: scenario.genre || [],
+        setting,
       });
 
       if (result.success && result.imageBase64) {

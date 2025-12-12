@@ -16,7 +16,6 @@ export const initialScenario: ScenarioData = {
   goalCluster: undefined,
   endingArchetypes: [],
   status: 'in_progress',
-  flagDictionary: [],
 } as const;
 
 // validation ids
@@ -45,8 +44,6 @@ export const VALIDATION_IDS = {
   ENDING_TITLE: 'ending_title',
   // 관계
   RELATIONSHIP_INVALID: 'relationship_invalid',
-  // 플래그
-  FLAG_NAME: 'flag_name',
 } as const;
 
 // 검증 상수

@@ -27,7 +27,7 @@ import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
 import { StatsBar } from '@/components/client/GameClient/StatsBar';
 import { ChatHistory } from '@/components/client/GameClient/ChatHistory';
 import { ChoiceButtons } from '@/components/client/GameClient/ChoiceButtons';
-import { SaveState, AIResponse, PlayerAction, ActionType, ActionRecord } from '@/types';
+import { SaveState, AIResponse, PlayerAction, ActionType, ActionRecord, ActionHistoryEntry, DynamicEndingResult } from '@/types';
 import { checkEndingConditions } from '@/lib/ending-checker';
 import {
   generateFallbackInitialChoices,
@@ -36,6 +36,7 @@ import {
 import { CharacterDialoguePanel } from '@/components/client/GameClient/CharacterDialoguePanel';
 import { ExplorationPanel } from '@/components/client/GameClient/ExplorationPanel';
 import { TimelineProgress } from '@/components/client/GameClient/TimelineProgress';
+import { DynamicEndingDisplay } from '@/components/client/GameClient/DynamicEndingDisplay';
 import { generateDialogueResponse } from '@/lib/dialogue-generator';
 import { generateExplorationResult } from '@/lib/exploration-generator';
 import {
@@ -55,6 +56,7 @@ import {
   getLocationsForUI,
   updateLocationStatus,
 } from '@/lib/world-state-manager';
+import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
 import type { WorldState, WorldLocation } from '@/types';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
@@ -73,7 +75,7 @@ const LEGACY_STAT_MAPPING: Record<string, string> = {
 // 행동 게이지 시스템 상수 및 함수
 // =============================================================================
 
-/** 일일 기본 행동 포인트 */
+/** 일일 기본 행동 포인트 (폴백용 - 시나리오별 설정은 getActionPointsPerDay 사용) */
 const ACTION_POINTS_PER_DAY = 3;
 
 /** 행동 유형별 비용 (Phase 1: 모든 행동 1 AP) */
@@ -131,8 +133,9 @@ const consumeActionPoint = (
   if (shouldAdvanceDay) {
     const newDay = currentDay + 1;
     newState.context.currentDay = newDay;
-    newState.context.actionPoints = ACTION_POINTS_PER_DAY;
-    newState.context.maxActionPoints = ACTION_POINTS_PER_DAY;
+    // Day 전환 시 maxAP로 충전 (시나리오별 설정 값 사용)
+    newState.context.actionPoints = maxAP;
+    // maxActionPoints는 유지 (초기화 시 설정된 시나리오별 값)
     newState.context.actionsThisDay = [];
     newState.context.turnsInCurrentDay = 0; // 하위 호환성
 
@@ -199,13 +202,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     {} as { [key: string]: number },
   );
 
-  const flags = scenario.flagDictionary.reduce(
-    (acc, flag) => {
-      acc[flag.flagName] = flag.initial;
-      return acc;
-    },
-    {} as { [key: string]: boolean | number },
-  );
+  // @deprecated - flags system removed, kept empty for backwards compatibility
+  const flags: { [key: string]: boolean | number } = {};
 
   const hiddenRelationships = scenario.initialRelationships.reduce(
     (acc, rel) => {
@@ -251,6 +249,9 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     return char;
   });
 
+  // 시나리오별 Action Points 설정 가져오기
+  const actionPointsPerDay = getActionPointsPerDay(scenario);
+
   // 초기 ActionContext 생성 (맥락 연결 시스템)
   const initialActionContext = createInitialContext(scenario, {
     context: {
@@ -260,8 +261,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
       turnsInCurrentDay: 0,
-      actionPoints: ACTION_POINTS_PER_DAY,
-      maxActionPoints: ACTION_POINTS_PER_DAY,
+      actionPoints: actionPointsPerDay,
+      maxActionPoints: actionPointsPerDay,
       actionsThisDay: [],
     },
     community: {
@@ -284,14 +285,28 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       currentDay: 1,
       remainingHours: (scenario.endCondition.value || 7) * 24,
       turnsInCurrentDay: 0, // @deprecated - 하위 호환성 유지
-      // 행동 게이지 시스템 초기화
-      actionPoints: ACTION_POINTS_PER_DAY,
-      maxActionPoints: ACTION_POINTS_PER_DAY,
+      // 행동 게이지 시스템 초기화 (시나리오별 설정 사용)
+      actionPoints: actionPointsPerDay,
+      maxActionPoints: actionPointsPerDay,
       actionsThisDay: [],
       // 맥락 연결 시스템 초기화
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
+      // [2025 Enhanced] 주인공 지식 시스템 초기화
+      protagonistKnowledge: {
+        metCharacters: [],
+        discoveredRelationships: [],
+        hintedRelationships: [],
+        informationPieces: [],
+      },
+      // [2025 Enhanced] 숨겨진 NPC 관계 상태 초기화
+      npcRelationshipStates: scenario.storyOpening?.hiddenNPCRelationships?.map((rel) => ({
+        relationId: rel.relationId,
+        visibility: rel.visibility || 'hidden',
+      })) || [],
+      // [2025 Enhanced] 발동된 스토리 트리거 초기화
+      triggeredStoryEvents: [],
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -687,32 +702,8 @@ const updateSaveState = (
     });
   }
 
-  // Add new flags, preventing duplicates
-  if (flags_acquired && flags_acquired.length > 0) {
-    console.log('🏴 획득 플래그 처리 시작:', flags_acquired);
-    flags_acquired.forEach((flag: string) => {
-      if (newSaveState.context.flags[flag] === undefined) {
-        const flagDef = scenario.flagDictionary.find(
-          (f: ScenarioFlag) => f.flagName === flag,
-        );
-        if (flagDef?.type === 'count') {
-          newSaveState.context.flags[flag] = 1;
-        } else {
-          newSaveState.context.flags[flag] = true;
-        }
-        // 새로운 플래그 획득 추적
-        trackedFlagsAcquired.push(flag);
-        console.log(
-          `🚩 새로운 플래그 획득: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
-        );
-      } else if (typeof newSaveState.context.flags[flag] === 'number') {
-        (newSaveState.context.flags[flag] as number) += 1;
-        console.log(
-          `🚩 기존 플래그 카운트 증가: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
-        );
-      }
-    });
-  }
+  // @deprecated - flags system removed, using ActionHistory instead
+  // flags_acquired is logged as significantEvents in ActionHistory
 
   // =============================================================================
   // 기존 Day 전환 로직 제거됨 (Phase 4: 행동 게이지 시스템으로 대체)
@@ -980,6 +971,102 @@ export default function GameClient({ scenario }: GameClientProps) {
   const [isDialogueLoading, setIsDialogueLoading] = useState(false);
   const [isExplorationLoading, setIsExplorationLoading] = useState(false);
 
+  // Dynamic Ending System: 행동 기록 및 동적 결말
+  const [actionHistory, setActionHistory] = useState<ActionHistoryEntry[]>([]);
+  const [dynamicEnding, setDynamicEnding] = useState<DynamicEndingResult | null>(null);
+  const [isGeneratingEnding, setIsGeneratingEnding] = useState(false);
+
+  /**
+   * ActionHistory에 행동 기록 추가
+   * SDT 기반 동적 결말 생성을 위한 데이터 수집
+   */
+  const addToActionHistory = (
+    actionType: ActionHistoryEntry['actionType'],
+    content: string,
+    consequence: ActionHistoryEntry['consequence'],
+    narrativeSummary: string,
+    target?: string,
+    moralAlignment?: ActionHistoryEntry['moralAlignment']
+  ) => {
+    const entry: ActionHistoryEntry = {
+      day: saveState.context.currentDay ?? 1,
+      timestamp: new Date().toISOString(),
+      actionType,
+      content,
+      target,
+      consequence,
+      narrativeSummary,
+      moralAlignment,
+    };
+
+    setActionHistory(prev => [...prev, entry]);
+    console.log('📝 ActionHistory 기록:', actionType, content.slice(0, 50) + '...');
+  };
+
+  /**
+   * 동적 엔딩 생성 함수
+   * endingDay에 도달하면 ActionHistory를 기반으로 AI가 결말 생성
+   */
+  const generateDynamicEnding = async (currentState: SaveState, history: ActionHistoryEntry[]) => {
+    if (!scenario.dynamicEndingConfig?.enabled) return;
+    if (isGeneratingEnding || dynamicEnding) return;
+
+    const currentDay = currentState.context.currentDay ?? 1;
+    const endingDay = scenario.dynamicEndingConfig.endingDay;
+
+    // 엔딩 Day 도달 체크
+    if (currentDay < endingDay) return;
+
+    console.log('🎬 동적 엔딩 생성 시작...');
+    setIsGeneratingEnding(true);
+
+    try {
+      const response = await fetch('/api/generate-ending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarioId: scenario.scenarioId,
+          scenario: {
+            title: scenario.title,
+            synopsis: scenario.synopsis,
+            genre: scenario.genre,
+            playerGoal: scenario.playerGoal,
+            characters: scenario.characters,
+          },
+          dynamicEndingConfig: scenario.dynamicEndingConfig,
+          actionHistory: history,
+          finalState: {
+            stats: currentState.context.scenarioStats,
+            relationships: currentState.community.hiddenRelationships,
+            day: currentDay,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.ending) {
+        console.log('✅ 동적 엔딩 생성 완료:', result.ending.title);
+        setDynamicEnding(result.ending);
+      } else {
+        console.error('❌ 동적 엔딩 생성 실패:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ 동적 엔딩 API 오류:', error);
+    } finally {
+      setIsGeneratingEnding(false);
+    }
+  };
+
+  // 엔딩 Day 경고 체크
+  const shouldShowEndingWarning = () => {
+    if (!scenario.dynamicEndingConfig?.enabled) return false;
+    const currentDay = saveState.context.currentDay ?? 1;
+    const endingDay = scenario.dynamicEndingConfig.endingDay;
+    const warningDays = scenario.dynamicEndingConfig.warningDays;
+    return currentDay >= (endingDay - warningDays) && currentDay < endingDay;
+  };
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     const chatContainer = document.getElementById('chat-container');
@@ -1011,7 +1098,7 @@ export default function GameClient({ scenario }: GameClientProps) {
       setError(null);
       try {
         const initialState = createInitialSaveState(scenario);
-        const aiSettings = getOptimalAISettings(1, 'medium', 0);
+        const aiSettings = getOptimalAISettings(1, 'medium', 0, scenario);
 
         // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
         const result = await generateInitialDilemmaWithOpening(
@@ -1199,6 +1286,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         newSaveState.context.currentDay || 1,
         'medium',
         0, // 초기 토큰 사용량
+        scenario,
       );
 
       // 제미나이 API를 통한 게임 응답 생성
@@ -1326,6 +1414,52 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       recordKeyDecision();
 
+      // Dynamic Ending System: ActionHistory 기록
+      {
+        // 스탯 변화 추출
+        const statsChanged = Object.entries(cleanedResponse.statChanges.scenarioStats || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: updatedSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        // 관계 변화 추출
+        const relationshipsChanged = (cleanedResponse.statChanges.hiddenRelationships_change || [])
+          .filter((r: { characterPair?: string; delta?: number }) => r.delta && r.delta !== 0)
+          .map((r: { characterPair?: string; delta?: number }) => {
+            const char = r.characterPair?.replace('플레이어-', '') || '';
+            return {
+              character: char,
+              delta: r.delta || 0,
+              newValue: updatedSaveState.community.hiddenRelationships[`플레이어-${char}`] ?? 0,
+            };
+          });
+
+        // 도덕적 성격 판단 (간단한 휴리스틱)
+        const determineMoralAlignment = (choice: string): ActionHistoryEntry['moralAlignment'] => {
+          const lc = choice.toLowerCase();
+          if (lc.includes('희생') || lc.includes('보호') || lc.includes('도움') || lc.includes('구출')) return 'selfless';
+          if (lc.includes('자원') || lc.includes('효율') || lc.includes('전략')) return 'pragmatic';
+          if (lc.includes('혼자') || lc.includes('포기') || lc.includes('탈출')) return 'selfish';
+          return 'neutral';
+        };
+
+        addToActionHistory(
+          'choice',
+          choiceDetails,
+          {
+            statsChanged,
+            relationshipsChanged,
+            significantEvents: cleanedResponse.statChanges.flags_acquired || [],
+          },
+          cleanedResponse.log.slice(0, 200),
+          undefined,
+          determineMoralAlignment(choiceDetails)
+        );
+      }
+
       // 맥락 연결 시스템: 선택 결과로 맥락 업데이트
       if (updatedSaveState.context.actionContext) {
         const currentDay = updatedSaveState.context.currentDay || 1;
@@ -1356,6 +1490,17 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진`);
       }
 
+      // Dynamic Ending System: 동적 엔딩 체크
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDay = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDay >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // actionHistory에 현재 기록이 추가된 상태로 호출
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // Check for ending condition after state is updated
       // stateAfterAP 사용 (Day 전환이 반영된 상태)
       const currentPlayerState: PlayerState = {
@@ -1368,9 +1513,10 @@ export default function GameClient({ scenario }: GameClientProps) {
       let ending: EndingArchetype | null = null;
       const currentDay = stateAfterAP.context.currentDay || 1;
 
-      // Day 5 이후에만 엔딩 조건 체크
+      // 엔딩 체크 시점 이후에만 엔딩 조건 체크 (동적 계산)
+      // 동적 엔딩 시스템이 비활성화된 경우에만 기존 엔딩 체크
       const survivorCount = stateAfterAP.community.survivors.length;
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
@@ -1384,7 +1530,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
       } else {
         console.log(
-          `⏸️ Day ${currentDay} - 엔딩 체크 대기 중 (Day 5 이후 체크)`,
+          `⏸️ Day ${currentDay} - 엔딩 체크 대기 중 (엔딩 체크 시점 이후 체크)`,
         );
       }
 
@@ -1538,6 +1684,28 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       }
 
+      // Dynamic Ending System: ActionHistory 기록 (대화)
+      addToActionHistory(
+        'dialogue',
+        `${topic.label}`,
+        {
+          statsChanged: [],
+          relationshipsChanged: dialogueResponse.relationshipChange
+            ? [{
+                character: characterName,
+                delta: dialogueResponse.relationshipChange,
+                newValue: newSaveState.community.hiddenRelationships[
+                  ['(플레이어)', characterName].sort().join('-')
+                ] ?? 0,
+              }]
+            : [],
+          significantEvents: dialogueResponse.infoGained ? [`정보 획득: ${dialogueResponse.infoGained.slice(0, 50)}`] : [],
+        },
+        dialogueResponse.dialogue.slice(0, 200),
+        characterName,
+        'neutral'
+      );
+
       // 맥락 연결 시스템: 대화 결과로 맥락 업데이트
       if (newSaveState.context.actionContext) {
         const currentDay = newSaveState.context.currentDay || 1;
@@ -1572,11 +1740,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -1610,10 +1778,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
@@ -1712,14 +1881,7 @@ export default function GameClient({ scenario }: GameClientProps) {
             }
           }
 
-          if (discovery.effects?.flagsAcquired) {
-            for (const flag of discovery.effects.flagsAcquired) {
-              if (newSaveState.context.flags[flag] === undefined) {
-                const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
-                newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
-              }
-            }
-          }
+          // @deprecated - flags system removed, using ActionHistory instead
         }
 
         // 위치 변경 알림 (몰입감 있는 형식 - 중요한 변화만)
@@ -1761,16 +1923,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           }
         }
 
-        // 플래그 획득
-        if (explorationResult.rewards.flagsAcquired) {
-          for (const flag of explorationResult.rewards.flagsAcquired) {
-            if (newSaveState.context.flags[flag] === undefined) {
-              const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
-              newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
-              console.log(`🚩 탐색 플래그 획득: ${flag}`);
-            }
-          }
-        }
+        // @deprecated - flags system removed
+        // significantDiscoveries logged in ActionHistory instead
 
         // 정보 획득 (WorldState에서 이미 구체적 발견물을 추가했으므로 중복 방지)
         if (explorationResult.rewards.infoGained && !worldStateResult?.newDiscoveries.length) {
@@ -1780,6 +1934,36 @@ export default function GameClient({ scenario }: GameClientProps) {
             timestamp: Date.now() + 2,
           });
         }
+      }
+
+      // Dynamic Ending System: ActionHistory 기록 (탐색)
+      {
+        const statsChanged = Object.entries(explorationResult.rewards?.statChanges || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: newSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        // significantEvents now comes from significantDiscoveries
+        const significantEvents = [
+          ...(explorationResult.rewards?.significantDiscoveries || []),
+          ...(worldStateResult?.newDiscoveries.map(d => `발견: ${d.name}`) || []),
+        ];
+
+        addToActionHistory(
+          'exploration',
+          `${location.name} 탐색`,
+          {
+            statsChanged,
+            relationshipsChanged: [],
+            significantEvents,
+          },
+          explorationResult.narrative.slice(0, 200),
+          location.name,
+          'pragmatic'
+        );
       }
 
       // 맥락 연결 시스템: 탐색 결과로 맥락 업데이트
@@ -1827,11 +2011,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -1865,10 +2049,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
@@ -1920,6 +2105,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         newSaveState.context.currentDay || 1,
         'medium',
         0,
+        scenario,
       );
 
       const aiResponse = await generateGameResponse(
@@ -1955,6 +2141,50 @@ export default function GameClient({ scenario }: GameClientProps) {
         scenario,
       );
 
+      // Dynamic Ending System: ActionHistory 기록 (자유 입력)
+      {
+        const statsChanged = Object.entries(cleanedResponse.statChanges?.scenarioStats || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: updatedSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        const relationshipsChanged = (cleanedResponse.statChanges?.hiddenRelationships_change || [])
+          .filter((r: { characterPair?: string; delta?: number }) => r.delta && r.delta !== 0)
+          .map((r: { characterPair?: string; delta?: number }) => {
+            const char = r.characterPair?.replace('플레이어-', '') || '';
+            return {
+              character: char,
+              delta: r.delta || 0,
+              newValue: updatedSaveState.community.hiddenRelationships[`플레이어-${char}`] ?? 0,
+            };
+          });
+
+        // 도덕적 성격 판단
+        const determineMoralAlignment = (input: string): ActionHistoryEntry['moralAlignment'] => {
+          const lc = input.toLowerCase();
+          if (lc.includes('희생') || lc.includes('보호') || lc.includes('도움')) return 'selfless';
+          if (lc.includes('자원') || lc.includes('효율') || lc.includes('전략')) return 'pragmatic';
+          if (lc.includes('혼자') || lc.includes('포기')) return 'selfish';
+          return 'neutral';
+        };
+
+        addToActionHistory(
+          'freeText',
+          text,
+          {
+            statsChanged,
+            relationshipsChanged,
+            significantEvents: cleanedResponse.statChanges?.flags_acquired || [],
+          },
+          cleanedResponse.log.slice(0, 200),
+          undefined,
+          determineMoralAlignment(text)
+        );
+      }
+
       // 맥락 연결 시스템: 자유 입력 결과로 맥락 업데이트
       if (updatedSaveState.context.actionContext) {
         const currentDay = updatedSaveState.context.currentDay || 1;
@@ -1984,11 +2214,11 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);
       }
 
-      // 엔딩 체크 (Day 5 이후 항상 체크 - handlePlayerChoice와 동일)
+      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (currentDay >= 5) {
+      if (canCheckEnding(currentDay, scenario)) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -2022,10 +2252,11 @@ export default function GameClient({ scenario }: GameClientProps) {
               ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
             }
             if (!ending) {
+              const totalDays = scenario.endCondition.value || 7;
               ending = {
                 endingId: 'DEFAULT_TIME_UP',
                 title: '결단의 시간',
-                description: '7일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.',
+                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
                 systemConditions: [],
                 isGoalSuccess: false,
               };
@@ -2044,6 +2275,37 @@ export default function GameClient({ scenario }: GameClientProps) {
       setIsLoading(false);
     }
   };
+
+  // 동적 엔딩 생성 중 로딩 표시
+  if (isGeneratingEnding) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-telos-black text-zinc-100">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-950/20 via-transparent to-transparent" />
+        <div className="relative z-10 text-center space-y-4">
+          <div className="animate-pulse">
+            <div className="text-4xl mb-4">🎬</div>
+            <h2 className="text-xl font-bold text-zinc-200">결말을 생성하고 있습니다...</h2>
+            <p className="text-zinc-400 text-sm mt-2">당신의 여정을 분석하고 있습니다</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 동적 엔딩 표시
+  if (dynamicEnding) {
+    return (
+      <>
+        <DynamicEndingDisplay
+          ending={dynamicEnding}
+          onClose={() => {
+            // 로비로 이동
+            window.location.href = '/lobby';
+          }}
+        />
+      </>
+    );
+  }
 
   if (triggeredEnding) {
     return (

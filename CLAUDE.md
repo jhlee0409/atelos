@@ -141,6 +141,7 @@ atelos/
 │   ├── ending-checker.ts             # Ending condition evaluation
 │   ├── chat-history-manager.ts       # Chat history compression
 │   ├── simulation-utils.ts           # Stat calculations & dilemmas
+│   ├── scenario-validator.ts         # Scenario data consistency validation
 │   ├── validations.ts                # Form validation schemas
 │   ├── utils.ts                      # General utilities (cn, etc.)
 │   ├── firebase.ts                   # Firebase client initialization
@@ -244,28 +245,58 @@ Key files:
 - `lib/ai-scenario-generator.ts`: Scenario generation client
 - `lib/synopsis-generator.ts`: Synopsis generation
 - `lib/genre-narrative-styles.ts`: Genre-specific narrative guidance
+- `lib/gameplay-config.ts`: Dynamic gameplay configuration utilities (Day calculation, route scores, action points, stat thresholds)
 
 Language validation features:
 - Detects and removes Arabic, Thai, Hindi, Cyrillic characters
 - Validates Korean content ratio (>30% required)
 - Cleans weird Unicode characters
 
+#### Gameplay Configuration System (`lib/gameplay-config.ts`)
+
+시나리오별로 게임플레이 설정을 동적으로 조정할 수 있는 시스템입니다.
+
+**주요 함수:**
+- `getTotalDays(scenario)`: 시나리오의 총 일수 가져오기
+- `getRouteActivationDay(scenario)`: 루트 분기 활성화 Day 계산
+- `getEndingCheckDay(scenario)`: 엔딩 체크 시작 Day 계산
+- `getNarrativePhase(currentDay, scenario)`: 서사 단계 계산 (setup/rising_action/midpoint/climax)
+- `canCheckEnding(currentDay, scenario)`: 엔딩 체크 가능 여부
+- `getActionPointsPerDay(scenario)`: 하루당 Action Points 가져오기
+- `isStatCritical(percentage, scenario)`: 스탯 위험 상태 체크
+- `isStatWarning(percentage, scenario)`: 스탯 경고 상태 체크
+- `calculateRouteScores(flags, stats, scenario)`: 동적 루트 점수 계산
+- `getFallbackChoices(scenario)`: 장르별 Fallback 선택지
+
+**설정 가능 항목 (ScenarioData.gameplayConfig):**
+```typescript
+gameplayConfig?: {
+  routeActivationRatio?: number;     // 루트 활성화 비율 (기본: 0.4 = Day 3 for 7일)
+  endingCheckRatio?: number;         // 엔딩 체크 비율 (기본: 0.7 = Day 5 for 7일)
+  narrativePhaseRatios?: { setup, rising_action, midpoint, climax };
+  actionPointsPerDay?: number;       // 하루당 AP (기본: 3)
+  criticalStatThreshold?: number;    // 위험 스탯 임계값 (기본: 0.4)
+  warningStatThreshold?: number;     // 경고 스탯 임계값 (기본: 0.5)
+  routeScores?: RouteScoreConfig[];  // 커스텀 루트 점수 설정
+  customFallbackChoices?: { prompt, choice_a, choice_b };
+};
+```
+
 #### Ending System (`lib/ending-checker.ts`)
 
 - Checks stat conditions with comparison operators (>=, <=, ==, >, <, !=)
 - Checks flag conditions (boolean true or count > 0)
-- Only checks endings after Day 5
+- Only checks endings after `endingCheckDay` (동적 계산, 기본: Day 5 for 7일 게임)
 - Time limit ending triggers after configured days (ENDING_TIME_UP)
 - Falls back to default "결단의 시간" ending if no conditions met
 
 #### Route System (`RouteIndicator.tsx`)
 
-Determines narrative path based on flags:
-- **탈출 (Escape)**: FLAG_ESCAPE_VEHICLE_SECURED, FLAG_LEADER_SACRIFICE
-- **항전 (Defense)**: FLAG_DEFENSES_COMPLETE, FLAG_RESOURCE_MONOPOLY, FLAG_IDEOLOGY_ESTABLISHED
-- **협상 (Negotiation)**: FLAG_ALLY_NETWORK_FORMED, FLAG_GOVERNMENT_CONTACT, FLAG_UNDERGROUND_HIDEOUT
+Determines narrative path based on scenario's `routeScores` configuration:
+- Default routes: 탈출 (Escape), 항전 (Defense), 협상 (Negotiation)
+- Route scores calculated from flags and stats defined in `gameplayConfig.routeScores`
 
-Route is "미정" (undetermined) until Day 3, then calculated based on accumulated flag scores.
+Route is "미정" (undetermined) until `routeActivationDay` (동적 계산, 기본: Day 3 for 7일 게임), then calculated based on accumulated flag scores.
 
 #### Character Arc System (`CharacterArcPanel.tsx`)
 
@@ -340,6 +371,10 @@ World state that changes based on player actions:
 - `EmergentNarrativeConfig`: Dynamic story events from player action combinations
 - `StorySiftingTrigger`: Conditions that generate emergent story events
 - `ProtagonistKnowledge`: Tracks what the player character knows
+- **Protagonist-NPC Name Collision Detection**: Prevents protagonist name from matching NPC names
+  - `prompt-builder.ts` detects collision at runtime and clears protagonist name
+  - AI generation API (`ai-generate/route.ts`) instructs AI to avoid name collision
+  - Fallback: AI uses pronouns or occupation title instead of name when collision detected
 
 #### Genre Narrative Styles (`lib/genre-narrative-styles.ts`)
 
@@ -517,6 +552,32 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 - `endCondition` (time_limit with days/hours)
 - `storyOpening` for 3-phase opening configuration
 
+### Scenario Data Validation (`lib/scenario-validator.ts`)
+
+시나리오 데이터의 일관성을 검증하는 유틸리티입니다. Admin 에디터의 StickySidebar에서 실시간으로 검증 결과를 표시합니다.
+
+**검증 항목:**
+
+| 검증 유형 | 심각도 | 설명 |
+|----------|--------|------|
+| 엔딩 스탯 참조 | error | 존재하지 않는 statId 참조 |
+| 엔딩 플래그 참조 | error | 존재하지 않는 flagName 참조 |
+| 관계 캐릭터 | error | 존재하지 않는 캐릭터 관계 설정 |
+| 스토리 오프닝 캐릭터 | error | firstCharacterToMeet 등이 캐릭터 목록에 없음 |
+| 스탯 범위 | error | initialValue가 min/max 범위 밖 |
+| 엔딩 조건 충돌 | warning | 같은 스탯에 충돌하는 조건 (>=80 AND <=20) |
+| 미사용 플래그 | warning | 정의되었지만 엔딩 조건에서 사용되지 않는 플래그 |
+
+**사용법:**
+```typescript
+import { validateScenario } from '@/lib/scenario-validator';
+
+const result = validateScenario(scenario);
+// result.isValid: boolean - 오류 없으면 true
+// result.issues: ValidationIssue[] - 발견된 이슈 목록
+// result.summary: { errors: number, warnings: number }
+```
+
 ## Testing
 
 ### Test Structure
@@ -661,6 +722,12 @@ Custom colors defined in `tailwind.config.ts`:
 3. Check image type is 'poster' or 'character'
 4. Look for safety filter blocks in error messages
 
+### Story Opening Issues
+1. Check for "⚠️ 주인공 이름...충돌" warning in console (protagonist-NPC name collision)
+2. Verify `storyOpening.protagonistSetup.name` differs from all NPC character names
+3. If collision detected, system auto-clears protagonist name (AI uses pronouns instead)
+4. Check `firstCharacterToMeet` matches an actual character in `scenario.characters`
+
 ## 🚨 Development Checklist (MANDATORY)
 
 **이 체크리스트는 기능 구현/개선 시 반드시 따라야 합니다.**
@@ -739,3 +806,205 @@ GameClient의 4개 주요 핸들러에 동일한 로직이 필요한 경우:
 | Key Decisions | N/A | `handlePlayerChoice` | `gemini-client.ts` | `KeyDecisionPanel` |
 | Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |
 | ProtagonistKnowledge | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | N/A |
+| GameplayConfig | N/A | N/A | `gameplay-config.ts` | `RouteIndicator`, `EndingProgress`, `StatsBar` |
+
+### 🔗 전체 시스템 통합 검증 (3-Way Integration)
+
+**ATELOS는 세 가지 핵심 시스템이 긴밀하게 연결되어 있습니다. 새로운 기능/데이터를 추가할 때 반드시 세 시스템 모두에서 통합을 확인해야 합니다.**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ATELOS 시스템 통합 다이어그램                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐  │
+│  │ 1. AI 시나리오   │ → │ 2. Admin Editor │ → │ 3. 게임      │  │
+│  │    생성 시스템   │    │    (수정/저장)   │    │   플레이    │  │
+│  └─────────────────┘    └─────────────────┘    └─────────────┘  │
+│                                                                 │
+│  - ai-generate/route.ts   - ScenarioEditor/*    - GameClient   │
+│  - ai-scenario-generator  - BaseContent         - game-builder │
+│  - CATEGORY_SCHEMAS       - SystemRulesContent  - gameplay-config│
+│                           - GameplayConfigContent - RouteIndicator│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 새로운 ScenarioData 필드 추가 시 필수 체크리스트
+
+**예시: `gameplayConfig` 필드를 추가하는 경우**
+
+| 단계 | 확인 사항 | 체크 |
+|------|----------|------|
+| **1. 타입 정의** | `types/index.ts`에 타입이 정의되었는가? | [ ] |
+| **2. AI 생성** | `ai-generate/route.ts`에 생성 카테고리가 추가되었는가? | [ ] |
+|  | `ai-scenario-generator.ts`에 결과 타입이 추가되었는가? | [ ] |
+|  | AI가 생성한 데이터가 ScenarioData에 올바르게 매핑되는가? | [ ] |
+| **3. Admin 편집** | Admin Editor에 수정 UI가 추가되었는가? | [ ] |
+|  | 저장 시 Firebase에 올바르게 저장되는가? | [ ] |
+|  | 시나리오 불러오기 시 데이터가 로드되는가? | [ ] |
+| **4. 게임 사용** | GameClient에서 해당 데이터를 사용하는가? | [ ] |
+|  | 기본값(defaults)이 정의되어 있는가? (선택적 필드의 경우) | [ ] |
+|  | 관련 UI 컴포넌트에 전달되는가? | [ ] |
+| **5. 유틸리티** | 헬퍼 함수가 필요한 경우 `lib/` 에 추가되었는가? | [ ] |
+|  | 다른 파일에서 import하여 사용 가능한가? | [ ] |
+
+#### 통합 검증 예시
+
+```
+❌ 불완전한 구현:
+"GameplayConfig 타입을 추가하고, Admin Editor UI를 만들었습니다."
+→ AI 생성 시스템과 게임 플레이 시스템에서 사용하지 않음!
+
+✅ 완전한 구현:
+"GameplayConfig 전체 통합 완료:
+1. types/index.ts: ✅ GameplayConfig, RouteScoreConfig 타입 정의
+2. ai-generate/route.ts: ✅ 'gameplay_config' 카테고리 추가
+   - CATEGORY_SCHEMAS에 스키마 정의
+   - CATEGORY_TEMPERATURE, CATEGORY_MAX_TOKENS 설정
+   - getCategoryPrompt에 프롬프트 템플릿 추가
+3. ai-scenario-generator.ts: ✅ GameplayConfigResult 타입 및 CATEGORY_INFO 추가
+4. GameplayConfigContent.tsx: ✅ Admin Editor UI 컴포넌트
+5. admin/[scenarioId]/page.tsx: ✅ 편집 페이지에 섹션 추가
+6. lib/gameplay-config.ts: ✅ 헬퍼 함수 및 기본값
+7. GameClient.tsx: ✅ getActionPointsPerDay, canCheckEnding 등 사용
+8. RouteIndicator.tsx: ✅ calculateRouteScores 사용
+9. EndingProgress.tsx: ✅ getEndingCheckDay 사용
+모든 시스템에서 gameplayConfig가 사용됨을 확인했습니다."
+```
+
+#### ScenarioData 필드별 통합 현황
+
+| 필드 | AI 생성 | Admin 편집 | 게임 사용 |
+|------|---------|------------|----------|
+| `title`, `synopsis`, `playerGoal` | scenario_overview | BaseContent | GameClient |
+| `characters` | characters | CharacterContent | GameClient |
+| `initialRelationships` | relationships | CharacterContent | GameClient |
+| `scenarioStats` | stats | SystemRulesContent | StatsBar, GameClient |
+| `flagDictionary` | flags | SystemRulesContent | RouteIndicator, GameClient |
+| `endingArchetypes` | endings | CoreStoryElementsContent | ending-checker |
+| `traitPool` | traits | SystemRulesContent | GameClient |
+| `storyOpening` | story_opening | StoryOpeningContent | GameClient |
+| `gameplayConfig` | gameplay_config | GameplayConfigContent | gameplay-config utils |
+
+**⚠️ 새 필드 추가 시 위 테이블의 모든 열이 채워져야 합니다!**
+
+## 🧪 테스트 전략 (Test-Aware Development)
+
+**LLM 기반 개발에 최적화된 실용적 테스트 전략입니다.**
+
+### 테스트 적용 기준
+
+| 구분 | 테스트 필수 | 테스트 선택 |
+|------|-------------|-------------|
+| **핵심 비즈니스 로직** | ✅ | |
+| (ending-checker, simulation-utils) | | |
+| **API 엔드포인트** | ✅ | |
+| **유틸리티 함수** | ✅ | |
+| **UI 컴포넌트** | | ✅ |
+| **AI 생성 기능** | | ✅ (출력 비결정적) |
+| **스타일/레이아웃** | | ❌ 불필요 |
+
+### 개발 워크플로우
+
+#### 1단계: 구현 계획 공유
+
+구현 전 무엇을 만들지 명확히 설명:
+
+```
+📋 구현 계획:
+- 목표: 스토리 오프닝 재생성 버튼 추가
+- 변경 파일: ScenarioEditor/index.tsx, ai-generate/route.ts
+- 영향 범위: 기존 시나리오 편집 기능
+```
+
+#### 2단계: 구현
+
+LLM으로 빠르게 구현 진행
+
+#### 3단계: 핵심 테스트 작성 (해당 시)
+
+핵심 로직 변경 시에만 테스트 추가:
+
+```typescript
+// 핵심 로직 예시 - 테스트 필수
+describe('checkEndingConditions', () => {
+  it('should trigger ending when all conditions met', () => {
+    // ...
+  });
+});
+```
+
+#### 4단계: 검증
+
+```bash
+pnpm build       # 빌드 성공 확인
+pnpm test        # 기존 테스트 통과 확인
+```
+
+### 테스트 파일 위치
+
+| 테스트 유형 | 위치 | 용도 |
+|------------|------|------|
+| Unit Tests | `tests/unit/` | 핵심 함수/모듈 테스트 |
+| Integration Tests | `tests/integration/` | 시스템 간 통합 테스트 |
+| AI Quality Tests | `tests/ai-quality/` | AI 응답 품질 테스트 |
+
+### 테스트 작성 시 가이드라인
+
+1. **테스트 이름은 명확하게**: `should [동작] when [조건]`
+2. **AAA 패턴 사용**: Arrange → Act → Assert
+3. **엣지 케이스 포함**: 빈 값, null, 경계값 등
+4. **Mock 적절히 사용**: 외부 의존성은 mock 처리
+5. **독립적인 테스트**: 테스트 간 의존성 없이 독립 실행 가능
+
+### 핵심 원칙
+
+```
+✅ 올바른 패턴:
+"엔딩 체커 로직 수정 → 테스트 추가 → 검증"
+"UI 버튼 추가 → 빌드 확인 → 수동 테스트"
+
+❌ 피해야 할 패턴:
+"모든 기능에 테스트 먼저 작성" (과도한 오버헤드)
+"테스트 없이 핵심 로직 수정" (위험)
+```
+
+## 📝 문서화 규칙 (Documentation Rules)
+
+**기능 구현/개선 후 반드시 관련 문서를 업데이트해야 합니다.**
+
+### 필수 업데이트 대상
+
+| 변경 유형 | 업데이트 대상 |
+|----------|---------------|
+| 새로운 시스템/기능 추가 | CLAUDE.md (Project Structure, High-Level Architecture) |
+| 새로운 유틸리티 함수 추가 | CLAUDE.md (lib/ 섹션에 파일 설명 추가) |
+| 타입 정의 변경 | CLAUDE.md (Type System 섹션) |
+| API 엔드포인트 추가 | CLAUDE.md (API Routes 테이블) |
+| 환경 변수 추가 | CLAUDE.md (Environment Setup) |
+| 디버깅 팁 발견 | CLAUDE.md (Common Debugging) |
+| 주요 기능 완성 | README.md (Features 섹션) |
+
+### 문서 업데이트 체크리스트
+
+기능 구현 완료 후 다음을 확인:
+
+- [ ] **CLAUDE.md**: 새 파일/함수가 Project Structure에 반영되었는가?
+- [ ] **CLAUDE.md**: 새 시스템이 High-Level Architecture에 설명되었는가?
+- [ ] **CLAUDE.md**: 핵심 통합 지점 테이블이 업데이트 되었는가?
+- [ ] **README.md**: 사용자에게 보이는 새 기능이 Features에 추가되었는가?
+
+### 문서화 예시
+
+```
+✅ 올바른 패턴:
+"시나리오 검증 시스템 구현 완료.
+- lib/scenario-validator.ts 추가
+- CLAUDE.md: lib/ 섹션에 scenario-validator.ts 설명 추가
+- CLAUDE.md: Admin 섹션에 검증 시스템 설명 추가"
+
+❌ 잘못된 패턴:
+"시나리오 검증 시스템 구현 완료. 빌드 성공!"
+(문서 업데이트 없음)
+```

@@ -1,16 +1,19 @@
 import { cn } from '@/lib/utils';
-import { EndingArchetype, SystemCondition } from '@/types';
+import { EndingArchetype, SystemCondition, ScenarioData } from '@/types';
 import { compareValues } from '@/constants/comparison-operators';
-import { getKoreanStatName, getKoreanFlagName } from '@/constants/korean-english-mapping';
-import { ChevronDown, ChevronUp, Target, Flag, Users, CheckCircle2, XCircle } from 'lucide-react';
+import { getKoreanStatName } from '@/constants/korean-english-mapping';
+import { ChevronDown, ChevronUp, Target, Users, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { getRouteActivationDay, getEndingCheckDay } from '@/lib/gameplay-config';
 
 interface EndingProgressProps {
   endingArchetypes: EndingArchetype[];
   currentStats: Record<string, number>;
-  currentFlags: Record<string, boolean | number>;
+  /** @deprecated Flags system removed - kept for backwards compatibility */
+  currentFlags?: Record<string, boolean | number>;
   survivorCount: number;
   currentDay: number;
+  scenario?: ScenarioData | null;
   isExpanded?: boolean;
 }
 
@@ -18,17 +21,12 @@ interface EndingProgressProps {
 const checkCondition = (
   condition: SystemCondition,
   stats: Record<string, number>,
-  flags: Record<string, boolean | number>,
   survivorCount: number
 ): { met: boolean; current: number | boolean; required: number | string } => {
   if (condition.type === 'required_stat') {
     const currentValue = stats[condition.statId] ?? 0;
     const met = compareValues(currentValue, condition.comparison, condition.value);
     return { met, current: currentValue, required: condition.value };
-  } else if (condition.type === 'required_flag') {
-    const flagValue = flags[condition.flagName];
-    const met = typeof flagValue === 'boolean' ? flagValue === true : (flagValue ?? 0) > 0;
-    return { met, current: flagValue ?? false, required: '획득 필요' };
   } else if (condition.type === 'survivor_count') {
     const met = compareValues(survivorCount, condition.comparison, condition.value);
     return { met, current: survivorCount, required: condition.value };
@@ -40,24 +38,24 @@ const checkCondition = (
 const calculateEndingProgress = (
   ending: EndingArchetype,
   stats: Record<string, number>,
-  flags: Record<string, boolean | number>,
   survivorCount: number
 ): { progress: number; metConditions: number; totalConditions: number } => {
-  if (ending.systemConditions.length === 0) {
+  const conditions = ending.systemConditions || [];
+  if (conditions.length === 0) {
     return { progress: 0, metConditions: 0, totalConditions: 0 };
   }
 
   let metCount = 0;
-  for (const condition of ending.systemConditions) {
-    const result = checkCondition(condition, stats, flags, survivorCount);
+  for (const condition of conditions) {
+    const result = checkCondition(condition, stats, survivorCount);
     if (result.met) metCount++;
   }
 
-  const progress = (metCount / ending.systemConditions.length) * 100;
+  const progress = (metCount / conditions.length) * 100;
   return {
     progress,
     metConditions: metCount,
-    totalConditions: ending.systemConditions.length,
+    totalConditions: conditions.length,
   };
 };
 
@@ -66,8 +64,6 @@ const ConditionIcon = ({ type }: { type: SystemCondition['type'] }) => {
   switch (type) {
     case 'required_stat':
       return <Target className="h-3 w-3" />;
-    case 'required_flag':
-      return <Flag className="h-3 w-3" />;
     case 'survivor_count':
       return <Users className="h-3 w-3" />;
     default:
@@ -92,15 +88,13 @@ const getComparisonText = (comparison: string): string => {
 const ConditionItem = ({
   condition,
   stats,
-  flags,
   survivorCount,
 }: {
   condition: SystemCondition;
   stats: Record<string, number>;
-  flags: Record<string, boolean | number>;
   survivorCount: number;
 }) => {
-  const result = checkCondition(condition, stats, flags, survivorCount);
+  const result = checkCondition(condition, stats, survivorCount);
 
   let label = '';
   let valueDisplay = '';
@@ -109,10 +103,6 @@ const ConditionItem = ({
     const koreanName = getKoreanStatName(condition.statId) || condition.statId;
     label = koreanName;
     valueDisplay = `${result.current} / ${result.required} ${getComparisonText(condition.comparison)}`;
-  } else if (condition.type === 'required_flag') {
-    const koreanName = getKoreanFlagName(condition.flagName) || condition.flagName.replace('FLAG_', '');
-    label = koreanName;
-    valueDisplay = result.met ? '✓ 획득' : '미획득';
   } else if (condition.type === 'survivor_count') {
     label = '생존자 수';
     valueDisplay = `${result.current}명 / ${result.required}명 ${getComparisonText(condition.comparison)}`;
@@ -143,13 +133,11 @@ const ConditionItem = ({
 const EndingCard = ({
   ending,
   stats,
-  flags,
   survivorCount,
   rank,
 }: {
   ending: EndingArchetype;
   stats: Record<string, number>;
-  flags: Record<string, boolean | number>;
   survivorCount: number;
   rank: number;
 }) => {
@@ -157,7 +145,6 @@ const EndingCard = ({
   const { progress, metConditions, totalConditions } = calculateEndingProgress(
     ending,
     stats,
-    flags,
     survivorCount
   );
 
@@ -228,12 +215,11 @@ const EndingCard = ({
       {isExpanded && (
         <div className="mt-2 space-y-1 border-t border-zinc-800 pt-2">
           <div className="text-[10px] text-zinc-400 mb-1">{ending.description}</div>
-          {ending.systemConditions.map((condition, idx) => (
+          {(ending.systemConditions || []).map((condition, idx) => (
             <ConditionItem
               key={idx}
               condition={condition}
               stats={stats}
-              flags={flags}
               survivorCount={survivorCount}
             />
           ))}
@@ -249,21 +235,26 @@ export const EndingProgress = ({
   currentFlags,
   survivorCount,
   currentDay,
+  scenario,
   isExpanded: initialExpanded = false,
 }: EndingProgressProps) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
-  // Day 3 이전에는 표시하지 않음
-  if (currentDay < 3) {
+  // 동적 Day 계산
+  const routeActivationDay = getRouteActivationDay(scenario);
+  const endingCheckDay = getEndingCheckDay(scenario);
+
+  // 루트 활성화 전에는 표시하지 않음
+  if (currentDay < routeActivationDay) {
     return null;
   }
 
   // 시간 제한 엔딩 제외하고, 진행률 높은 순으로 정렬
   const checkableEndings = endingArchetypes
-    .filter((ending) => ending.systemConditions.length > 0 && ending.endingId !== 'ENDING_TIME_UP')
+    .filter((ending) => (ending.systemConditions?.length ?? 0) > 0 && ending.endingId !== 'ENDING_TIME_UP')
     .map((ending) => ({
       ending,
-      ...calculateEndingProgress(ending, currentStats, currentFlags, survivorCount),
+      ...calculateEndingProgress(ending, currentStats, survivorCount),
     }))
     .sort((a, b) => b.progress - a.progress);
 
@@ -280,7 +271,7 @@ export const EndingProgress = ({
         <div className="flex items-center gap-2">
           <span className="text-sm">🎯</span>
           <span className="text-sm font-medium text-zinc-200">엔딩 진행도</span>
-          {currentDay >= 5 && (
+          {currentDay >= endingCheckDay && (
             <span className="rounded bg-yellow-900/50 px-1.5 py-0.5 text-[10px] text-yellow-400">
               엔딩 체크 활성
             </span>
@@ -303,7 +294,6 @@ export const EndingProgress = ({
             key={ending.endingId}
             ending={ending}
             stats={currentStats}
-            flags={currentFlags}
             survivorCount={survivorCount}
             rank={idx + 1}
           />
@@ -317,10 +307,10 @@ export const EndingProgress = ({
         </div>
       )}
 
-      {/* Day 5 미만 안내 */}
-      {currentDay < 5 && (
+      {/* 엔딩 체크 시점 미만 안내 */}
+      {currentDay < endingCheckDay && (
         <div className="mt-2 text-center text-[10px] text-zinc-500">
-          Day 5부터 엔딩 조건이 체크됩니다
+          Day {endingCheckDay}부터 엔딩 조건이 체크됩니다
         </div>
       )}
     </div>

@@ -11,7 +11,9 @@ import BaseContent from '@/components/admin/ScenarioEditor/BaseContent';
 import StoryOpeningContent from '@/components/admin/ScenarioEditor/StoryOpeningContent';
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
-import CoreStoryElementsContent from '@/components/admin/ScenarioEditor/CoreStoryElementsContent';
+import GameplayConfigContent from '@/components/admin/ScenarioEditor/GameplayConfigContent';
+import LocationsContent from '@/components/admin/ScenarioEditor/LocationsContent';
+import { DynamicEndingConfigContent } from '@/components/admin/ScenarioEditor/DynamicEndingConfigContent';
 import StickySidebar from '@/components/admin/ScenarioEditor/StickySidebar';
 import { toast } from 'sonner';
 import { VALIDATION_IDS } from '@/constants/scenario';
@@ -173,30 +175,57 @@ function ScenarioDetailContent() {
       <div className="mx-auto flex max-w-7xl gap-6 px-6 py-8">
         {/* Main Content */}
         <div className="flex-1 space-y-6">
-          <BaseContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <StoryOpeningContent
-            scenario={scenario}
-            setScenario={setScenario}
-          />
-          <CharacterContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <SystemRulesContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
-          <CoreStoryElementsContent
-            scenario={scenario}
-            setScenario={setScenario}
-            errors={validationErrors}
-          />
+          <div id="section-basic">
+            <BaseContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-story">
+            <StoryOpeningContent
+              scenario={scenario}
+              setScenario={setScenario}
+            />
+          </div>
+          <div id="section-characters">
+            <CharacterContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-system">
+            <SystemRulesContent
+              scenario={scenario}
+              setScenario={setScenario}
+              errors={validationErrors}
+            />
+          </div>
+          <div id="section-gameplay">
+            <GameplayConfigContent
+              scenario={scenario}
+              setScenario={setScenario}
+            />
+          </div>
+          <div id="section-locations">
+            <LocationsContent
+              scenario={scenario}
+              setScenario={setScenario}
+            />
+          </div>
+          <div id="section-dynamic-ending">
+            <DynamicEndingConfigContent
+              config={scenario.dynamicEndingConfig}
+              genre={scenario.genre || []}
+              onChange={(config) =>
+                setScenario((prev) => ({
+                  ...prev,
+                  dynamicEndingConfig: config,
+                }))
+              }
+            />
+          </div>
         </div>
 
         {/* Sidebar */}

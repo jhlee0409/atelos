@@ -1,3 +1,10 @@
+/**
+ * @deprecated This module is deprecated and will be removed in a future version.
+ * Use Dynamic Ending System (DynamicEndingConfig) instead.
+ *
+ * 이 모듈은 레거시 엔딩 시스템을 위한 것입니다.
+ * 새 시나리오에서는 dynamicEndingConfig를 사용하세요.
+ */
 import { PlayerState, SystemCondition, EndingArchetype } from '@/types';
 import { compareValues } from '@/constants/comparison-operators';
 
@@ -10,20 +17,6 @@ export const checkStatCondition = (
 
   // 개선된 비교 연산자 함수 사용
   return compareValues(statValue, condition.comparison, condition.value);
-};
-
-export const checkFlagCondition = (
-  condition: Extract<SystemCondition, { type: 'required_flag' }>,
-  flags: PlayerState['flags'],
-): boolean => {
-  const flagValue = flags[condition.flagName];
-  // For boolean flags, we check for true. For count flags, we just check for existence and > 0.
-  if (typeof flagValue === 'boolean') {
-    return flagValue === true;
-  } else if (typeof flagValue === 'number') {
-    return flagValue > 0;
-  }
-  return false;
 };
 
 export const checkSurvivorCountCondition = (
@@ -40,12 +33,13 @@ export const checkEndingConditions = (
 ): EndingArchetype | null => {
   console.log('🔍 엔딩 조건 체크 시작...');
   console.log('📊 현재 스탯:', playerState.stats);
-  console.log('🏴 현재 플래그:', playerState.flags);
   console.log('👥 생존자 수:', survivorCount ?? '정보 없음');
 
   // "결단의 날"과 같은 시간 제한 엔딩은 제외 (별도 처리)
+  // systemConditions는 이제 optional - 없으면 체크 건너뜀
   const checkableEndings = endingArchetypes.filter(
     (ending) =>
+      ending.systemConditions &&
       ending.systemConditions.length > 0 &&
       ending.endingId !== 'ENDING_TIME_UP',
   );
@@ -53,7 +47,8 @@ export const checkEndingConditions = (
   for (const ending of checkableEndings) {
     console.log(`\n🎯 "${ending.title}" 엔딩 체크 중...`);
 
-    const conditionResults = ending.systemConditions.map((condition) => {
+    // systemConditions이 있는 것만 필터링했으므로 안전
+    const conditionResults = (ending.systemConditions || []).map((condition) => {
       let result = false;
       let details = '';
 
@@ -61,10 +56,6 @@ export const checkEndingConditions = (
         result = checkStatCondition(condition, playerState.stats);
         const currentValue = playerState.stats[condition.statId];
         details = `스탯 ${condition.statId}: ${currentValue} ${condition.comparison} ${condition.value} = ${result}`;
-      } else if (condition.type === 'required_flag') {
-        result = checkFlagCondition(condition, playerState.flags);
-        const currentValue = playerState.flags[condition.flagName];
-        details = `플래그 ${condition.flagName}: ${currentValue} = ${result}`;
       } else if (condition.type === 'survivor_count') {
         // 생존자 수 조건 체크 - survivorCount가 전달되지 않으면 조건을 통과시키지 않음
         if (survivorCount === undefined) {

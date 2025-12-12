@@ -1,0 +1,119 @@
+{
+  "project": "Dynamic Ending System",
+  "version": "1.0.0",
+  "created": "2025-12-11",
+  "lastUpdated": "2025-12-12",
+  "status": "completed",
+  "sdt_principles": {
+    "autonomy": "플레이어 선택이 결말에 반영됨을 체감",
+    "competence": "달성감, 성장 경험 제공",
+    "relatedness": "캐릭터와의 관계가 결말에 영향"
+  },
+  "phases": [
+    {
+      "id": 1,
+      "name": "Type Definitions",
+      "status": "completed",
+      "tasks": [
+        { "task": "Add ActionHistoryEntry type", "file": "types/index.ts", "done": true },
+        { "task": "Add DynamicEndingConfig type", "file": "types/index.ts", "done": true },
+        { "task": "Add DynamicEndingResult type", "file": "types/index.ts", "done": true },
+        { "task": "Add CharacterFate type", "file": "types/index.ts", "done": true },
+        { "task": "Add GoalAchievementLevel type", "file": "types/index.ts", "done": true },
+        { "task": "Extend ScenarioData type", "file": "types/index.ts", "done": true }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "ActionHistory Collection",
+      "status": "completed",
+      "tasks": [
+        { "task": "Add actionHistory state to GameClient", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true },
+        { "task": "Update handlePlayerChoice", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true },
+        { "task": "Update handleDialogueSelect", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true },
+        { "task": "Update handleExplore", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true },
+        { "task": "Update handleFreeTextSubmit", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Ending Generation API",
+      "status": "completed",
+      "tasks": [
+        { "task": "Create route.ts with SDT prompt", "file": "app/api/generate-ending/route.ts", "done": true },
+        { "task": "Define JSON schema for Gemini", "file": "app/api/generate-ending/route.ts", "done": true },
+        { "task": "Implement response validation", "file": "app/api/generate-ending/route.ts", "done": true }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Admin UI",
+      "status": "completed",
+      "tasks": [
+        { "task": "Create DynamicEndingConfigContent component", "file": "components/admin/ScenarioEditor/DynamicEndingConfigContent.tsx", "done": true },
+        { "task": "Integrate into ScenarioEditor", "file": "app/admin/[scenarioId]/page.tsx", "done": true }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Ending Display",
+      "status": "completed",
+      "tasks": [
+        { "task": "Create DynamicEndingDisplay component", "file": "components/client/GameClient/DynamicEndingDisplay.tsx", "done": true },
+        { "task": "Integrate ending trigger logic", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "ScenarioWizard Update",
+      "status": "completed",
+      "tasks": [
+        { "task": "Add DynamicEndingConfig defaults", "file": "components/admin/ScenarioWizard.tsx", "done": true },
+        { "task": "Remove legacy ending generation", "file": "components/admin/ScenarioWizard.tsx", "done": false, "note": "Kept for backwards compatibility" }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Verification",
+      "status": "completed",
+      "tasks": [
+        { "task": "Run pnpm build", "done": true },
+        { "task": "Run pnpm test", "done": true },
+        { "task": "Manual ending quality test", "done": false, "note": "Requires live testing" }
+      ]
+    }
+  ],
+  "critical_requirements": [
+    "플레이어 행동과 결말 간 명확한 인과관계",
+    "SDT 3요소 (자율성, 유능감, 관계성) 만족",
+    "혼란을 주는 열린 결말 절대 금지",
+    "모든 캐릭터의 운명 명시",
+    "목표 달성도 명확한 설명"
+  ],
+  "files_to_modify": [
+    "types/index.ts",
+    "app/game/[scenarioId]/GameClient.tsx",
+    "app/api/generate-ending/route.ts",
+    "components/admin/ScenarioEditor/DynamicEndingConfigContent.tsx",
+    "app/admin/[scenarioId]/page.tsx",
+    "components/client/GameClient/DynamicEndingDisplay.tsx",
+    "components/admin/ScenarioWizard.tsx"
+  ],
+  "commits": [
+    {
+      "hash": "0ea89a1",
+      "message": "feat: Add Dynamic Ending System types and documentation",
+      "date": "2025-12-12"
+    },
+    {
+      "hash": "c5f7925",
+      "message": "feat: Implement SDT-based ending generation API and ActionHistory collection",
+      "date": "2025-12-12"
+    },
+    {
+      "hash": "bff7b5c",
+      "message": "feat: Complete Dynamic Ending System implementation",
+      "date": "2025-12-12"
+    }
+  ]
+}

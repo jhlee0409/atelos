@@ -51,15 +51,25 @@ export type Dilemma = {
   isEditing?: boolean;
 };
 
+/**
+ * @deprecated Flags system has been removed. Use ActionHistory instead.
+ * Kept for backwards compatibility with legacy scenarios only.
+ */
 export type ScenarioFlag = {
   flagName: string;
   description: string;
   type: 'boolean' | 'count';
   initial: boolean | number;
-  triggerCondition?: string; // AI에게 알려줄 플래그 부여 조건 (예: "탈출 차량 확보 선택 시")
+  triggerCondition?: string;
   isEditing?: boolean;
 };
 
+// =============================================================================
+// [DEPRECATED] Legacy Ending System Types - Kept for backwards compatibility
+// Use DynamicEndingConfig instead for new scenarios
+// =============================================================================
+
+/** @deprecated Use DynamicEndingConfig instead */
 export type SystemCondition =
   | {
       type: 'required_stat';
@@ -75,11 +85,6 @@ export type SystemCondition =
       isEditing?: boolean;
     }
   | {
-      type: 'required_flag';
-      flagName: string;
-      isEditing?: boolean;
-    }
-  | {
       type: 'survivor_count';
       comparison:
         | 'greater_equal'
@@ -92,6 +97,7 @@ export type SystemCondition =
       isEditing?: boolean;
     };
 
+/** @deprecated Use DynamicEndingConfig instead */
 export type GoalCluster = {
   id: string;
   title: string;
@@ -99,15 +105,18 @@ export type GoalCluster = {
   connectedEndings: string[];
 };
 
+/** @deprecated Use DynamicEndingConfig instead - AI generates endings dynamically */
 export type EndingArchetype = {
   endingId: string;
   title: string;
   description: string;
-  systemConditions: SystemCondition[];
+  /** @deprecated No longer used - AI generates endings based on ActionHistory */
+  systemConditions?: SystemCondition[];
   isGoalSuccess?: boolean;
   isEditing?: boolean;
 };
 
+/** @deprecated Use DynamicEndingConfig.endingDay instead */
 export type EndCondition = {
   type: 'time_limit' | 'goal_achievement' | 'condition_met';
   value?: number;
@@ -159,11 +168,12 @@ export interface CharacterIntroductionSequence {
   firstImpressionKeywords?: string[];
   /** 만남 예상 시점 */
   expectedTiming?: 'opening' | 'day1' | 'day2' | 'event-driven';
-  /** 만남 트리거 조건 (플래그/스탯 기반, 없으면 순서대로) */
+  /** 만남 트리거 조건 (스탯/캐릭터 기반, 없으면 순서대로) */
   triggerCondition?: {
-    requiredFlag?: string;
     requiredStat?: { statId: string; minValue: number };
     afterCharacterMet?: string; // 특정 캐릭터를 만난 후
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
 }
 
@@ -217,8 +227,8 @@ export interface RelationshipDiscoveryMethod {
     dialogueTopic?: string;
     /** 필요한 탐색 장소 */
     explorationLocation?: string;
-    /** 필요한 플래그 */
-    requiredFlag?: string;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
     /** 필요한 신뢰도 (특정 캐릭터와의) */
     requiredTrust?: { characterName: string; minTrust: number };
   };
@@ -295,8 +305,8 @@ export interface StorySiftingTrigger {
     charactersMetTogether?: string[];
     /** 발견한 관계 */
     relationshipsDiscovered?: string[];
-    /** 획득한 플래그 조합 */
-    flagCombination?: string[];
+    /** 행동 패턴 키워드 조합 (ActionHistory 기반) */
+    actionPatternKeywords?: string[];
     /** 스탯 조건 */
     statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
     /** 현재 일차 */
@@ -456,6 +466,114 @@ export interface StoryOpening {
   initialProtagonistKnowledge?: Partial<ProtagonistKnowledge>;
 }
 
+// ============================================================================
+// 게임플레이 설정 타입 (Phase 8: 하드코딩 동적화)
+// ============================================================================
+
+/**
+ * 루트 분기 점수 설정
+ * ActionHistory 패턴과 스탯 기반으로 루트 점수 계산
+ */
+export type RouteScoreConfig = {
+  /** 루트 이름 (예: '탈출', '항전', '협상') */
+  routeName: string;
+  /** 이 루트에 기여하는 행동 패턴들 */
+  actionPatterns?: {
+    /** 패턴 설명 (AI 분석용) */
+    description: string;
+    /** 행동 유형 */
+    actionType?: 'choice' | 'dialogue' | 'exploration';
+    /** 대상 키워드 (캐릭터명, 장소명, 선택지 키워드 등) */
+    targetKeywords?: string[];
+    /** 패턴 매칭 시 점수 */
+    score: number;
+  }[];
+  /** 이 루트에 기여하는 스탯 조건 */
+  statScores?: {
+    statId: string;
+    /** 비교 연산자 */
+    comparison: '>=' | '<=' | '>' | '<' | '==';
+    /** 임계값 */
+    threshold: number;
+    /** 조건 만족 시 점수 */
+    score: number;
+  }[];
+};
+
+/**
+ * 게임플레이 설정 - 하드코딩된 값들을 시나리오별로 커스터마이징
+ */
+export type GameplayConfig = {
+  // === Day 기반 설정 ===
+  /**
+   * 루트 분기가 활성화되는 시점 (전체 일수 대비 비율, 기본값: 0.4)
+   * 예: 7일 게임에서 0.4 = Day 3부터 루트 표시
+   */
+  routeActivationRatio?: number;
+
+  /**
+   * 엔딩 체크가 시작되는 시점 (전체 일수 대비 비율, 기본값: 0.7)
+   * 예: 7일 게임에서 0.7 = Day 5부터 엔딩 체크
+   */
+  endingCheckRatio?: number;
+
+  /**
+   * 서사 단계별 Day 비율 (setup, rising_action, midpoint, climax)
+   * 기본값: { setup: 0.3, rising_action: 0.6, midpoint: 0.75, climax: 1.0 }
+   */
+  narrativePhaseRatios?: {
+    setup: number;      // 이 비율까지 setup (기본: 0.3 → Day 1-2)
+    rising_action: number; // 이 비율까지 rising_action (기본: 0.6 → Day 3-4)
+    midpoint: number;   // 이 비율까지 midpoint (기본: 0.75 → Day 5)
+    climax: number;     // 이후 climax (기본: 1.0 → Day 6-7)
+  };
+
+  // === Action Points 설정 ===
+  /**
+   * 하루당 행동 포인트 (기본값: 3)
+   */
+  actionPointsPerDay?: number;
+
+  // === 스탯 임계값 설정 ===
+  /**
+   * 위험 상태로 간주하는 스탯 비율 (기본값: 0.4 = 40% 미만)
+   */
+  criticalStatThreshold?: number;
+
+  /**
+   * 경고 상태로 간주하는 스탯 비율 (기본값: 0.5 = 50% 미만)
+   */
+  warningStatThreshold?: number;
+
+  // === 루트 분기 설정 ===
+  /**
+   * 루트 점수 설정 (없으면 기본 점수 시스템 사용)
+   */
+  routeScores?: RouteScoreConfig[];
+
+  // === AI 토큰 설정 ===
+  /**
+   * 토큰 예산 승수 (기본값: 1.0)
+   * 짧은 게임은 0.7, 긴 게임은 1.5 등으로 조절 가능
+   */
+  tokenBudgetMultiplier?: number;
+
+  // === Fallback 설정 ===
+  /**
+   * 장르별 Fallback 선택지 사용 여부 (기본값: true)
+   */
+  useGenreFallback?: boolean;
+
+  /**
+   * 커스텀 Fallback 선택지 (지정 시 장르 Fallback 대신 사용)
+   */
+  customFallbackChoices?: {
+    prompt: string;
+    choice_a: string;
+    choice_b: string;
+  };
+};
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -466,22 +584,37 @@ export type ScenarioData = {
   playerGoal: string;
   characters: Character[];
   initialRelationships: Relationship[];
-  endCondition: EndCondition;
   scenarioStats: ScenarioStat[];
   traitPool: TraitPool;
-  flagDictionary: ScenarioFlag[];
-  goalCluster?: GoalCluster;
-  endingArchetypes: EndingArchetype[];
   status: 'in_progress' | 'testing' | 'active';
   /** 스토리 오프닝 설정 (Phase 7) */
   storyOpening?: StoryOpening;
+  /** 게임플레이 설정 (Phase 8: 하드코딩 동적화) */
+  gameplayConfig?: GameplayConfig;
+  /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
+  dynamicEndingConfig?: DynamicEndingConfig;
+  /** 탐색 위치 설정 - 시나리오별 커스텀 탐색 장소 */
+  locations?: ScenarioLocation[];
+
+  // =============================================================================
+  // [DEPRECATED] Legacy fields - kept for backwards compatibility only
+  // =============================================================================
+  /** @deprecated Use dynamicEndingConfig.endingDay instead */
+  endCondition?: EndCondition;
+  /** @deprecated Use dynamicEndingConfig instead */
+  goalCluster?: GoalCluster;
+  /** @deprecated Use dynamicEndingConfig instead */
+  endingArchetypes?: EndingArchetype[];
+  /** @deprecated Flags system removed. Use ActionHistory for tracking player actions. */
+  flagDictionary?: ScenarioFlag[];
 };
 
 // --- Game-specific state types, not part of scenario definition ---
 
 export type PlayerState = {
   stats: Record<string, number>;
-  flags: Record<string, boolean | number>;
+  /** @deprecated Flags system removed. Use ActionHistory instead. */
+  flags?: Record<string, boolean | number>;
   traits: string[]; // array of traitIds
   relationships: Record<string, number>;
 };
@@ -521,7 +654,8 @@ export interface RelationshipChangeRecord {
 export interface ChangeSummaryData {
   statChanges: StatChangeRecord[];
   relationshipChanges: RelationshipChangeRecord[];
-  flagsAcquired: string[];
+  /** @deprecated Flags system removed. */
+  flagsAcquired?: string[];
   timestamp: number;
 }
 
@@ -529,7 +663,8 @@ export interface SaveState {
   context: {
     scenarioId: string;
     scenarioStats: { [key: string]: number };
-    flags: { [key: string]: boolean | number };
+    /** @deprecated Flags system removed. Use ActionHistory instead. */
+    flags?: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
     /** @deprecated turnsInCurrentDay는 actionPoints로 대체됩니다. 하위 호환성을 위해 유지. */
@@ -597,7 +732,8 @@ export interface AIResponse {
     scenarioStats: { [key: string]: number };
     survivorStatus: { name: string; newStatus: string }[];
     hiddenRelationships_change: any[]; // Type can be refined if needed
-    flags_acquired: string[];
+    /** @deprecated Flags system removed. */
+    flags_acquired?: string[];
     shouldAdvanceTime?: boolean; // AI가 시간 진행 여부를 결정
   };
 }
@@ -631,7 +767,8 @@ export interface KeyDecision {
   choice: string; // 플레이어가 선택한 선택지 텍스트
   consequence: string; // 선택의 결과 요약 (50자 이내)
   category: 'survival' | 'relationship' | 'moral' | 'strategic';
-  flagsAcquired?: string[]; // 이 선택으로 획득한 플래그
+  /** @deprecated Flags system removed. Use significantEvents in ActionHistory instead. */
+  flagsAcquired?: string[];
   impactedCharacters?: string[]; // 영향받은 캐릭터들
 }
 
@@ -678,7 +815,8 @@ export interface ExplorationResult {
   narrative: string; // 탐색 결과 서사
   rewards?: {
     statChanges?: { [key: string]: number };
-    flagsAcquired?: string[];
+    /** 발견한 주요 사항 */
+    significantDiscoveries?: string[];
     infoGained?: string;
   };
 }
@@ -720,8 +858,8 @@ export interface ActionRecord {
   result?: {
     /** 스탯 변화 */
     statChanges?: Record<string, number>;
-    /** 획득한 플래그 */
-    flagsAcquired?: string[];
+    /** 주요 이벤트/발견 */
+    significantEvents?: string[];
     /** 관계 변화 */
     relationshipChanges?: Record<string, number>;
     /** 획득한 정보 */
@@ -767,8 +905,8 @@ export interface DiscoveredClue {
     day: number;
     actionIndex: number;
   };
-  /** 관련 플래그 */
-  relatedFlags?: string[];
+  /** 관련 키워드 (연관 검색용) */
+  relatedKeywords?: string[];
   /** 관련 캐릭터 */
   relatedCharacters?: string[];
   /** 단서 중요도 */
@@ -873,6 +1011,51 @@ export interface ContextUpdate {
 // =============================================================================
 
 /**
+ * 위치 아이콘 타입
+ */
+export type LocationIcon =
+  | 'warehouse'   // 창고
+  | 'entrance'    // 입구
+  | 'medical'     // 의무실
+  | 'roof'        // 옥상
+  | 'basement'    // 지하
+  | 'quarters'    // 숙소
+  | 'office'      // 사무실
+  | 'corridor'    // 복도
+  | 'exterior'    // 외부
+  | 'hidden';     // 숨겨진 장소
+
+/**
+ * 시나리오 탐색 위치 정의 - ScenarioData에서 사용
+ * WorldLocation보다 단순화된 버전으로, 시나리오 에디터에서 설정
+ */
+export interface ScenarioLocation {
+  /** 위치 고유 ID */
+  locationId: string;
+  /** 위치 이름 (한글) */
+  name: string;
+  /** 위치 설명 */
+  description: string;
+  /** 아이콘 타입 */
+  icon: LocationIcon;
+  /** 초기 상태 */
+  initialStatus: 'available' | 'locked' | 'hidden';
+  /** 해금 조건 (locked/hidden일 때) */
+  unlockCondition?: {
+    /** 특정 Day 이후 자동 해금 */
+    requiredDay?: number;
+    /** 특정 위치 탐색 후 해금 */
+    requiredExploration?: string;
+  };
+  /** 위험도 (0-3, 높을수록 부정적 이벤트 확률 증가) */
+  dangerLevel?: 0 | 1 | 2 | 3;
+  /** 재탐색 쿨다운 (Day 단위, 0이면 즉시 재탐색 가능) */
+  explorationCooldown?: number;
+  /** 에디터용 편집 상태 */
+  isEditing?: boolean;
+}
+
+/**
  * 위치 상태 - 위치의 현재 상태를 추적
  */
 export type LocationStatus =
@@ -897,16 +1080,18 @@ export interface ConcreteDiscovery {
   description: string;
   /** 발견 장소 ID */
   locationId: string;
-  /** 발견 조건 (플래그/스탯 조건) */
+  /** 발견 조건 */
   discoveryCondition?: {
-    requiredFlag?: string;
     requiredStat?: { statId: string; minValue: number };
     requiredItem?: string;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
   /** 발견 시 효과 */
   effects?: {
     statChanges?: Record<string, number>;
-    flagsAcquired?: string[];
+    /** 발생하는 주요 이벤트 */
+    significantEvents?: string[];
     newLocationsUnlocked?: string[];
     locationsDestroyed?: string[];
     locationsBlocked?: string[];
@@ -935,17 +1120,18 @@ export interface WorldLocation {
   /** 현재 상태에 따른 설명 */
   currentDescription: string;
   /** 아이콘 타입 */
-  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters' | 'office' | 'corridor' | 'exterior' | 'hidden';
+  icon: LocationIcon;
   /** 위치 상태 */
   status: LocationStatus;
   /** 상태 사유 (파괴됨, 차단됨 등일 때) */
   statusReason?: string;
   /** 잠금 해제 조건 */
   unlockCondition?: {
-    requiredFlag?: string;
     requiredItem?: string;
     requiredDay?: number;
     requiredExploration?: string; // 다른 위치 탐색 필요
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
   /** 탐색 쿨다운 (Day 단위) */
   explorationCooldown: number;
@@ -971,12 +1157,11 @@ export interface ObjectRelation {
     | 'character-item'       // 캐릭터가 아이템 소유/관련
     | 'location-item'        // 위치에 아이템이 있음
     | 'character-character'  // 캐릭터 간 관계
-    | 'location-location'    // 위치 간 연결
-    | 'item-flag';           // 아이템이 플래그와 연결
+    | 'location-location';   // 위치 간 연결
   /** 주체 */
   subject: { type: 'character' | 'location' | 'item'; id: string };
   /** 대상 */
-  object: { type: 'character' | 'location' | 'item' | 'flag'; id: string };
+  object: { type: 'character' | 'location' | 'item'; id: string };
   /** 관계 설명 */
   description: string;
   /** 관계 강도 (-100 ~ 100) */
@@ -985,8 +1170,9 @@ export interface ObjectRelation {
   active: boolean;
   /** 관계 활성화/비활성화 조건 */
   activationCondition?: {
-    requiredFlag?: string;
     requiredDay?: number;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
 }
 
@@ -1002,7 +1188,8 @@ export interface WorldEvent {
   description: string;
   /** 트리거 조건 */
   trigger: {
-    flag?: string;
+    /** 행동 키워드 (ActionHistory에서 검색) */
+    actionKeyword?: string;
     stat?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number };
     day?: number;
     exploration?: string; // 특정 위치 탐색 시
@@ -1064,4 +1251,194 @@ export interface WorldStateUpdateResult {
   changedLocations: { locationId: string; previousStatus: LocationStatus; newStatus: LocationStatus; reason?: string }[];
   /** UI에 표시할 알림 메시지 */
   notifications: string[];
+}
+
+// =============================================================================
+// Dynamic Ending System (동적 결말 시스템)
+// SDT(Self-Determination Theory) 기반 플레이어 만족도 최적화
+// =============================================================================
+
+/**
+ * 행동 기록 엔트리 - 플레이어의 모든 행동을 기록
+ * 엔딩 생성 시 AI가 분석하여 결말에 반영
+ */
+export interface ActionHistoryEntry {
+  /** 행동이 발생한 일차 */
+  day: number;
+
+  /** ISO 타임스탬프 */
+  timestamp: string;
+
+  /** 행동 유형 */
+  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText';
+
+  /** 플레이어가 선택/입력한 내용 */
+  content: string;
+
+  /** 대상 (캐릭터명 또는 장소명) */
+  target?: string;
+
+  /** 행동의 결과 */
+  consequence: {
+    /** 변경된 스탯들 */
+    statsChanged: { statId: string; delta: number; newValue: number }[];
+
+    /** 변경된 관계들 */
+    relationshipsChanged: { character: string; delta: number; newValue: number }[];
+
+    /** 발생한 주요 이벤트/발견 */
+    significantEvents: string[];
+  };
+
+  /** AI가 생성한 내러티브 요약 (200자 이내) */
+  narrativeSummary: string;
+
+  /** 행동의 도덕적 성격 (AI 평가) */
+  moralAlignment?: 'selfless' | 'pragmatic' | 'selfish' | 'neutral';
+}
+
+/**
+ * 목표 달성 수준 - SDT 유능감(Competence) 평가용
+ */
+export type GoalAchievementLevel =
+  | 'triumph'      // 완벽한 성공 - 목표 초과 달성
+  | 'success'      // 성공 - 목표 달성
+  | 'partial'      // 부분 성공 - 일부 목표 달성
+  | 'pyrrhic'      // 피로스의 승리 - 큰 대가를 치른 성공
+  | 'failure'      // 실패 - 목표 미달성
+  | 'subverted'    // 전복 - 예상과 다르지만 의미있는 결과
+  | 'tragic';      // 비극 - 피할 수 없는 비극적 결말
+
+/**
+ * 캐릭터 운명 - 각 캐릭터의 결말
+ * SDT 관계성(Relatedness) 반영
+ */
+export interface CharacterFate {
+  /** 캐릭터 이름 */
+  name: string;
+
+  /** 최종 관계 수치 */
+  finalRelationship: number;
+
+  /** 캐릭터의 운명 (100자 이내) */
+  fate: string;
+
+  /** 플레이어와의 마지막 장면 (선택적, 150자 이내) */
+  finalScene?: string;
+
+  /** 관계 변화 요약 */
+  relationshipJourney?: string;
+}
+
+/**
+ * 동적 결말 결과 - AI가 생성하는 최종 결말
+ */
+export interface DynamicEndingResult {
+  /** 결말 제목 */
+  title: string;
+
+  /** 결말 내러티브 (500-1000자) */
+  narrative: string;
+
+  /** 목표 달성도 */
+  goalAchievement: GoalAchievementLevel;
+
+  /** 목표 달성 설명 (플레이어 행동과의 인과관계 명시) */
+  goalExplanation: string;
+
+  /** 각 캐릭터의 운명 */
+  characterFates: CharacterFate[];
+
+  /** 플레이어의 유산/영향 (150자 이내) */
+  playerLegacy: string;
+
+  /** 에필로그 (선택적, 200자 이내) */
+  epilogue?: string;
+
+  /**
+   * SDT 만족도 점수 (AI 내부 평가용)
+   * 각 0-100 점수
+   */
+  sdtScores: {
+    /** 자율성: 플레이어 선택이 결말에 얼마나 반영되었는가 */
+    autonomy: number;
+    /** 유능감: 성취감/달성감을 얼마나 느낄 수 있는가 */
+    competence: number;
+    /** 관계성: 캐릭터와의 관계가 얼마나 의미있게 마무리되었는가 */
+    relatedness: number;
+  };
+
+  /** 결말 생성 근거 (디버깅/분석용) */
+  reasoning: string;
+}
+
+/**
+ * 동적 결말 설정 - 시나리오별 결말 생성 설정
+ */
+export interface DynamicEndingConfig {
+  /** 동적 엔딩 시스템 활성화 여부 */
+  enabled: boolean;
+
+  /** 결말 트리거 일차 (예: 7, 10, 14) */
+  endingDay: number;
+
+  /** 경고 시작 일수 (endingDay - warningDays부터 경고 메시지 표시) */
+  warningDays: number;
+
+  /** 목표 유형: manual(수동 입력) 또는 ai-assisted(AI 보조) */
+  goalType: 'manual' | 'ai-assisted';
+
+  /**
+   * AI 결말 생성 시 평가 기준 가중치
+   * SDT 이론 기반: 자율성, 유능감, 관계성
+   * 모든 가중치 합 = 1.0
+   */
+  evaluationCriteria: {
+    /** 목표 달성도 평가 가중치 (0-1) - 유능감 관련 */
+    goalWeight: number;
+
+    /** 관계 품질 평가 가중치 (0-1) - 관계성 관련 */
+    relationshipWeight: number;
+
+    /** 도덕적 일관성 평가 가중치 (0-1) - 자율성 관련 */
+    moralWeight: number;
+
+    /** 서사적 완결성 평가 가중치 (0-1) */
+    narrativeWeight: number;
+  };
+
+  /** AI 결말 생성 가이드라인 (창작자가 작성) */
+  narrativeGuidelines: string;
+
+  /** 장르별 결말 톤 힌트 (AI 참고용) */
+  endingToneHints: string[];
+}
+
+/**
+ * ScenarioData 확장 - dynamicEndingConfig 추가
+ * (기존 ScenarioData에 dynamicEndingConfig 필드 추가 필요)
+ */
+export interface ScenarioDataWithDynamicEnding extends Omit<ScenarioData, 'endingArchetypes'> {
+  /** 동적 결말 설정 */
+  dynamicEndingConfig?: DynamicEndingConfig;
+
+  /**
+   * [레거시] 기존 엔딩 아키타입 - 마이그레이션 기간 동안 유지
+   * dynamicEndingConfig.enabled가 true면 무시됨
+   */
+  endingArchetypes?: EndingArchetype[];
+}
+
+/**
+ * SaveState 확장 - actionHistory 추가
+ */
+export interface SaveStateWithDynamicEnding extends SaveState {
+  /** 플레이어 행동 기록 */
+  actionHistory?: ActionHistoryEntry[];
+
+  /** 엔딩 트리거 여부 */
+  endingTriggered?: boolean;
+
+  /** 생성된 동적 결말 */
+  dynamicEnding?: DynamicEndingResult;
 }

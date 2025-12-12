@@ -6,7 +6,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   checkStatCondition,
-  checkFlagCondition,
   checkSurvivorCountCondition,
   checkEndingConditions,
 } from '@/lib/ending-checker';
@@ -174,57 +173,8 @@ describe('checkStatCondition', () => {
 });
 
 // =============================================================================
-// 플래그 조건 체크 테스트
+// 플래그 조건 체크 테스트 (DEPRECATED - ActionHistory로 대체)
 // =============================================================================
-
-describe('checkFlagCondition', () => {
-  const flags = {
-    FLAG_FIRST_CONTACT: true,
-    FLAG_RESOURCE_CACHE_FOUND: false,
-    FLAG_ALLIANCE_FORMED: 3,
-    FLAG_EMPTY_COUNT: 0,
-  };
-
-  it('boolean true 플래그는 true 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_FIRST_CONTACT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(true);
-  });
-
-  it('boolean false 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_RESOURCE_CACHE_FOUND',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-
-  it('count > 0인 플래그는 true 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_ALLIANCE_FORMED',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(true);
-  });
-
-  it('count가 0인 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_EMPTY_COUNT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-
-  it('존재하지 않는 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_NON_EXISTENT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-});
 
 // =============================================================================
 // 생존자 수 조건 체크 테스트
@@ -317,17 +267,17 @@ describe('checkEndingConditions', () => {
     expect(result).toBeNull();
   });
 
-  it('플래그 조건이 포함된 엔딩을 체크함', () => {
-    // FLAG_ESCAPE_VEHICLE_SECURED가 필요한 탈출 엔딩
+  it('탈출 엔딩 조건 체크 (스탯 기반)', () => {
+    // ENDING_ESCAPE_SUCCESS는 스탯 조건으로 체크됨
+    // survivalFoundation >= 60 AND cityChaos < 80
     const escapeState = {
       ...mockPlayerStateInitial,
       stats: {
         ...mockPlayerStateInitial.stats,
-        cityChaos: 50, // 80 미만
+        survivalFoundation: 65, // >= 60
+        cityChaos: 50, // < 80
       },
-      flags: {
-        FLAG_ESCAPE_VEHICLE_SECURED: true,
-      },
+      flags: {},
     };
 
     const result = checkEndingConditions(escapeState, mockEndingArchetypes);
@@ -399,7 +349,8 @@ describe('checkEndingConditions', () => {
     expect(result).toBeNull();
   });
 
-  it('복합 조건 (스탯 + 플래그)을 모두 만족해야 엔딩 발동', () => {
+  it('복합 스탯 조건을 모두 만족해야 엔딩 발동', () => {
+    // 플래그 시스템 deprecated - 스탯만으로 복합 조건 테스트
     const complexEnding = [
       {
         endingId: 'ENDING_COMPLEX',
@@ -414,34 +365,36 @@ describe('checkEndingConditions', () => {
             value: 60,
           },
           {
-            type: 'required_flag' as const,
-            flagName: 'FLAG_ALLIANCE_FORMED',
+            type: 'required_stat' as const,
+            statId: 'communityCohesion',
+            comparison: 'greater_equal' as const,
+            value: 50,
           },
         ],
       },
     ];
 
-    // 스탯만 만족
-    const statOnlyState = {
+    // 첫 번째 스탯만 만족
+    const stat1OnlyState = {
       ...mockPlayerStateInitial,
-      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 70 },
+      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 70, communityCohesion: 30 },
       flags: {},
     };
-    expect(checkEndingConditions(statOnlyState, complexEnding)).toBeNull();
+    expect(checkEndingConditions(stat1OnlyState, complexEnding)).toBeNull();
 
-    // 플래그만 만족
-    const flagOnlyState = {
+    // 두 번째 스탯만 만족
+    const stat2OnlyState = {
       ...mockPlayerStateInitial,
-      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 40 },
-      flags: { FLAG_ALLIANCE_FORMED: true },
+      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 40, communityCohesion: 60 },
+      flags: {},
     };
-    expect(checkEndingConditions(flagOnlyState, complexEnding)).toBeNull();
+    expect(checkEndingConditions(stat2OnlyState, complexEnding)).toBeNull();
 
     // 둘 다 만족
     const bothState = {
       ...mockPlayerStateInitial,
-      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 70 },
-      flags: { FLAG_ALLIANCE_FORMED: true },
+      stats: { ...mockPlayerStateInitial.stats, survivalFoundation: 70, communityCohesion: 60 },
+      flags: {},
     };
     const result = checkEndingConditions(bothState, complexEnding);
     expect(result).not.toBeNull();

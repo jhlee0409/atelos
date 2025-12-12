@@ -3,7 +3,7 @@
  * 실제 ZERO_HOUR.json 구조를 기반으로 함
  */
 
-import type { ScenarioData, PlayerState, Character, EndingArchetype, ScenarioStat, FlagDefinition } from '@/types';
+import type { ScenarioData, PlayerState, Character, EndingArchetype, ScenarioStat } from '@/types';
 
 // =============================================================================
 // Mock Scenario Stats
@@ -121,44 +121,7 @@ export const mockCharacters: Character[] = [
 ];
 
 // =============================================================================
-// Mock Flags
-// =============================================================================
-
-export const mockFlagDictionary: FlagDefinition[] = [
-  {
-    flagName: 'FLAG_FIRST_CONTACT',
-    description: '첫 외부 접촉 이벤트',
-    type: 'boolean',
-    initial: false,
-  },
-  {
-    flagName: 'FLAG_RESOURCE_CACHE_FOUND',
-    description: '자원 은닉처 발견',
-    type: 'boolean',
-    initial: false,
-  },
-  {
-    flagName: 'FLAG_ALLIANCE_FORMED',
-    description: '동맹 형성',
-    type: 'boolean',
-    initial: false,
-  },
-  {
-    flagName: 'FLAG_DEFENSES_COMPLETE',
-    description: '방어 시설 완성',
-    type: 'boolean',
-    initial: false,
-  },
-  {
-    flagName: 'FLAG_ESCAPE_VEHICLE_SECURED',
-    description: '탈출 수단 확보',
-    type: 'boolean',
-    initial: false,
-  },
-];
-
-// =============================================================================
-// Mock Endings
+// Mock Endings (stat-based only, no flags)
 // =============================================================================
 
 export const mockEndingArchetypes: EndingArchetype[] = [
@@ -189,8 +152,10 @@ export const mockEndingArchetypes: EndingArchetype[] = [
     isGoalSuccess: true,
     systemConditions: [
       {
-        type: 'required_flag',
-        flagName: 'FLAG_ESCAPE_VEHICLE_SECURED',
+        type: 'required_stat',
+        statId: 'survivalFoundation',
+        comparison: 'greater_equal',
+        value: 60,
       },
       {
         type: 'required_stat',
@@ -261,7 +226,7 @@ export const mockScenario: ScenarioData = {
       description: '위험 상황에서 위축됨',
     },
   ],
-  flagDictionary: mockFlagDictionary,
+  // flagDictionary removed - using ActionHistory for tracking
   endingArchetypes: mockEndingArchetypes,
   endCondition: {
     type: 'time_limit',
@@ -282,7 +247,7 @@ export const mockPlayerStateInitial: PlayerState = {
     citizenTrust: 50,
     resourceLevel: 40,
   },
-  flags: {},
+  flags: {}, // deprecated - kept for backwards compatibility
   traits: [],
   relationships: {
     '박지현-김서연': 60,
@@ -299,10 +264,7 @@ export const mockPlayerStateMidGame: PlayerState = {
     citizenTrust: 40,
     resourceLevel: 35,
   },
-  flags: {
-    FLAG_FIRST_CONTACT: true,
-    FLAG_RESOURCE_CACHE_FOUND: true,
-  },
+  flags: {}, // deprecated - kept for backwards compatibility
   traits: [],
   relationships: {
     '박지현-김서연': 55,
@@ -319,12 +281,7 @@ export const mockPlayerStateEndingSuccess: PlayerState = {
     citizenTrust: 70,
     resourceLevel: 60,
   },
-  flags: {
-    FLAG_FIRST_CONTACT: true,
-    FLAG_RESOURCE_CACHE_FOUND: true,
-    FLAG_ALLIANCE_FORMED: true,
-    FLAG_DEFENSES_COMPLETE: true,
-  },
+  flags: {}, // deprecated - kept for backwards compatibility
   traits: [],
   relationships: {
     '박지현-김서연': 80,
@@ -341,7 +298,7 @@ export const mockPlayerStateChaosEnding: PlayerState = {
     citizenTrust: 15,
     resourceLevel: 10,
   },
-  flags: {},
+  flags: {}, // deprecated - kept for backwards compatibility
   traits: [],
   relationships: {
     '박지현-김서연': 20,
@@ -369,7 +326,7 @@ export const mockValidAIResponse = {
     },
     survivorStatus: [],
     hiddenRelationships_change: [],
-    flags_acquired: ['FLAG_RESOURCE_CACHE_FOUND'],
+    flags_acquired: [], // deprecated - kept for backwards compatibility
   },
 };
 

@@ -5,6 +5,11 @@ import {
   getNarrativeStyleFromGenres,
 } from './genre-narrative-styles';
 import { formatContextForPrompt } from './context-manager';
+import {
+  getTotalDays,
+  getGameplayConfig,
+  DEFAULT_GAMEPLAY_CONFIG,
+} from './gameplay-config';
 
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
@@ -28,11 +33,21 @@ export type PromptComplexity = 'minimal' | 'lite' | 'full' | 'detailed';
 // 3막 구조 서사 단계 정의
 export type NarrativePhase = 'setup' | 'rising_action' | 'midpoint' | 'climax';
 
-// 현재 일차에 따른 서사 단계 결정
-export const getNarrativePhase = (currentDay: number): NarrativePhase => {
-  if (currentDay <= 2) return 'setup';
-  if (currentDay <= 4) return 'rising_action';
-  if (currentDay === 5) return 'midpoint';
+/**
+ * 현재 일차에 따른 서사 단계 결정
+ * @param currentDay 현재 Day
+ * @param scenario 시나리오 데이터 (optional, 없으면 7일 기준 기본값 사용)
+ */
+export const getNarrativePhase = (currentDay: number, scenario?: ScenarioData | null): NarrativePhase => {
+  const totalDays = getTotalDays(scenario);
+  const config = getGameplayConfig(scenario);
+  const ratios = config.narrativePhaseRatios ?? DEFAULT_GAMEPLAY_CONFIG.narrativePhaseRatios;
+
+  const dayRatio = currentDay / totalDays;
+
+  if (dayRatio <= ratios.setup) return 'setup';
+  if (dayRatio <= ratios.rising_action) return 'rising_action';
+  if (dayRatio <= ratios.midpoint) return 'midpoint';
   return 'climax';
 };
 
@@ -66,7 +81,7 @@ NARRATIVE PHASE: ACT 2A - RISING ACTION (Route Branching)
 - 이전 선택들의 결과가 드러나기 시작할 것
 - 탈출/항전/협상 중 하나의 방향으로 기울어지는 선택 제시
 - 캐릭터 간 대립이 표면화될 것
-- 중요한 플래그 획득 기회 제공
+- 중요한 행동 패턴 기록 기회 제공
 
 서사 톤:
 - 긴장감 고조, 갈등 심화
@@ -78,10 +93,10 @@ NARRATIVE PHASE: ACT 2A - RISING ACTION (Route Branching)
 - 누군가를 희생하거나 포기해야 하는 상황
 - 선택에 따라 특정 캐릭터와 갈등 or 신뢰 형성
 
-루트 힌트 (플래그 기반):
-- 탈출 루트: 이동 수단 확보, 외부 연락처 확인
-- 항전 루트: 방어 시설 강화, 무기 확보
-- 협상 루트: 외부 세력과 접촉, 동맹 형성`,
+루트 힌트 (행동 패턴 기반):
+- 탈출 루트: 탈출, 이동, 차량 관련 행동
+- 항전 루트: 방어, 강화, 보호 관련 행동
+- 협상 루트: 협상, 대화, 동맹 관련 행동`,
 
   midpoint: `
 ### 📖 서사 단계: 2막 후반 - 전환점 (Day 5) ###
@@ -103,10 +118,10 @@ NARRATIVE PHASE: ACT 2B - MIDPOINT (Route Lock-in)
 - 명확한 득실이 있는 무거운 결정
 - 선택 후 특정 엔딩 루트로 고정됨
 
-이 시점의 주요 플래그:
-- FLAG_ESCAPE_VEHICLE_SECURED → 탈출 루트 가능
-- FLAG_DEFENSES_COMPLETE → 항전 루트 가능
-- FLAG_ALLY_NETWORK_FORMED → 협상 루트 가능`,
+이 시점의 주요 행동 패턴:
+- 탈출 관련 행동 누적 → 탈출 루트 가능
+- 방어 관련 행동 누적 → 항전 루트 가능
+- 협상 관련 행동 누적 → 협상 루트 가능`,
 
   climax: `
 ### 📖 서사 단계: 3막 - 결말 (Day 6-7) ###
@@ -131,7 +146,7 @@ NARRATIVE PHASE: ACT 3 - CLIMAX & RESOLUTION
 엔딩 힌트 (현재 상태 기반):
 - cityChaos ≤40 & communityCohesion ≥70 → "우리들의 법칙" (공동체 승리)
 - survivalFoundation ≥50 & communityCohesion ≥50 → "새로운 보안관" (질서 확립)
-- FLAG_ESCAPE_VEHICLE_SECURED → "탈출자들" (성공적 탈출)
+- 탈출 관련 행동 충분 → "탈출자들" (성공적 탈출)
 - 조건 미달 시 → "결단의 시간" (기본 엔딩)`
 };
 
@@ -259,7 +274,8 @@ const buildLitePrompt = (
   options: any,
 ): GamePromptData => {
   const currentDay = options.currentDay || 1;
-  const narrativePhase = getNarrativePhase(currentDay);
+  const totalDays = getTotalDays(scenario);
+  const narrativePhase = getNarrativePhase(currentDay, scenario);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
 
   // 장르별 서사 스타일 가져오기
@@ -281,10 +297,8 @@ const buildLitePrompt = (
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
 
-  const activeFlags = Object.entries(playerState.flags)
-    .filter(([, value]) => value)
-    .map(([key]) => key)
-    .join(', ');
+  // flags deprecated - using ActionHistory for tracking
+  const activeFlags = '';
 
   // 핵심 캐릭터 정보 포함 (품질 보장을 위해 모든 캐릭터 포함)
   const characterInfo = scenario.characters
@@ -312,7 +326,7 @@ Characters: ${characterInfo}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
 Active Flags: ${activeFlags || 'None'}
-Day: ${options.currentDay || 1}/7
+Day: ${options.currentDay || 1}/${totalDays}
 
 CRITICAL LANGUAGE REQUIREMENTS:
 1. **ONLY KOREAN**: Write exclusively in Korean. Never mix with Arabic, Thai, Hindi, or other languages.
@@ -387,13 +401,6 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Stats: cityChaos (↓ is good), communityCohesion (↑ is good), survivalFoundation (↑ is good)
 - Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
-
-FLAG ACQUISITION RULES (IMPORTANT - grant flags when conditions are met):
-${scenario.flagDictionary && scenario.flagDictionary.length > 0
-  ? scenario.flagDictionary.map(flag => `- **${flag.flagName}**: ${flag.triggerCondition || flag.description}`).join('\n')
-  : '- No flags defined for this scenario'}
-- Grant 1-2 flags per response when conditions are clearly met by player actions
-- flags_acquired array must contain the exact flag name (e.g., "FLAG_POWER_AWAKENED")
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
@@ -474,13 +481,8 @@ const buildFullPrompt = (
     })
     .join(', ');
 
-  const currentFlags = Object.entries(playerState.flags)
-    .filter(([, value]) => value)
-    .map(([key, value]) => {
-      const flagDef = scenario.flagDictionary?.find((f) => f.flagName === key);
-      return `${flagDef?.description || key}: ${value}`;
-    })
-    .join(', ');
+  // flags deprecated - using ActionHistory for tracking
+  const currentFlags = '';
 
   // 캐릭터 정보 구성 (Character Bible 형식)
   const characterBible = scenario.characters
@@ -802,6 +804,15 @@ export const buildStoryOpeningPrompt = (
   const protagonist = storyOpening.protagonistSetup || {};
   const npcRelationshipExposure = storyOpening.npcRelationshipExposure || 'hidden';
 
+  // [2025 Enhanced] 주인공-NPC 이름 충돌 검사
+  const npcNames = npcs.map(c => c.characterName);
+  const hasNameCollision = protagonist.name && npcNames.includes(protagonist.name);
+  if (hasNameCollision) {
+    console.warn(`⚠️ 주인공 이름 "${protagonist.name}"이(가) NPC 이름과 충돌합니다! 스토리 혼란 방지를 위해 주인공 이름을 비워둡니다.`);
+  }
+  // 충돌 시 주인공 이름을 비워서 AI가 "당신" 또는 적절한 호칭을 사용하도록 함
+  const safeProtagonistName = hasNameCollision ? undefined : protagonist.name;
+
   // [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 처리
   const introSequence = storyOpening.characterIntroductionSequence;
   let firstCharacter;
@@ -934,15 +945,16 @@ ${storyOpening.firstEncounterContext ? `- 만남 상황: ${storyOpening.firstEnc
 `
     : '';
 
-  // 주인공 정보
-  const protagonistInfo = protagonist.name || protagonist.occupation
+  // 주인공 정보 (이름 충돌 시 safeProtagonistName 사용)
+  const protagonistInfo = safeProtagonistName || protagonist.occupation
     ? `
 ### 주인공 정보 ###
-${protagonist.name ? `- 이름: ${protagonist.name}` : ''}
+${safeProtagonistName ? `- 이름: ${safeProtagonistName}` : '- 이름: (플레이어가 자신을 부르는 호칭은 자유롭게 선택)'}
 ${protagonist.occupation ? `- 직업/역할: ${protagonist.occupation}` : ''}
 ${protagonist.personality ? `- 성격: ${protagonist.personality}` : ''}
 ${protagonist.dailyRoutine ? `- 일상: ${protagonist.dailyRoutine}` : ''}
 ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
+${hasNameCollision ? `\n**주의**: 원래 설정된 주인공 이름이 NPC와 충돌하여 비워두었습니다. 주인공을 지칭할 때 "그", "그녀", 직업명 등을 사용하세요.` : ''}
 `
     : '';
 
@@ -972,6 +984,9 @@ ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
 - 키워드: ${scenario.coreKeywords?.join(', ') || ''}
 
 ${protagonistInfo}
+
+### NPC 이름 목록 (주인공 이름과 겹치면 안 됨) ###
+${npcNames.join(', ')}
 
 ${firstCharacterInfo}
 
@@ -1046,6 +1061,7 @@ ${storyOpening.incitingIncident
 }
 
 ### CRITICAL FORMATTING RULES ###
+- **주인공-NPC 이름 충돌 절대 금지**: 주인공 이름을 NPC 이름과 동일하게 사용하면 스토리가 심각하게 혼란스러워집니다. 위 NPC 이름 목록을 확인하고, 주인공은 반드시 다른 이름을 가져야 합니다.
 - **스탯 숫자 절대 금지**: 20, 40, 60 같은 수치 노출 금지
 - **스탯명 절대 금지**: "생존의 기반", "결속력" 등 게임 용어 금지
 - **빈 괄호 금지**: "()", "( )" 사용 금지

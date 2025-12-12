@@ -14,6 +14,7 @@ import {
   ActionRecord,
 } from '@/types';
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
+import { getRouteActivationDay, getEndingCheckDay } from './gameplay-config';
 
 // =============================================================================
 // 초기 맥락 생성
@@ -308,7 +309,7 @@ ${context.discoveredClues.slice(-5).map((c) => `- ${c.content}`).join('\n') || '
   }
 
   // 폴백: 기본 위치 반환
-  return generateFallbackLocations(context, currentDay);
+  return generateFallbackLocations(context, currentDay, scenario);
 };
 
 /**
@@ -316,9 +317,14 @@ ${context.discoveredClues.slice(-5).map((c) => `- ${c.content}`).join('\n') || '
  */
 const generateFallbackLocations = (
   context: ActionContext,
-  currentDay: number
+  currentDay: number,
+  scenario?: ScenarioData | null
 ): DynamicLocation[] => {
   const visitedToday = context.todayActions.explorations.map((e) => e.location);
+
+  // 동적 Day 계산
+  const routeActivationDay = getRouteActivationDay(scenario);
+  const endingCheckDay = getEndingCheckDay(scenario);
 
   const baseLocations: DynamicLocation[] = [
     {
@@ -347,8 +353,8 @@ const generateFallbackLocations = (
     },
   ];
 
-  // Day 3+ 추가 위치
-  if (currentDay >= 3) {
+  // 루트 활성화 시점 이후 추가 위치 (기본: Day 3+ for 7일 게임)
+  if (currentDay >= routeActivationDay) {
     baseLocations.push({
       locationId: 'roof',
       name: '옥상',
@@ -359,8 +365,8 @@ const generateFallbackLocations = (
     });
   }
 
-  // Day 5+ 추가 위치
-  if (currentDay >= 5) {
+  // 엔딩 체크 시점 이후 추가 위치 (기본: Day 5+ for 7일 게임)
+  if (currentDay >= endingCheckDay) {
     baseLocations.push({
       locationId: 'basement',
       name: '지하',

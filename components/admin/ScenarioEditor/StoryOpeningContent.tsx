@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { BookOpen, User, Zap, Users, Clock, MapPin, Palette, Eye, EyeOff, Sparkles, ListOrdered, Plus, Trash2, Link2 } from 'lucide-react';
+import { BookOpen, User, Zap, Users, Clock, MapPin, Palette, Eye, EyeOff, Sparkles, ListOrdered, Plus, Trash2, Link2, Loader2, Wand2, RefreshCw, Lock } from 'lucide-react';
 import type {
   ScenarioData,
   StoryOpening,
@@ -25,7 +25,16 @@ import type {
   HiddenNPCRelationship,
   RelationshipVisibility,
 } from '@/types';
-import { SetStateAction, useState } from 'react';
+import { SetStateAction, useState, useCallback } from 'react';
+import { toast } from 'sonner';
+import {
+  generateWithAI,
+  type StoryOpeningResult,
+  type CharacterIntroductionsResult,
+  type HiddenRelationshipsResult,
+  type CharacterRevelationsResult,
+  type EmergentNarrativeResult,
+} from '@/lib/ai-scenario-generator';
 
 type Props = {
   scenario: ScenarioData;
@@ -96,6 +105,14 @@ const EXPECTED_TIMING_OPTIONS: {
 ];
 
 export default function StoryOpeningContent({ scenario, setScenario }: Props) {
+  // AI 생성 로딩 상태
+  const [isGeneratingOpening, setIsGeneratingOpening] = useState(false);
+  const [isGeneratingIntroductions, setIsGeneratingIntroductions] = useState(false);
+  const [isGeneratingHiddenRels, setIsGeneratingHiddenRels] = useState(false);
+  const [isGeneratingRevelations, setIsGeneratingRevelations] = useState(false);
+  const [isGeneratingEmergent, setIsGeneratingEmergent] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+
   // 스토리 오프닝 업데이트 헬퍼
   const updateStoryOpening = (updates: Partial<StoryOpening>) => {
     setScenario((prev) => ({
@@ -128,6 +145,281 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
   const [useIntroSequence, setUseIntroSequence] = useState(
     !!(storyOpening.characterIntroductionSequence && storyOpening.characterIntroductionSequence.length > 0)
   );
+
+  // AI 생성을 위한 시나리오 컨텍스트 생성
+  const buildScenarioContext = useCallback(() => {
+    const characterDetails = scenario.characters
+      .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory || ''}`)
+      .join('\n');
+
+    const scenarioInput = `시나리오: ${scenario.title}
+시놉시스: ${scenario.synopsis}
+플레이어 목표: ${scenario.playerGoal}
+장르: ${scenario.genre?.join(', ') || ''}
+배경: ${scenario.setting?.place || ''}, ${scenario.setting?.time || ''}
+
+등장 캐릭터:
+${characterDetails}`;
+
+    const context = {
+      genre: scenario.genre || [],
+      title: scenario.title,
+      synopsis: scenario.synopsis,
+      existingCharacters: scenario.characters.map((c) => `${c.characterName} (${c.roleName})`),
+      existingStats: scenario.scenarioStats?.map((s) => s.id) || [],
+    };
+
+    return { scenarioInput, context };
+  }, [scenario]);
+
+  // 스토리 오프닝 AI 생성
+  const handleGenerateStoryOpening = useCallback(async () => {
+    setIsGeneratingOpening(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context);
+
+      if (response.data) {
+        updateStoryOpening({
+          prologue: response.data.prologue,
+          incitingIncident: response.data.incitingIncident,
+          firstCharacterToMeet: response.data.firstCharacterToMeet,
+          firstEncounterContext: response.data.firstEncounterContext,
+          protagonistSetup: response.data.protagonistSetup,
+          openingTone: response.data.openingTone,
+          characterIntroductionStyle: response.data.characterIntroductionStyle,
+          timeOfDay: response.data.timeOfDay,
+          openingLocation: response.data.openingLocation,
+          thematicElements: response.data.thematicElements,
+          npcRelationshipExposure: response.data.npcRelationshipExposure || 'hidden',
+        });
+        toast.success('스토리 오프닝이 생성되었습니다');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '스토리 오프닝 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingOpening(false);
+    }
+  }, [buildScenarioContext]);
+
+  // 캐릭터 소개 시퀀스 AI 생성
+  const handleGenerateIntroductions = useCallback(async () => {
+    if (scenario.characters.length < 2) {
+      toast.error('캐릭터가 2명 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingIntroductions(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context);
+
+      if (response.data?.characterIntroductionSequence) {
+        const sequence = response.data.characterIntroductionSequence.map((intro) => ({
+          characterName: intro.characterName,
+          order: intro.order,
+          encounterContext: intro.encounterContext,
+          firstImpressionKeywords: intro.firstImpressionKeywords,
+          expectedTiming: intro.expectedTiming,
+        }));
+
+        // 첫 번째 캐릭터 찾기 (order=1)
+        const firstInSequence = sequence.find((s) => s.order === 1);
+
+        // firstCharacterToMeet 자동 동기화
+        updateStoryOpening({
+          characterIntroductionSequence: sequence,
+          // 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
+          ...(firstInSequence && {
+            firstCharacterToMeet: firstInSequence.characterName,
+            firstEncounterContext: firstInSequence.encounterContext,
+          }),
+        });
+        setUseIntroSequence(true);
+        toast.success('캐릭터 소개 시퀀스가 생성되었습니다 (첫 캐릭터 자동 동기화됨)');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '캐릭터 소개 시퀀스 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingIntroductions(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length]);
+
+  // 숨겨진 NPC 관계 AI 생성
+  const handleGenerateHiddenRelationships = useCallback(async () => {
+    if (scenario.characters.length < 2) {
+      toast.error('캐릭터가 2명 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingHiddenRels(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context);
+
+      if (response.data?.hiddenNPCRelationships) {
+        updateStoryOpening({
+          hiddenNPCRelationships: response.data.hiddenNPCRelationships.map((rel) => ({
+            relationId: rel.relationId,
+            characterA: rel.characterA,
+            characterB: rel.characterB,
+            actualValue: rel.actualValue,
+            relationshipType: rel.relationshipType,
+            backstory: rel.backstory,
+            visibility: rel.visibility as 'hidden' | 'hinted',
+            discoveryMethods: [{
+              method: rel.discoveryMethod,
+              revealsTo: 'revealed' as const,
+              hintText: rel.discoveryHint,
+            }],
+          })),
+        });
+        toast.success('숨겨진 NPC 관계가 생성되었습니다');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '숨겨진 관계 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingHiddenRels(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length]);
+
+  // 점진적 캐릭터 공개 AI 생성
+  const handleGenerateRevelations = useCallback(async () => {
+    if (scenario.characters.length < 1) {
+      toast.error('캐릭터가 1명 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingRevelations(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context);
+
+      if (response.data?.characterRevelations) {
+        updateStoryOpening({
+          characterRevelations: response.data.characterRevelations.map((rev) => ({
+            characterName: rev.characterName,
+            revelationLayers: rev.revelationLayers,
+            ultimateSecret: rev.ultimateSecret,
+          })),
+        });
+        toast.success('점진적 캐릭터 공개가 생성되었습니다');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '캐릭터 공개 설정 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingRevelations(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length]);
+
+  // 이머전트 내러티브 AI 생성 (ActionHistory 기반)
+  const handleGenerateEmergentNarrative = useCallback(async () => {
+    if (scenario.characters.length < 2) {
+      toast.error('캐릭터가 2명 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingEmergent(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+      const response = await generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context);
+
+      if (response.data) {
+        updateStoryOpening({
+          emergentNarrative: {
+            enabled: response.data.enabled,
+            triggers: response.data.triggers.map((trigger) => ({
+              triggerId: trigger.triggerId,
+              name: trigger.name,
+              conditions: trigger.conditions,
+              generatedEvent: trigger.generatedEvent,
+              triggered: false, // 초기 상태
+              oneTime: trigger.oneTime,
+            })),
+            dynamicEventGuidelines: response.data.dynamicEventGuidelines,
+          },
+        });
+        toast.success('이머전트 내러티브 트리거가 생성되었습니다');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '이머전트 내러티브 생성에 실패했습니다');
+    } finally {
+      setIsGeneratingEmergent(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length]);
+
+  // 모든 2025 Enhanced 기능 일괄 생성
+  const handleGenerateAllEnhanced = useCallback(async () => {
+    if (scenario.characters.length < 2) {
+      toast.error('캐릭터가 2명 이상 필요합니다');
+      return;
+    }
+    setIsGeneratingAll(true);
+    try {
+      const { scenarioInput, context } = buildScenarioContext();
+
+      const [openingRes, introRes, hiddenRes, revRes] = await Promise.all([
+        generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
+        generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context),
+        generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context),
+        generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context),
+      ]);
+
+      const updates: Partial<StoryOpening> = {};
+
+      if (openingRes.data) {
+        updates.prologue = openingRes.data.prologue;
+        updates.incitingIncident = openingRes.data.incitingIncident;
+        updates.firstCharacterToMeet = openingRes.data.firstCharacterToMeet;
+        updates.firstEncounterContext = openingRes.data.firstEncounterContext;
+        updates.protagonistSetup = openingRes.data.protagonistSetup;
+        updates.openingTone = openingRes.data.openingTone;
+        updates.characterIntroductionStyle = openingRes.data.characterIntroductionStyle;
+        updates.timeOfDay = openingRes.data.timeOfDay;
+        updates.openingLocation = openingRes.data.openingLocation;
+        updates.thematicElements = openingRes.data.thematicElements;
+        updates.npcRelationshipExposure = openingRes.data.npcRelationshipExposure || 'hidden';
+      }
+
+      if (introRes.data?.characterIntroductionSequence) {
+        updates.characterIntroductionSequence = introRes.data.characterIntroductionSequence;
+        setUseIntroSequence(true);
+
+        // [일관성 보장] 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
+        const firstInSequence = introRes.data.characterIntroductionSequence.find((s) => s.order === 1);
+        if (firstInSequence) {
+          updates.firstCharacterToMeet = firstInSequence.characterName;
+          updates.firstEncounterContext = firstInSequence.encounterContext;
+        }
+      }
+
+      if (hiddenRes.data?.hiddenNPCRelationships) {
+        updates.hiddenNPCRelationships = hiddenRes.data.hiddenNPCRelationships.map((rel) => ({
+          relationId: rel.relationId,
+          characterA: rel.characterA,
+          characterB: rel.characterB,
+          actualValue: rel.actualValue,
+          relationshipType: rel.relationshipType,
+          backstory: rel.backstory,
+          visibility: rel.visibility as 'hidden' | 'hinted',
+          discoveryMethods: [{
+            method: rel.discoveryMethod,
+            revealsTo: 'revealed' as const,
+            hintText: rel.discoveryHint,
+          }],
+        }));
+      }
+
+      if (revRes.data?.characterRevelations) {
+        updates.characterRevelations = revRes.data.characterRevelations;
+      }
+
+      updateStoryOpening(updates);
+      toast.success('스토리 오프닝 시스템이 모두 생성되었습니다');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '생성에 실패했습니다');
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  }, [buildScenarioContext, scenario.characters.length]);
+
+  const isAnyGenerating = isGeneratingOpening || isGeneratingIntroductions || isGeneratingHiddenRels || isGeneratingRevelations || isGeneratingEmergent || isGeneratingAll;
 
   // 첫 번째 캐릭터 선택을 위한 옵션
   const characterOptions = scenario.characters
@@ -182,18 +474,45 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 설명 */}
+      {/* 헤더 설명 + AI 일괄 생성 버튼 */}
       <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-purple-700">
-            <BookOpen className="h-5 w-5" />
-            스토리 오프닝 시스템
-          </CardTitle>
-          <CardDescription className="text-purple-600">
-            플레이어가 게임을 시작했을 때 보게 될 이야기의 첫 장면을 설정합니다.
-            <br />
-            3단계 구조로 구성됩니다: <strong>프롤로그</strong> → <strong>촉발 사건</strong> → <strong>첫 캐릭터 만남</strong>
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-purple-700">
+                <BookOpen className="h-5 w-5" />
+                스토리 오프닝 시스템
+              </CardTitle>
+              <CardDescription className="text-purple-600 mt-1">
+                플레이어가 게임을 시작했을 때 보게 될 이야기의 첫 장면을 설정합니다.
+                <br />
+                3단계 구조로 구성됩니다: <strong>프롤로그</strong> → <strong>촉발 사건</strong> → <strong>첫 캐릭터 만남</strong>
+              </CardDescription>
+            </div>
+            <Button
+              onClick={handleGenerateAllEnhanced}
+              disabled={isAnyGenerating || scenario.characters.length < 2}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+            >
+              {isGeneratingAll ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  AI 전체 생성
+                </>
+              )}
+            </Button>
+          </div>
+          {scenario.characters.length < 2 && (
+            <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              AI 생성을 위해 캐릭터 2명 이상이 필요합니다
+            </p>
+          )}
         </CardHeader>
       </Card>
 
@@ -363,10 +682,33 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
       {/* 3단계 스토리 구조 */}
       <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg text-kairos-gold">스토리 3단계 구조</CardTitle>
-          <CardDescription>
-            각 단계를 직접 작성하거나 비워두면 AI가 시나리오 정보를 바탕으로 자동 생성합니다.
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-lg text-kairos-gold">스토리 3단계 구조</CardTitle>
+              <CardDescription>
+                각 단계를 직접 작성하거나 비워두면 AI가 시나리오 정보를 바탕으로 자동 생성합니다.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateStoryOpening}
+              disabled={isAnyGenerating}
+              className="border-kairos-gold/30 hover:bg-kairos-gold/10"
+            >
+              {isGeneratingOpening ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  AI 재생성
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* 1단계: 프롤로그 */}
@@ -550,15 +892,38 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
       {/* [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 */}
       <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
-            <ListOrdered className="h-5 w-5" />
-            1:1 캐릭터 소개 시퀀스
-          </CardTitle>
-          <CardDescription>
-            주인공이 각 NPC를 개별적으로 만나는 순서와 상황을 정의합니다.
-            <br />
-            활성화하면 기존 &apos;캐릭터 소개 방식&apos; 설정 대신 이 시퀀스가 사용됩니다.
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+                <ListOrdered className="h-5 w-5" />
+                1:1 캐릭터 소개 시퀀스
+              </CardTitle>
+              <CardDescription>
+                주인공이 각 NPC를 개별적으로 만나는 순서와 상황을 정의합니다.
+                <br />
+                활성화하면 기존 &apos;캐릭터 소개 방식&apos; 설정 대신 이 시퀀스가 사용됩니다.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateIntroductions}
+              disabled={isAnyGenerating || scenario.characters.length < 2}
+              className="border-indigo-300 hover:bg-indigo-50"
+            >
+              {isGeneratingIntroductions ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  AI 생성
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 활성화 토글 */}
@@ -718,16 +1083,209 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
         </CardContent>
       </Card>
 
-      {/* [2025 Enhanced] 이머전트 내러티브 힌트 */}
+      {/* [2025 Enhanced] 숨겨진 NPC 관계 */}
       <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
-            <Sparkles className="h-5 w-5" />
-            이머전트 내러티브 (동적 스토리)
-          </CardTitle>
-          <CardDescription>
-            플레이어 행동 조합에 따라 동적으로 발생하는 스토리 이벤트를 위한 가이드라인입니다.
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+                <Link2 className="h-5 w-5" />
+                숨겨진 NPC 관계
+              </CardTitle>
+              <CardDescription>
+                NPC들 간의 비밀 관계를 설정합니다. 플레이어는 게임 중 대화/탐색으로 발견합니다.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateHiddenRelationships}
+              disabled={isAnyGenerating || scenario.characters.length < 2}
+              className="border-rose-300 hover:bg-rose-50"
+            >
+              {isGeneratingHiddenRels ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  AI 생성
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {storyOpening.hiddenNPCRelationships && storyOpening.hiddenNPCRelationships.length > 0 ? (
+            <div className="space-y-3">
+              {storyOpening.hiddenNPCRelationships.map((rel, idx) => (
+                <div key={idx} className="rounded-lg border border-rose-200 bg-rose-50/30 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-rose-800">{rel.characterA}</span>
+                      <span className="text-rose-400">↔</span>
+                      <span className="font-medium text-rose-800">{rel.characterB}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={rel.visibility === 'hidden' ? 'destructive' : 'secondary'} className="text-xs">
+                        {rel.visibility === 'hidden' ? '숨김' : '힌트'}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {rel.actualValue > 0 ? '+' : ''}{rel.actualValue}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newRels = storyOpening.hiddenNPCRelationships?.filter((_, i) => i !== idx);
+                          updateStoryOpening({ hiddenNPCRelationships: newRels });
+                        }}
+                        className="h-6 w-6 p-0 text-red-500 hover:bg-red-100"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-rose-700 font-medium">{rel.relationshipType}</p>
+                  <p className="text-xs text-gray-600 mt-1">{rel.backstory}</p>
+                  {rel.discoveryMethods && rel.discoveryMethods[0] && (
+                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                      <Eye className="h-3 w-3" />
+                      발견: {rel.discoveryMethods[0].method} - {rel.discoveryMethods[0].hintText}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+              <Link2 className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              <p>숨겨진 NPC 관계가 없습니다.</p>
+              <p className="text-sm">AI 생성 버튼을 눌러 NPC들 간의 비밀 관계를 추가하세요.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* [2025 Enhanced] 점진적 캐릭터 공개 */}
+      <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+                <Lock className="h-5 w-5" />
+                점진적 캐릭터 공개
+              </CardTitle>
+              <CardDescription>
+                신뢰도에 따라 캐릭터 정보가 단계적으로 공개됩니다. 깊은 관계일수록 더 많은 비밀이 드러납니다.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateRevelations}
+              disabled={isAnyGenerating || scenario.characters.length < 1}
+              className="border-amber-300 hover:bg-amber-50"
+            >
+              {isGeneratingRevelations ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  AI 생성
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {storyOpening.characterRevelations && storyOpening.characterRevelations.length > 0 ? (
+            <div className="space-y-4">
+              {storyOpening.characterRevelations.map((rev, idx) => (
+                <div key={idx} className="rounded-lg border border-amber-200 bg-amber-50/30 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium text-amber-800">{rev.characterName}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newRevs = storyOpening.characterRevelations?.filter((_, i) => i !== idx);
+                        updateStoryOpening({ characterRevelations: newRevs });
+                      }}
+                      className="h-6 w-6 p-0 text-red-500 hover:bg-red-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {rev.revelationLayers?.map((layer, layerIdx) => (
+                      <div key={layerIdx} className="flex items-start gap-2 text-sm">
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          신뢰 {layer.trustThreshold}+
+                        </Badge>
+                        <span className="text-xs text-amber-600">[{layer.revelationType}]</span>
+                        <span className="text-gray-700">{layer.content}</span>
+                      </div>
+                    ))}
+                    {rev.ultimateSecret && (
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          궁극의 비밀:
+                        </span>
+                        <p className="text-sm text-gray-700 mt-1">{rev.ultimateSecret}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+              <Lock className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              <p>점진적 캐릭터 공개 설정이 없습니다.</p>
+              <p className="text-sm">AI 생성 버튼을 눌러 캐릭터별 비밀 공개 레이어를 추가하세요.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* [2025 Enhanced] 이머전트 내러티브 힌트 */}
+      <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg text-kairos-gold">
+              <Sparkles className="h-5 w-5" />
+              이머전트 내러티브 (동적 스토리)
+            </CardTitle>
+            <CardDescription>
+              플레이어 행동 조합에 따라 동적으로 발생하는 스토리 이벤트 트리거입니다.
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerateEmergentNarrative}
+            disabled={isAnyGenerating || scenario.characters.length < 2}
+            className="shrink-0 border-kairos-gold text-kairos-gold hover:bg-kairos-gold/10"
+          >
+            {isGeneratingEmergent ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-4 w-4" />
+                AI 자동 생성
+              </>
+            )}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
@@ -752,26 +1310,73 @@ export default function StoryOpeningContent({ scenario, setScenario }: Props) {
           </div>
 
           {storyOpening.emergentNarrative?.enabled && (
-            <div>
-              <Label className="text-sm font-medium text-gray-700">동적 이벤트 가이드라인 (AI용)</Label>
-              <Textarea
-                value={storyOpening.emergentNarrative?.dynamicEventGuidelines || ''}
-                onChange={(e) => {
-                  updateStoryOpening({
-                    emergentNarrative: {
-                      ...storyOpening.emergentNarrative,
-                      enabled: true,
-                      triggers: storyOpening.emergentNarrative?.triggers || [],
-                      dynamicEventGuidelines: e.target.value,
-                    },
-                  });
-                }}
-                placeholder="예: 캐릭터 A와 B가 모두 만난 후, 둘의 과거 관계에 대한 힌트를 자연스럽게 흘려주세요."
-                className="mt-1 min-h-[100px] border-socratic-grey bg-parchment-white"
-              />
-              <p className="mt-2 text-xs text-gray-500">
-                AI가 동적 이벤트를 생성할 때 참고할 가이드라인입니다.
-              </p>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700">동적 이벤트 가이드라인 (AI용)</Label>
+                <Textarea
+                  value={storyOpening.emergentNarrative?.dynamicEventGuidelines || ''}
+                  onChange={(e) => {
+                    updateStoryOpening({
+                      emergentNarrative: {
+                        ...storyOpening.emergentNarrative,
+                        enabled: true,
+                        triggers: storyOpening.emergentNarrative?.triggers || [],
+                        dynamicEventGuidelines: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="예: 캐릭터 A와 B가 모두 만난 후, 둘의 과거 관계에 대한 힌트를 자연스럽게 흘려주세요."
+                  className="mt-1 min-h-[100px] border-socratic-grey bg-parchment-white"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  AI가 동적 이벤트를 생성할 때 참고할 가이드라인입니다.
+                </p>
+              </div>
+
+              {/* 생성된 트리거 목록 */}
+              {storyOpening.emergentNarrative?.triggers && storyOpening.emergentNarrative.triggers.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    생성된 트리거 ({storyOpening.emergentNarrative.triggers.length}개)
+                  </Label>
+                  <div className="mt-2 space-y-3">
+                    {storyOpening.emergentNarrative.triggers.map((trigger, idx) => (
+                      <div
+                        key={trigger.triggerId || idx}
+                        className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{trigger.name}</p>
+                            <p className="text-xs text-gray-500">{trigger.triggerId}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {trigger.generatedEvent.eventType}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {trigger.generatedEvent.tone}
+                            </Badge>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-700">{trigger.generatedEvent.eventSeed}</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {trigger.conditions.charactersMetTogether?.map((char) => (
+                            <Badge key={char} variant="outline" className="text-xs bg-blue-50">
+                              👤 {char}
+                            </Badge>
+                          ))}
+                          {trigger.conditions.actionPatternKeywords?.map((keyword) => (
+                            <Badge key={keyword} variant="outline" className="text-xs bg-green-50">
+                              📝 {keyword}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
