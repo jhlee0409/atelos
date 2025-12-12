@@ -1881,14 +1881,7 @@ export default function GameClient({ scenario }: GameClientProps) {
             }
           }
 
-          if (discovery.effects?.flagsAcquired) {
-            for (const flag of discovery.effects.flagsAcquired) {
-              if (newSaveState.context.flags[flag] === undefined) {
-                const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
-                newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
-              }
-            }
-          }
+          // @deprecated - flags system removed, using ActionHistory instead
         }
 
         // 위치 변경 알림 (몰입감 있는 형식 - 중요한 변화만)
