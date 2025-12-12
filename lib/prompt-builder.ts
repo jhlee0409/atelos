@@ -804,6 +804,15 @@ export const buildStoryOpeningPrompt = (
   const protagonist = storyOpening.protagonistSetup || {};
   const npcRelationshipExposure = storyOpening.npcRelationshipExposure || 'hidden';
 
+  // [2025 Enhanced] 주인공-NPC 이름 충돌 검사
+  const npcNames = npcs.map(c => c.characterName);
+  const hasNameCollision = protagonist.name && npcNames.includes(protagonist.name);
+  if (hasNameCollision) {
+    console.warn(`⚠️ 주인공 이름 "${protagonist.name}"이(가) NPC 이름과 충돌합니다! 스토리 혼란 방지를 위해 주인공 이름을 비워둡니다.`);
+  }
+  // 충돌 시 주인공 이름을 비워서 AI가 "당신" 또는 적절한 호칭을 사용하도록 함
+  const safeProtagonistName = hasNameCollision ? undefined : protagonist.name;
+
   // [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 처리
   const introSequence = storyOpening.characterIntroductionSequence;
   let firstCharacter;
@@ -936,15 +945,16 @@ ${storyOpening.firstEncounterContext ? `- 만남 상황: ${storyOpening.firstEnc
 `
     : '';
 
-  // 주인공 정보
-  const protagonistInfo = protagonist.name || protagonist.occupation
+  // 주인공 정보 (이름 충돌 시 safeProtagonistName 사용)
+  const protagonistInfo = safeProtagonistName || protagonist.occupation
     ? `
 ### 주인공 정보 ###
-${protagonist.name ? `- 이름: ${protagonist.name}` : ''}
+${safeProtagonistName ? `- 이름: ${safeProtagonistName}` : '- 이름: (플레이어가 자신을 부르는 호칭은 자유롭게 선택)'}
 ${protagonist.occupation ? `- 직업/역할: ${protagonist.occupation}` : ''}
 ${protagonist.personality ? `- 성격: ${protagonist.personality}` : ''}
 ${protagonist.dailyRoutine ? `- 일상: ${protagonist.dailyRoutine}` : ''}
 ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
+${hasNameCollision ? `\n**주의**: 원래 설정된 주인공 이름이 NPC와 충돌하여 비워두었습니다. 주인공을 지칭할 때 "그", "그녀", 직업명 등을 사용하세요.` : ''}
 `
     : '';
 
@@ -974,6 +984,9 @@ ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
 - 키워드: ${scenario.coreKeywords?.join(', ') || ''}
 
 ${protagonistInfo}
+
+### NPC 이름 목록 (주인공 이름과 겹치면 안 됨) ###
+${npcNames.join(', ')}
 
 ${firstCharacterInfo}
 
@@ -1048,6 +1061,7 @@ ${storyOpening.incitingIncident
 }
 
 ### CRITICAL FORMATTING RULES ###
+- **주인공-NPC 이름 충돌 절대 금지**: 주인공 이름을 NPC 이름과 동일하게 사용하면 스토리가 심각하게 혼란스러워집니다. 위 NPC 이름 목록을 확인하고, 주인공은 반드시 다른 이름을 가져야 합니다.
 - **스탯 숫자 절대 금지**: 20, 40, 60 같은 수치 노출 금지
 - **스탯명 절대 금지**: "생존의 기반", "결속력" 등 게임 용어 금지
 - **빈 괄호 금지**: "()", "( )" 사용 금지

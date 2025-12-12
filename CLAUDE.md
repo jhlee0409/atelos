@@ -371,6 +371,10 @@ World state that changes based on player actions:
 - `EmergentNarrativeConfig`: Dynamic story events from player action combinations
 - `StorySiftingTrigger`: Conditions that generate emergent story events
 - `ProtagonistKnowledge`: Tracks what the player character knows
+- **Protagonist-NPC Name Collision Detection**: Prevents protagonist name from matching NPC names
+  - `prompt-builder.ts` detects collision at runtime and clears protagonist name
+  - AI generation API (`ai-generate/route.ts`) instructs AI to avoid name collision
+  - Fallback: AI uses pronouns or occupation title instead of name when collision detected
 
 #### Genre Narrative Styles (`lib/genre-narrative-styles.ts`)
 
@@ -717,6 +721,12 @@ Custom colors defined in `tailwind.config.ts`:
 2. Check `BLOB_READ_WRITE_TOKEN` is set
 3. Check image type is 'poster' or 'character'
 4. Look for safety filter blocks in error messages
+
+### Story Opening Issues
+1. Check for "⚠️ 주인공 이름...충돌" warning in console (protagonist-NPC name collision)
+2. Verify `storyOpening.protagonistSetup.name` differs from all NPC character names
+3. If collision detected, system auto-clears protagonist name (AI uses pronouns instead)
+4. Check `firstCharacterToMeet` matches an actual character in `scenario.characters`
 
 ## 🚨 Development Checklist (MANDATORY)
 

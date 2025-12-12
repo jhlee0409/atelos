@@ -1232,6 +1232,7 @@ dark(어둡고 절망적), hopeful(희망적 성장), thriller(긴장감 서스�
 - 주인공은 플레이어의 아바타입니다. 너무 구체적인 성격보다는 플레이어가 투영할 수 있는 여지를 남겨주세요.
 - 직업과 일상 루틴은 구체적으로, 성격은 핵심 특징만 간결하게.
 - 약점이나 고민은 시나리오의 핵심 갈등과 연결되어야 합니다.
+- **매우 중요**: 주인공 이름(protagonistSetup.name)은 반드시 existing_characters에 있는 NPC 이름과 달라야 합니다! 같은 이름을 사용하면 스토리가 혼란스러워집니다.
 </protagonist_guidelines>
 
 <tone_guidelines>
@@ -1270,7 +1271,10 @@ ${baseContext}
 - thematicElements: 오프닝에서 암시할 핵심 테마 3-5개
 </specific_requirements>
 
-<critical>firstCharacterToMeet은 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다.</critical>`,
+<critical>
+1. firstCharacterToMeet은 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다.
+2. protagonistSetup.name은 절대로 existing_characters에 있는 NPC 이름과 같으면 안 됩니다! 이름이 겹치면 스토리에서 주인공과 NPC가 구분되지 않아 심각한 혼란이 발생합니다.
+</critical>`,
     },
 
     // ========================================================================
