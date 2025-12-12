@@ -804,14 +804,13 @@ export const buildStoryOpeningPrompt = (
   const protagonist = storyOpening.protagonistSetup || {};
   const npcRelationshipExposure = storyOpening.npcRelationshipExposure || 'hidden';
 
-  // [2025 Enhanced] 주인공-NPC 이름 충돌 검사
+  // NPC 이름 목록 (프롬프트에서 참조용)
   const npcNames = npcs.map(c => c.characterName);
-  const hasNameCollision = protagonist.name && npcNames.includes(protagonist.name);
-  if (hasNameCollision) {
-    console.warn(`⚠️ 주인공 이름 "${protagonist.name}"이(가) NPC 이름과 충돌합니다! 스토리 혼란 방지를 위해 주인공 이름을 비워둡니다.`);
+
+  // [2025 Enhanced] 주인공-NPC 이름 충돌 경고 (1인칭 서술이므로 이름 충돌 영향 최소화)
+  if (protagonist.name && npcNames.includes(protagonist.name)) {
+    console.warn(`⚠️ 주인공 이름 "${protagonist.name}"이(가) NPC 이름과 충돌합니다! 1인칭 서술로 자동 처리됩니다.`);
   }
-  // 충돌 시 주인공 이름을 비워서 AI가 "당신" 또는 적절한 호칭을 사용하도록 함
-  const safeProtagonistName = hasNameCollision ? undefined : protagonist.name;
 
   // [2025 Enhanced] 1:1 캐릭터 소개 시퀀스 처리
   const introSequence = storyOpening.characterIntroductionSequence;
@@ -945,18 +944,20 @@ ${storyOpening.firstEncounterContext ? `- 만남 상황: ${storyOpening.firstEnc
 `
     : '';
 
-  // 주인공 정보 (이름 충돌 시 safeProtagonistName 사용)
-  const protagonistInfo = safeProtagonistName || protagonist.occupation
+  // 주인공 정보 (1인칭 서술 - 이름은 참고용)
+  const protagonistInfo = protagonist.occupation
     ? `
-### 주인공 정보 ###
-${safeProtagonistName ? `- 이름: ${safeProtagonistName}` : '- 이름: (플레이어가 자신을 부르는 호칭은 자유롭게 선택)'}
+### 주인공 정보 (1인칭 서술용 참고) ###
+- **서술 관점**: 반드시 1인칭("나는", "내가", "나의")으로 서술. 주인공 이름을 직접 부르지 말 것.
 ${protagonist.occupation ? `- 직업/역할: ${protagonist.occupation}` : ''}
 ${protagonist.personality ? `- 성격: ${protagonist.personality}` : ''}
 ${protagonist.dailyRoutine ? `- 일상: ${protagonist.dailyRoutine}` : ''}
 ${protagonist.weakness ? `- 약점/고민: ${protagonist.weakness}` : ''}
-${hasNameCollision ? `\n**주의**: 원래 설정된 주인공 이름이 NPC와 충돌하여 비워두었습니다. 주인공을 지칭할 때 "그", "그녀", 직업명 등을 사용하세요.` : ''}
 `
-    : '';
+    : `
+### 주인공 정보 ###
+- **서술 관점**: 반드시 1인칭("나는", "내가", "나의")으로 서술할 것.
+`;
 
   // 기존 캐릭터들 간략 정보 (관계는 숨김 - 2025 Enhanced)
   const otherCharactersInfo = npcs
@@ -1035,10 +1036,11 @@ ${storyOpening.incitingIncident
 
 ### CRITICAL KOREAN QUALITY REQUIREMENTS ###
 1. **순수 한국어**: 한글만 사용, 다른 언어 문자 절대 금지
-2. **감정 표현 필수**: "...라고 느꼈다", "마음이...", "가슴이..." 등 내면 묘사
-3. **대화와 묘사의 균형**: 대화문과 서술문을 번갈아 배치
-4. **줄바꿈으로 가독성**: 문단과 대화 사이에 \\n 사용
-5. **마크다운 강조**: **중요한 대사**, *감정 표현*
+2. **1인칭 서술 필수**: 반드시 1인칭("나는", "내가", "나의", "내")으로 서술할 것. 주인공을 3인칭 이름으로 부르지 말 것.
+3. **감정 표현 필수**: "...라고 느꼈다", "마음이...", "가슴이..." 등 내면 묘사
+4. **대화와 묘사의 균형**: 대화문과 서술문을 번갈아 배치
+5. **줄바꿈으로 가독성**: 문단과 대화 사이에 \\n 사용
+6. **마크다운 강조**: **중요한 대사**, *감정 표현*
 
 ### [2025 Enhanced] 몰입감 향상 규칙 ###
 6. **1:1 캐릭터 만남**: 첫 만남 장면에서는 오직 한 명의 캐릭터만 직접 등장
@@ -1061,7 +1063,7 @@ ${storyOpening.incitingIncident
 }
 
 ### CRITICAL FORMATTING RULES ###
-- **주인공-NPC 이름 충돌 절대 금지**: 주인공 이름을 NPC 이름과 동일하게 사용하면 스토리가 심각하게 혼란스러워집니다. 위 NPC 이름 목록을 확인하고, 주인공은 반드시 다른 이름을 가져야 합니다.
+- **1인칭 서술 필수**: 주인공은 반드시 "나", "내가", "나의"로만 지칭. 주인공에게 이름을 부여하거나 3인칭으로 서술하지 말 것.
 - **스탯 숫자 절대 금지**: 20, 40, 60 같은 수치 노출 금지
 - **스탯명 절대 금지**: "생존의 기반", "결속력" 등 게임 용어 금지
 - **빈 괄호 금지**: "()", "( )" 사용 금지
@@ -1069,11 +1071,11 @@ ${storyOpening.incitingIncident
 - **줄바꿈 표기**: 실제 줄바꿈은 \\n으로 표기
 - **NPC 관계 노출 금지**: A와 B의 관계를 암시하는 표현 금지
 
-### EXAMPLE OUTPUT (2025 Enhanced) ###
+### EXAMPLE OUTPUT (2025 Enhanced - 1인칭 필수) ###
 {
-  "prologue": "평범한 도시의 평범한 회사원 김민준.\\n\\n그의 삶은 어제까지 반복되는 서류 작업과 야근의 연속이었다. 매일 같은 지하철, 같은 커피, 같은 책상. *지루했지만 안정적이었다.*",
-  "incitingIncident": "하지만 오늘, 모든 것이 변했다.\\n\\n손끝에서 푸른빛이 터져 나왔을 때, 그는 자신의 눈을 의심했다. **이게 대체 뭐지?** 억누를 수 없는 힘이 온몸을 휘감았다.",
-  "firstEncounter": "**\\"괜찮으세요?\\"**\\n\\n낯선 여성이 조용히 다가왔다. 최지혜. 처음 보는 얼굴이었다. 그녀의 눈빛에서 복잡한 감정을 읽을 수 있었다. 걱정인지, 아니면... 호기심인지. *왜 이렇게 차분하지?* 민준은 의문을 품었다.",
+  "prologue": "나는 평범한 도시의 평범한 회사원이었다.\\n\\n내 삶은 어제까지 반복되는 서류 작업과 야근의 연속이었다. 매일 같은 지하철, 같은 커피, 같은 책상. *지루했지만 안정적이었다.*",
+  "incitingIncident": "하지만 오늘, 모든 것이 변했다.\\n\\n내 손끝에서 푸른빛이 터져 나왔을 때, 나는 내 눈을 의심했다. **이게 대체 뭐지?** 억누를 수 없는 힘이 온몸을 휘감았다.",
+  "firstEncounter": "**\\"괜찮으세요?\\"**\\n\\n낯선 여성이 조용히 다가왔다. 처음 보는 얼굴이었다. 그녀의 눈빛에서 복잡한 감정을 읽을 수 있었다. 걱정인지, 아니면... 호기심인지. *왜 이렇게 차분하지?* 나는 의문을 품었다.",
   "dilemma": {
     "prompt": "처음 보는 사람이 다가왔다. 방금 일어난 이상한 일에 대해 어떻게 반응해야 할까?",
     "choice_a": "솔직하게 방금 일어난 일에 대해 털어놓는다",
