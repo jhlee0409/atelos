@@ -110,12 +110,13 @@ export type GoalCluster = {
   connectedEndings: string[];
 };
 
-/** @deprecated Use DynamicEndingConfig instead */
+/** @deprecated Use DynamicEndingConfig instead - AI generates endings dynamically */
 export type EndingArchetype = {
   endingId: string;
   title: string;
   description: string;
-  systemConditions: SystemCondition[];
+  /** @deprecated No longer used - AI generates endings based on ActionHistory */
+  systemConditions?: SystemCondition[];
   isGoalSuccess?: boolean;
   isEditing?: boolean;
 };

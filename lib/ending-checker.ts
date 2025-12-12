@@ -58,8 +58,10 @@ export const checkEndingConditions = (
   console.log('👥 생존자 수:', survivorCount ?? '정보 없음');
 
   // "결단의 날"과 같은 시간 제한 엔딩은 제외 (별도 처리)
+  // systemConditions는 이제 optional - 없으면 체크 건너뜀
   const checkableEndings = endingArchetypes.filter(
     (ending) =>
+      ending.systemConditions &&
       ending.systemConditions.length > 0 &&
       ending.endingId !== 'ENDING_TIME_UP',
   );
@@ -67,7 +69,8 @@ export const checkEndingConditions = (
   for (const ending of checkableEndings) {
     console.log(`\n🎯 "${ending.title}" 엔딩 체크 중...`);
 
-    const conditionResults = ending.systemConditions.map((condition) => {
+    // systemConditions이 있는 것만 필터링했으므로 안전
+    const conditionResults = (ending.systemConditions || []).map((condition) => {
       let result = false;
       let details = '';
 
