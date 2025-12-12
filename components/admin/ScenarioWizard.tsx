@@ -61,7 +61,7 @@ import {
   type GameplayConfigResult,
   type EmergentNarrativeResult,
 } from '@/lib/ai-scenario-generator';
-import type { ScenarioData, SystemCondition, Trait } from '@/types';
+import type { ScenarioData, SystemCondition, Trait, DynamicEndingConfig } from '@/types';
 
 // 비교 연산자 타입
 type ComparisonOperator =
@@ -631,6 +631,34 @@ ${characterDetails}`;
         useGenreFallback: gameplayConfig.useGenreFallback,
         customFallbackChoices: gameplayConfig.customFallbackChoices,
       } : undefined,
+      // 동적 결말 시스템 (기본 활성화)
+      dynamicEndingConfig: {
+        enabled: true,
+        endingDay: synopsisResult.targetDays || 7,
+        warningDays: 2,
+        goalType: 'manual',
+        evaluationCriteria: {
+          goalWeight: 0.3,
+          relationshipWeight: 0.3,
+          moralWeight: 0.2,
+          narrativeWeight: 0.2,
+        },
+        narrativeGuidelines: '',
+        endingToneHints: synopsisResult.genre.map((g) => {
+          // 장르별 기본 톤 힌트
+          const genreTones: Record<string, string> = {
+            '스릴러': '긴장감 유지',
+            '호러': '공포의 여운',
+            '미스터리': '진실 공개',
+            'SF': '과학적 결말',
+            '드라마': '감정적 해소',
+            '로맨스': '관계의 결실',
+            '판타지': '영웅의 귀환',
+            '액션': '최종 대결',
+          };
+          return genreTones[g] || '';
+        }).filter(Boolean),
+      } as DynamicEndingConfig,
     };
 
     onComplete(scenario);

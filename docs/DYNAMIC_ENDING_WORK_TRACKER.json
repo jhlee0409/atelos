@@ -57,27 +57,27 @@
     {
       "id": 5,
       "name": "Ending Display",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
-        { "task": "Create DynamicEndingDisplay component", "file": "components/client/GameClient/DynamicEndingDisplay.tsx", "done": false },
-        { "task": "Integrate ending trigger logic", "file": "app/game/[scenarioId]/GameClient.tsx", "done": false }
+        { "task": "Create DynamicEndingDisplay component", "file": "components/client/GameClient/DynamicEndingDisplay.tsx", "done": true },
+        { "task": "Integrate ending trigger logic", "file": "app/game/[scenarioId]/GameClient.tsx", "done": true }
       ]
     },
     {
       "id": 6,
       "name": "ScenarioWizard Update",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
-        { "task": "Add DynamicEndingConfig defaults", "file": "components/admin/ScenarioWizard.tsx", "done": false },
-        { "task": "Remove legacy ending generation", "file": "components/admin/ScenarioWizard.tsx", "done": false }
+        { "task": "Add DynamicEndingConfig defaults", "file": "components/admin/ScenarioWizard.tsx", "done": true },
+        { "task": "Remove legacy ending generation", "file": "components/admin/ScenarioWizard.tsx", "done": false, "note": "Kept for backwards compatibility" }
       ]
     },
     {
       "id": 7,
       "name": "Verification",
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
-        { "task": "Run pnpm build", "done": false },
+        { "task": "Run pnpm build", "done": true },
         { "task": "Run pnpm test", "done": false },
         { "task": "Manual ending quality test", "done": false }
       ]

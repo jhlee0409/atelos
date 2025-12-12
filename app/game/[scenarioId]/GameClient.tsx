@@ -36,6 +36,7 @@ import {
 import { CharacterDialoguePanel } from '@/components/client/GameClient/CharacterDialoguePanel';
 import { ExplorationPanel } from '@/components/client/GameClient/ExplorationPanel';
 import { TimelineProgress } from '@/components/client/GameClient/TimelineProgress';
+import { DynamicEndingDisplay } from '@/components/client/GameClient/DynamicEndingDisplay';
 import { generateDialogueResponse } from '@/lib/dialogue-generator';
 import { generateExplorationResult } from '@/lib/exploration-generator';
 import {
@@ -1031,6 +1032,70 @@ export default function GameClient({ scenario }: GameClientProps) {
     console.log('📝 ActionHistory 기록:', actionType, content.slice(0, 50) + '...');
   };
 
+  /**
+   * 동적 엔딩 생성 함수
+   * endingDay에 도달하면 ActionHistory를 기반으로 AI가 결말 생성
+   */
+  const generateDynamicEnding = async (currentState: SaveState, history: ActionHistoryEntry[]) => {
+    if (!scenario.dynamicEndingConfig?.enabled) return;
+    if (isGeneratingEnding || dynamicEnding) return;
+
+    const currentDay = currentState.context.currentDay ?? 1;
+    const endingDay = scenario.dynamicEndingConfig.endingDay;
+
+    // 엔딩 Day 도달 체크
+    if (currentDay < endingDay) return;
+
+    console.log('🎬 동적 엔딩 생성 시작...');
+    setIsGeneratingEnding(true);
+
+    try {
+      const response = await fetch('/api/generate-ending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarioId: scenario.scenarioId,
+          scenario: {
+            title: scenario.title,
+            synopsis: scenario.synopsis,
+            genre: scenario.genre,
+            playerGoal: scenario.playerGoal,
+            characters: scenario.characters,
+          },
+          dynamicEndingConfig: scenario.dynamicEndingConfig,
+          actionHistory: history,
+          finalState: {
+            stats: currentState.context.scenarioStats,
+            relationships: currentState.community.hiddenRelationships,
+            day: currentDay,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.ending) {
+        console.log('✅ 동적 엔딩 생성 완료:', result.ending.title);
+        setDynamicEnding(result.ending);
+      } else {
+        console.error('❌ 동적 엔딩 생성 실패:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ 동적 엔딩 API 오류:', error);
+    } finally {
+      setIsGeneratingEnding(false);
+    }
+  };
+
+  // 엔딩 Day 경고 체크
+  const shouldShowEndingWarning = () => {
+    if (!scenario.dynamicEndingConfig?.enabled) return false;
+    const currentDay = saveState.context.currentDay ?? 1;
+    const endingDay = scenario.dynamicEndingConfig.endingDay;
+    const warningDays = scenario.dynamicEndingConfig.warningDays;
+    return currentDay >= (endingDay - warningDays) && currentDay < endingDay;
+  };
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     const chatContainer = document.getElementById('chat-container');
@@ -1454,6 +1519,17 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진`);
       }
 
+      // Dynamic Ending System: 동적 엔딩 체크
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDay = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDay >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // actionHistory에 현재 기록이 추가된 상태로 호출
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // Check for ending condition after state is updated
       // stateAfterAP 사용 (Day 전환이 반영된 상태)
       const currentPlayerState: PlayerState = {
@@ -1467,8 +1543,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       const currentDay = stateAfterAP.context.currentDay || 1;
 
       // 엔딩 체크 시점 이후에만 엔딩 조건 체크 (동적 계산)
+      // 동적 엔딩 시스템이 비활성화된 경우에만 기존 엔딩 체크
       const survivorCount = stateAfterAP.community.survivors.length;
-      if (canCheckEnding(currentDay, scenario)) {
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         ending = checkEndingConditions(
           currentPlayerState,
           scenario.endingArchetypes,
@@ -2241,6 +2318,37 @@ export default function GameClient({ scenario }: GameClientProps) {
       setIsLoading(false);
     }
   };
+
+  // 동적 엔딩 생성 중 로딩 표시
+  if (isGeneratingEnding) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-telos-black text-zinc-100">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-950/20 via-transparent to-transparent" />
+        <div className="relative z-10 text-center space-y-4">
+          <div className="animate-pulse">
+            <div className="text-4xl mb-4">🎬</div>
+            <h2 className="text-xl font-bold text-zinc-200">결말을 생성하고 있습니다...</h2>
+            <p className="text-zinc-400 text-sm mt-2">당신의 여정을 분석하고 있습니다</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 동적 엔딩 표시
+  if (dynamicEnding) {
+    return (
+      <>
+        <DynamicEndingDisplay
+          ending={dynamicEnding}
+          onClose={() => {
+            // 로비로 이동
+            window.location.href = '/lobby';
+          }}
+        />
+      </>
+    );
+  }
 
   if (triggeredEnding) {
     return (
