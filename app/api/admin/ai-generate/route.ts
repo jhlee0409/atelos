@@ -23,6 +23,7 @@ const getGeminiClient = (): GoogleGenerativeAI => {
 };
 
 // 카테고리별 생성 타입
+// v1.2: 'locations' 카테고리 제거됨 (동적 위치 시스템으로 대체)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
@@ -38,8 +39,7 @@ export type GenerationCategory =
   | 'hidden_relationships'
   | 'character_revelations'
   | 'gameplay_config'
-  | 'emergent_narrative'
-  | 'locations';
+  | 'emergent_narrative';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -662,58 +662,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['enabled', 'triggers', 'dynamicEventGuidelines', 'reasoning'],
   },
-
-  locations: {
-    type: SchemaType.OBJECT,
-    properties: {
-      locations: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            locationId: { type: SchemaType.STRING, description: '위치 ID (영문, 예: loc_storage, loc_rooftop)' },
-            name: { type: SchemaType.STRING, description: '위치 이름 (한글)' },
-            description: { type: SchemaType.STRING, description: '위치 설명 (50-100자)' },
-            icon: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              enum: ['warehouse', 'entrance', 'medical', 'roof', 'basement', 'quarters', 'office', 'corridor', 'exterior', 'hidden'],
-              description: '아이콘 타입',
-            },
-            initialStatus: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              enum: ['available', 'locked', 'hidden'],
-              description: '초기 상태',
-            },
-            unlockCondition: {
-              type: SchemaType.OBJECT,
-              properties: {
-                requiredDay: { type: SchemaType.INTEGER, description: '해금 필요 일차' },
-                requiredExploration: { type: SchemaType.STRING, description: '선행 탐색 위치 ID' },
-              },
-              description: '해금 조건 (locked/hidden인 경우)',
-            },
-            dangerLevel: {
-              type: SchemaType.INTEGER,
-              description: '위험도 (0-3)',
-            },
-            explorationCooldown: {
-              type: SchemaType.INTEGER,
-              description: '재탐색 쿨다운 (일 단위)',
-            },
-          },
-          required: ['locationId', 'name', 'description', 'icon', 'initialStatus'],
-        },
-        description: '탐색 위치 목록',
-      },
-      reasoning: {
-        type: SchemaType.STRING,
-        description: '위치 설계 이유',
-      },
-    },
-    required: ['locations', 'reasoning'],
-  },
+  // v1.2: 'locations' 스키마 제거됨 - 동적 위치 시스템으로 대체
 };
 
 // 카테고리별 최적 temperature 설정
@@ -737,8 +686,7 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
   // 이머전트 내러티브
   emergent_narrative: 0.7, // 창의적 - 흥미로운 트리거 조합 생성
-  // 탐색 위치
-  locations: 0.6, // 중간 - 시나리오에 맞는 흥미로운 위치 생성
+  // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -761,8 +709,7 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   gameplay_config: 3000, // 루트 점수 설정 + 설명
   // 이머전트 내러티브
   emergent_narrative: 4000, // 복잡한 트리거 조건 + 이벤트
-  // 탐색 위치
-  locations: 3000, // 여러 위치 + 설명
+  // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
 };
 
 interface AIGenerateRequestBody {
@@ -1584,66 +1531,7 @@ ${baseContext}
 - statConditions의 statId는 existing_stats에 있는 ID만 사용
 </critical>`,
     },
-
-    locations: {
-      systemPrompt: `<role>인터랙티브 내러티브 게임의 탐색 위치 설계자</role>
-
-<task>시나리오에 맞는 탐색 가능한 위치를 설계합니다. 플레이어가 탐색하며 아이템을 발견하고 정보를 얻을 수 있는 장소들입니다.</task>
-
-<location_design>
-1. **locationId**: 영문 ID (예: loc_storage, loc_rooftop, loc_basement)
-2. **name**: 한글 위치 이름 (예: 창고, 옥상, 지하실)
-3. **description**: 위치 설명 (50-100자, 탐색 동기 유발)
-4. **icon**: 아이콘 타입
-   - warehouse: 창고/물자 보관
-   - entrance: 입구/출입구
-   - medical: 의무실/치료 시설
-   - roof: 옥상/높은 곳
-   - basement: 지하/숨겨진 공간
-   - quarters: 숙소/거주 공간
-   - office: 사무실/행정 시설
-   - corridor: 복도/통로
-   - exterior: 외부/야외
-   - hidden: 숨겨진 장소
-5. **initialStatus**: 초기 상태
-   - available: 처음부터 탐색 가능
-   - locked: 특정 조건 충족 시 해금
-   - hidden: 발견해야 노출
-6. **unlockCondition**: 해금 조건 (locked/hidden인 경우)
-   - requiredDay: 해당 Day 이후 자동 해금
-   - requiredExploration: 다른 위치 탐색 후 해금
-7. **dangerLevel**: 위험도 (0=안전, 1=낮음, 2=중간, 3=높음)
-8. **explorationCooldown**: 재탐색 쿨다운 (일 단위, 0이면 즉시 재탐색 가능)
-</location_design>
-
-<design_principles>
-- 4-7개의 위치 설계 (너무 많으면 산만해짐)
-- 초반 접근 가능 위치 2-3개, 후반 해금 위치 2-3개
-- 각 위치가 시나리오 스토리에 맞는 발견물/정보 제공 가능하도록
-- 위험도는 스토리 긴장감과 연결
-- 장르에 맞는 위치 선택 (호러→어두운 곳, SF→기술 시설 등)
-</design_principles>`,
-      userPrompt: `<request>다음 시나리오에 맞는 탐색 위치를 설계해주세요.</request>
-
-<scenario_context>
-${input}
-</scenario_context>
-${baseContext}
-
-<additional_context>
-- 총 게임 일수: ${context?.totalDays || 7}일
-</additional_context>
-
-<requirements>
-- 4-7개의 위치 설계
-- 초반 접근 가능(available) 위치 2-3개 필수
-- Day 기반 해금 위치 1-2개 권장 (총 일수의 40-70% 시점)
-- 각 위치의 설명은 50-100자로 탐색 동기 유발
-- 아이콘은 위치 특성에 맞게 선택
-- 위험도는 스토리 긴장감에 맞게 설정
-- reasoning에 위치 설계 의도 설명
-</requirements>`,
-    },
+    // v1.2: 'locations' 프롬프트 제거됨 - 동적 위치 시스템으로 대체
   };
 
   return prompts[category];
@@ -1654,8 +1542,9 @@ export async function POST(request: NextRequest) {
     const body: AIGenerateRequestBody = await request.json();
     const { category, input, context } = body;
 
-    // idea_suggestions, gameplay_config, emergent_narrative, locations는 빈 입력 허용 (컨텍스트 기반 자동 생성)
-    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config', 'emergent_narrative', 'locations'];
+    // idea_suggestions, gameplay_config, emergent_narrative는 빈 입력 허용 (컨텍스트 기반 자동 생성)
+    // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
+    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config', 'emergent_narrative'];
     if (!category || (!categoriesAllowingEmptyInput.includes(category) && !input)) {
       return NextResponse.json(
         { error: 'category와 input은 필수입니다.' },

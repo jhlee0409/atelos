@@ -15,8 +15,7 @@ export type GenerationCategory =
   | 'hidden_relationships'
   | 'character_revelations'
   | 'gameplay_config'
-  | 'emergent_narrative'
-  | 'locations';
+  | 'emergent_narrative';
 
 export interface GenerationContext {
   genre?: string[];
@@ -272,6 +271,12 @@ export interface EmergentNarrativeResult {
 // 탐색 위치 설정 (Locations Generation)
 // =============================================================================
 
+/**
+ * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+ * 이제 위치는 AI 서사를 통해 동적으로 발견됩니다.
+ * storyOpening.openingLocation에서 시작 위치만 설정하고,
+ * AI 응답의 locations_discovered 필드를 통해 새 위치가 추가됩니다.
+ */
 export interface ScenarioLocationResult {
   locationId: string;
   name: string;
@@ -286,6 +291,10 @@ export interface ScenarioLocationResult {
   explorationCooldown?: number;
 }
 
+/**
+ * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+ * 위치는 더 이상 사전 생성되지 않습니다.
+ */
 export interface LocationsResult {
   locations: ScenarioLocationResult[];
   reasoning: string;

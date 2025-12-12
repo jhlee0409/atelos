@@ -593,12 +593,17 @@ export type ScenarioData = {
   gameplayConfig?: GameplayConfig;
   /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
-  /** 탐색 위치 설정 - 시나리오별 커스텀 탐색 장소 */
-  locations?: ScenarioLocation[];
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only
   // =============================================================================
+  /**
+   * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+   * 이제 위치는 storyOpening.openingLocation에서 시작 위치만 설정하고,
+   * 나머지는 AI 서사를 통해 동적으로 발견됩니다.
+   * locations_discovered 필드로 새 장소가 추가됩니다.
+   */
+  locations?: ScenarioLocation[];
   /** @deprecated Use dynamicEndingConfig.endingDay instead */
   endCondition?: EndCondition;
   /** @deprecated Use dynamicEndingConfig instead */
@@ -1035,6 +1040,10 @@ export type LocationIcon =
 /**
  * 시나리오 탐색 위치 정의 - ScenarioData에서 사용
  * WorldLocation보다 단순화된 버전으로, 시나리오 에디터에서 설정
+ *
+ * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+ * 이제 위치는 AI 서사를 통해 동적으로 발견됩니다.
+ * 레거시 호환성을 위해 유지되지만 새 시나리오에서는 사용하지 마세요.
  */
 export interface ScenarioLocation {
   /** 위치 고유 ID */
