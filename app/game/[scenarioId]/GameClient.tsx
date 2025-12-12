@@ -57,7 +57,7 @@ import {
   updateLocationStatus,
 } from '@/lib/world-state-manager';
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
-import { calculateDynamicAPCost, type DynamicAPCost } from '@/lib/action-engagement-system';
+import { calculateDynamicAPCost, getActionSynergy, type DynamicAPCost } from '@/lib/action-engagement-system';
 import type { WorldState, WorldLocation } from '@/types';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
@@ -1342,6 +1342,26 @@ export default function GameClient({ scenario }: GameClientProps) {
         throw new Error('AI 응답이 유효하지 않습니다.');
       }
 
+      // v1.2: 시너지 보너스 적용 (Phase 2.1)
+      const recentActions = newSaveState.context.actionsThisDay || [];
+      if (recentActions.length > 0) {
+        const lastAction = recentActions[recentActions.length - 1];
+        const synergy = getActionSynergy(lastAction.actionType, 'choice');
+
+        if (synergy?.mechanicEffect?.statBonus && cleanedResponse.statChanges?.scenarioStats) {
+          // 시너지 보너스를 첫 번째 양수 스탯 변화에 적용
+          const statsToBoost = Object.entries(cleanedResponse.statChanges.scenarioStats)
+            .filter(([, v]) => (v as number) > 0);
+
+          if (statsToBoost.length > 0) {
+            const [statId] = statsToBoost[0];
+            cleanedResponse.statChanges.scenarioStats[statId] =
+              (cleanedResponse.statChanges.scenarioStats[statId] || 0) + synergy.mechanicEffect.statBonus;
+            console.log(`✨ 시너지 보너스 적용: ${statId} +${synergy.mechanicEffect.statBonus} (${synergy.bonus})`);
+          }
+        }
+      }
+
       const updatedSaveState = updateSaveState(
         newSaveState,
         cleanedResponse,
@@ -1675,25 +1695,39 @@ export default function GameClient({ scenario }: GameClientProps) {
         timestamp: Date.now() + 1,
       });
 
-      // 관계 변화 적용
-      if (dialogueResponse.relationshipChange && dialogueResponse.relationshipChange !== 0) {
+      // v1.2: 시너지 보너스 적용 (탐색 → 대화: trustBonus)
+      let bonusRelationshipChange = 0;
+      const recentActions = newSaveState.context.actionsThisDay || [];
+      if (recentActions.length > 0) {
+        const lastAction = recentActions[recentActions.length - 1];
+        const synergy = getActionSynergy(lastAction.actionType, 'dialogue');
+
+        if (synergy?.mechanicEffect?.trustBonus) {
+          bonusRelationshipChange = synergy.mechanicEffect.trustBonus;
+          console.log(`✨ 시너지 보너스 적용: 신뢰도 +${bonusRelationshipChange} (${synergy.bonus})`);
+        }
+      }
+
+      // 관계 변화 적용 (시너지 보너스 포함)
+      const totalRelationshipChange = (dialogueResponse.relationshipChange || 0) + bonusRelationshipChange;
+      if (totalRelationshipChange !== 0) {
         const playerKey = ['(플레이어)', characterName].sort().join('-');
         if (newSaveState.community.hiddenRelationships[playerKey] === undefined) {
           newSaveState.community.hiddenRelationships[playerKey] = 0;
         }
         const newValue = Math.max(-100, Math.min(100,
-          newSaveState.community.hiddenRelationships[playerKey] + dialogueResponse.relationshipChange
+          newSaveState.community.hiddenRelationships[playerKey] + totalRelationshipChange
         ));
         newSaveState.community.hiddenRelationships[playerKey] = newValue;
 
         // 캐릭터 아크 업데이트
         const arc = newSaveState.characterArcs?.find(a => a.characterName === characterName);
         if (arc) {
-          arc.trustLevel = Math.max(-100, Math.min(100, arc.trustLevel + dialogueResponse.relationshipChange));
+          arc.trustLevel = Math.max(-100, Math.min(100, arc.trustLevel + totalRelationshipChange));
           arc.currentMood = dialogueResponse.mood;
         }
 
-        console.log(`🤝 대화로 관계 변화: ${characterName} ${dialogueResponse.relationshipChange > 0 ? '+' : ''}${dialogueResponse.relationshipChange}`);
+        console.log(`🤝 대화로 관계 변화: ${characterName} ${totalRelationshipChange > 0 ? '+' : ''}${totalRelationshipChange}${bonusRelationshipChange > 0 ? ` (시너지 +${bonusRelationshipChange})` : ''}`);
       }
 
       // 정보 획득 시 메시지 추가 (몰입감 있는 형식)
@@ -1705,16 +1739,16 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       }
 
-      // Dynamic Ending System: ActionHistory 기록 (대화)
+      // Dynamic Ending System: ActionHistory 기록 (대화) - v1.2: 시너지 보너스 반영
       addToActionHistory(
         'dialogue',
         `${topic.label}`,
         {
           statsChanged: [],
-          relationshipsChanged: dialogueResponse.relationshipChange
+          relationshipsChanged: totalRelationshipChange !== 0
             ? [{
                 character: characterName,
-                delta: dialogueResponse.relationshipChange,
+                delta: totalRelationshipChange,
                 newValue: newSaveState.community.hiddenRelationships[
                   ['(플레이어)', characterName].sort().join('-')
                 ] ?? 0,
@@ -1742,14 +1776,15 @@ export default function GameClient({ scenario }: GameClientProps) {
       }
 
       // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용 - 신뢰도 기반)
+      // v1.2: totalRelationshipChange 사용 (시너지 보너스 포함)
       const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
         newSaveState,
         scenario,
         'dialogue',
         characterName,  // 대화 대상 캐릭터명 (동적 비용 계산용)
         {
-          relationshipChanges: dialogueResponse.relationshipChange
-            ? { [characterName]: dialogueResponse.relationshipChange }
+          relationshipChanges: totalRelationshipChange !== 0
+            ? { [characterName]: totalRelationshipChange }
             : undefined,
           infoGained: dialogueResponse.infoGained,
         }
