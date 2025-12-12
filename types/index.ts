@@ -51,12 +51,16 @@ export type Dilemma = {
   isEditing?: boolean;
 };
 
+/**
+ * @deprecated Flags system has been removed. Use ActionHistory instead.
+ * Kept for backwards compatibility with legacy scenarios only.
+ */
 export type ScenarioFlag = {
   flagName: string;
   description: string;
   type: 'boolean' | 'count';
   initial: boolean | number;
-  triggerCondition?: string; // AI에게 알려줄 플래그 부여 조건 (예: "탈출 차량 확보 선택 시")
+  triggerCondition?: string;
   isEditing?: boolean;
 };
 
@@ -168,11 +172,12 @@ export interface CharacterIntroductionSequence {
   firstImpressionKeywords?: string[];
   /** 만남 예상 시점 */
   expectedTiming?: 'opening' | 'day1' | 'day2' | 'event-driven';
-  /** 만남 트리거 조건 (플래그/스탯 기반, 없으면 순서대로) */
+  /** 만남 트리거 조건 (스탯/캐릭터 기반, 없으면 순서대로) */
   triggerCondition?: {
-    requiredFlag?: string;
     requiredStat?: { statId: string; minValue: number };
     afterCharacterMet?: string; // 특정 캐릭터를 만난 후
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
 }
 
@@ -226,8 +231,8 @@ export interface RelationshipDiscoveryMethod {
     dialogueTopic?: string;
     /** 필요한 탐색 장소 */
     explorationLocation?: string;
-    /** 필요한 플래그 */
-    requiredFlag?: string;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
     /** 필요한 신뢰도 (특정 캐릭터와의) */
     requiredTrust?: { characterName: string; minTrust: number };
   };
@@ -304,14 +309,16 @@ export interface StorySiftingTrigger {
     charactersMetTogether?: string[];
     /** 발견한 관계 */
     relationshipsDiscovered?: string[];
-    /** 획득한 플래그 조합 */
-    flagCombination?: string[];
+    /** 행동 패턴 키워드 조합 (ActionHistory 기반) */
+    actionPatternKeywords?: string[];
     /** 스탯 조건 */
     statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
     /** 현재 일차 */
     dayRange?: { min?: number; max?: number };
     /** 이전 트리거 발동 필요 */
     requiredTriggers?: string[];
+    /** @deprecated Use actionPatternKeywords instead */
+    flagCombination?: string[];
   };
   /** 생성될 스토리 이벤트 */
   generatedEvent: {
@@ -471,14 +478,20 @@ export interface StoryOpening {
 
 /**
  * 루트 분기 점수 설정
- * 각 플래그가 특정 루트에 기여하는 점수를 정의
+ * ActionHistory 패턴과 스탯 기반으로 루트 점수 계산
  */
 export type RouteScoreConfig = {
   /** 루트 이름 (예: '탈출', '항전', '협상') */
   routeName: string;
-  /** 이 루트에 기여하는 플래그와 점수 */
-  flagScores: {
-    flagName: string;
+  /** 이 루트에 기여하는 행동 패턴들 */
+  actionPatterns?: {
+    /** 패턴 설명 (AI 분석용) */
+    description: string;
+    /** 행동 유형 */
+    actionType?: 'choice' | 'dialogue' | 'exploration';
+    /** 대상 키워드 (캐릭터명, 장소명, 선택지 키워드 등) */
+    targetKeywords?: string[];
+    /** 패턴 매칭 시 점수 */
     score: number;
   }[];
   /** 이 루트에 기여하는 스탯 조건 */
@@ -489,6 +502,11 @@ export type RouteScoreConfig = {
     /** 임계값 */
     threshold: number;
     /** 조건 만족 시 점수 */
+    score: number;
+  }[];
+  /** @deprecated Use actionPatterns instead */
+  flagScores?: {
+    flagName: string;
     score: number;
   }[];
 };
@@ -579,7 +597,6 @@ export type ScenarioData = {
   initialRelationships: Relationship[];
   scenarioStats: ScenarioStat[];
   traitPool: TraitPool;
-  flagDictionary: ScenarioFlag[];
   status: 'in_progress' | 'testing' | 'active';
   /** 스토리 오프닝 설정 (Phase 7) */
   storyOpening?: StoryOpening;
@@ -597,13 +614,16 @@ export type ScenarioData = {
   goalCluster?: GoalCluster;
   /** @deprecated Use dynamicEndingConfig instead */
   endingArchetypes?: EndingArchetype[];
+  /** @deprecated Flags system removed. Use ActionHistory for tracking player actions. */
+  flagDictionary?: ScenarioFlag[];
 };
 
 // --- Game-specific state types, not part of scenario definition ---
 
 export type PlayerState = {
   stats: Record<string, number>;
-  flags: Record<string, boolean | number>;
+  /** @deprecated Flags system removed. Use ActionHistory instead. */
+  flags?: Record<string, boolean | number>;
   traits: string[]; // array of traitIds
   relationships: Record<string, number>;
 };
@@ -643,7 +663,8 @@ export interface RelationshipChangeRecord {
 export interface ChangeSummaryData {
   statChanges: StatChangeRecord[];
   relationshipChanges: RelationshipChangeRecord[];
-  flagsAcquired: string[];
+  /** @deprecated Flags system removed. */
+  flagsAcquired?: string[];
   timestamp: number;
 }
 
@@ -651,7 +672,8 @@ export interface SaveState {
   context: {
     scenarioId: string;
     scenarioStats: { [key: string]: number };
-    flags: { [key: string]: boolean | number };
+    /** @deprecated Flags system removed. Use ActionHistory instead. */
+    flags?: { [key: string]: boolean | number };
     currentDay?: number;
     remainingHours?: number;
     /** @deprecated turnsInCurrentDay는 actionPoints로 대체됩니다. 하위 호환성을 위해 유지. */
@@ -719,7 +741,8 @@ export interface AIResponse {
     scenarioStats: { [key: string]: number };
     survivorStatus: { name: string; newStatus: string }[];
     hiddenRelationships_change: any[]; // Type can be refined if needed
-    flags_acquired: string[];
+    /** @deprecated Flags system removed. */
+    flags_acquired?: string[];
     shouldAdvanceTime?: boolean; // AI가 시간 진행 여부를 결정
   };
 }
@@ -753,7 +776,8 @@ export interface KeyDecision {
   choice: string; // 플레이어가 선택한 선택지 텍스트
   consequence: string; // 선택의 결과 요약 (50자 이내)
   category: 'survival' | 'relationship' | 'moral' | 'strategic';
-  flagsAcquired?: string[]; // 이 선택으로 획득한 플래그
+  /** @deprecated Flags system removed. Use significantEvents in ActionHistory instead. */
+  flagsAcquired?: string[];
   impactedCharacters?: string[]; // 영향받은 캐릭터들
 }
 
@@ -800,7 +824,8 @@ export interface ExplorationResult {
   narrative: string; // 탐색 결과 서사
   rewards?: {
     statChanges?: { [key: string]: number };
-    flagsAcquired?: string[];
+    /** 발견한 주요 사항 */
+    significantDiscoveries?: string[];
     infoGained?: string;
   };
 }
@@ -842,8 +867,8 @@ export interface ActionRecord {
   result?: {
     /** 스탯 변화 */
     statChanges?: Record<string, number>;
-    /** 획득한 플래그 */
-    flagsAcquired?: string[];
+    /** 주요 이벤트/발견 */
+    significantEvents?: string[];
     /** 관계 변화 */
     relationshipChanges?: Record<string, number>;
     /** 획득한 정보 */
@@ -889,8 +914,8 @@ export interface DiscoveredClue {
     day: number;
     actionIndex: number;
   };
-  /** 관련 플래그 */
-  relatedFlags?: string[];
+  /** 관련 키워드 (연관 검색용) */
+  relatedKeywords?: string[];
   /** 관련 캐릭터 */
   relatedCharacters?: string[];
   /** 단서 중요도 */
@@ -1019,16 +1044,18 @@ export interface ConcreteDiscovery {
   description: string;
   /** 발견 장소 ID */
   locationId: string;
-  /** 발견 조건 (플래그/스탯 조건) */
+  /** 발견 조건 */
   discoveryCondition?: {
-    requiredFlag?: string;
     requiredStat?: { statId: string; minValue: number };
     requiredItem?: string;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
   /** 발견 시 효과 */
   effects?: {
     statChanges?: Record<string, number>;
-    flagsAcquired?: string[];
+    /** 발생하는 주요 이벤트 */
+    significantEvents?: string[];
     newLocationsUnlocked?: string[];
     locationsDestroyed?: string[];
     locationsBlocked?: string[];
@@ -1064,10 +1091,11 @@ export interface WorldLocation {
   statusReason?: string;
   /** 잠금 해제 조건 */
   unlockCondition?: {
-    requiredFlag?: string;
     requiredItem?: string;
     requiredDay?: number;
     requiredExploration?: string; // 다른 위치 탐색 필요
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
   /** 탐색 쿨다운 (Day 단위) */
   explorationCooldown: number;
@@ -1093,12 +1121,11 @@ export interface ObjectRelation {
     | 'character-item'       // 캐릭터가 아이템 소유/관련
     | 'location-item'        // 위치에 아이템이 있음
     | 'character-character'  // 캐릭터 간 관계
-    | 'location-location'    // 위치 간 연결
-    | 'item-flag';           // 아이템이 플래그와 연결
+    | 'location-location';   // 위치 간 연결
   /** 주체 */
   subject: { type: 'character' | 'location' | 'item'; id: string };
   /** 대상 */
-  object: { type: 'character' | 'location' | 'item' | 'flag'; id: string };
+  object: { type: 'character' | 'location' | 'item'; id: string };
   /** 관계 설명 */
   description: string;
   /** 관계 강도 (-100 ~ 100) */
@@ -1107,8 +1134,9 @@ export interface ObjectRelation {
   active: boolean;
   /** 관계 활성화/비활성화 조건 */
   activationCondition?: {
-    requiredFlag?: string;
     requiredDay?: number;
+    /** 필요한 행동 키워드 (ActionHistory에서 검색) */
+    requiredActionKeyword?: string;
   };
 }
 
@@ -1124,7 +1152,8 @@ export interface WorldEvent {
   description: string;
   /** 트리거 조건 */
   trigger: {
-    flag?: string;
+    /** 행동 키워드 (ActionHistory에서 검색) */
+    actionKeyword?: string;
     stat?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number };
     day?: number;
     exploration?: string; // 특정 위치 탐색 시

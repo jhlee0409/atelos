@@ -60,11 +60,13 @@ function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[]
 /**
  * 엔딩 조건에서 참조하는 플래그가 실제 존재하는지 검증
  * @deprecated Legacy ending system validation - use DynamicEndingConfig instead
+ * @deprecated Flags system removed - use ActionHistory for tracking player actions
  */
 function validateEndingFlagReferences(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   // 동적 엔딩 시스템을 사용하거나 endingArchetypes가 없으면 검증 스킵
-  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+  // 또한 flagDictionary가 없으면 스킵 (flags 시스템 제거됨)
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length || !scenario.flagDictionary?.length) {
     return issues;
   }
 
@@ -289,11 +291,12 @@ function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIss
 /**
  * 미사용 플래그 감지 (경고)
  * @deprecated Legacy ending system validation - Dynamic Ending System doesn't use flag conditions
+ * @deprecated Flags system removed - use ActionHistory for tracking player actions
  */
 function detectUnusedFlags(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  // 동적 엔딩 시스템을 사용하면 플래그는 루트/스토리용으로만 사용되므로 검증 스킵
-  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+  // 동적 엔딩 시스템을 사용하거나 flagDictionary가 없으면 검증 스킵 (flags 시스템 제거됨)
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length || !scenario.flagDictionary?.length) {
     return issues;
   }
 
@@ -345,19 +348,21 @@ function validateDuplicateIds(scenario: ScenarioData): ValidationIssue[] {
     });
   });
 
-  // 플래그 이름 중복 체크
-  const flagNames = scenario.flagDictionary.map((f) => f.flagName);
-  const duplicateFlagNames = flagNames.filter((name, index) => flagNames.indexOf(name) !== index);
-  duplicateFlagNames.forEach((name) => {
-    issues.push({
-      type: 'error',
-      category: 'duplicate',
-      field: `flag.${name}`,
-      message: `플래그 "${name}"이(가) 중복됩니다.`,
-      suggestion: '각 플래그는 고유한 이름을 가져야 합니다.',
-      targetTab: 'system',
+  // 플래그 이름 중복 체크 (레거시 - flags 시스템 제거됨)
+  if (scenario.flagDictionary?.length) {
+    const flagNames = scenario.flagDictionary.map((f) => f.flagName);
+    const duplicateFlagNames = flagNames.filter((name, index) => flagNames.indexOf(name) !== index);
+    duplicateFlagNames.forEach((name) => {
+      issues.push({
+        type: 'error',
+        category: 'duplicate',
+        field: `flag.${name}`,
+        message: `플래그 "${name}"이(가) 중복됩니다.`,
+        suggestion: '각 플래그는 고유한 이름을 가져야 합니다.',
+        targetTab: 'system',
+      });
     });
-  });
+  }
 
   // 엔딩 ID 중복 체크 (레거시 - 동적 엔딩 시스템에서는 불필요)
   if (scenario.endingArchetypes?.length) {

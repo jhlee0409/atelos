@@ -5,7 +5,6 @@ export type GenerationCategory =
   | 'characters'
   | 'relationships'
   | 'stats'
-  | 'flags'
   | 'endings'
   | 'traits'
   | 'keywords'
@@ -24,7 +23,6 @@ export interface GenerationContext {
   synopsis?: string;
   existingCharacters?: string[];
   existingStats?: string[];
-  existingFlags?: string[];
 }
 
 // 카테고리별 응답 타입
@@ -55,6 +53,7 @@ export interface StatResult {
   polarity: 'positive' | 'negative';
 }
 
+/** @deprecated Flags system has been removed. Use ActionHistory instead. */
 export interface FlagResult {
   flagName: string;
   type: 'boolean' | 'count';
@@ -331,12 +330,6 @@ export const CATEGORY_INFO: Record<
     label: '스탯',
     description: '게임 진행에 영향을 주는 수치 시스템을 생성합니다.',
     placeholder: '예: 자원 관리, 그룹의 사기, 안전도, 외부 위협 수준을 추적하고 싶어',
-  },
-  flags: {
-    label: '플래그',
-    description: '스토리 진행을 추적하는 이벤트 플래그를 생성합니다.',
-    placeholder:
-      '예: 탈출 루트 발견, 동맹 결성, 배신자 적발 같은 주요 이벤트를 추적하고 싶어',
   },
   endings: {
     label: '엔딩',

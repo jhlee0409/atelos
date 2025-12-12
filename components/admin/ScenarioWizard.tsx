@@ -29,7 +29,6 @@ import {
   Lightbulb,
   Users,
   BarChart3,
-  Flag,
   Sparkles,
   RotateCcw,
   BookOpen,
@@ -46,7 +45,6 @@ import {
   generateWithAI,
   type CharacterResult,
   type StatResult,
-  type FlagResult,
   type RelationshipResult,
   type TraitsResult,
   type TraitResult,
@@ -109,7 +107,6 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [relationships, setRelationships] = useState<RelationshipResult[]>([]);
   const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
-  const [flags, setFlags] = useState<FlagResult[]>([]);
 
   // 스토리 오프닝 시스템 (Phase 7)
   const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
@@ -264,44 +261,25 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory}`)
         .join('\n');
 
-      // 스탯과 플래그를 병렬로 생성
-      const [statsResponse, flagsResponse] = await Promise.all([
-        generateWithAI<{ stats: StatResult[] }>(
-          'stats',
-          `시나리오: ${synopsisResult.title}
+      // 스탯 생성
+      const statsResponse = await generateWithAI<{ stats: StatResult[] }>(
+        'stats',
+        `시나리오: ${synopsisResult.title}
 시놉시스: ${synopsisResult.synopsis}
 테마: ${synopsisResult.suggestedThemes.join(', ')}
 갈등: ${synopsisResult.conflictType}
 
 등장 캐릭터:
 ${characterDetails}`,
-          {
-            genre: synopsisResult.genre,
-            title: synopsisResult.title,
-            synopsis: synopsisResult.synopsis,
-            existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
-          },
-        ),
-        generateWithAI<{ flags: FlagResult[] }>(
-          'flags',
-          `시나리오: ${synopsisResult.title}
-시놉시스: ${synopsisResult.synopsis}
-서사적 훅: ${synopsisResult.narrativeHooks.join(', ')}
-갈등: ${synopsisResult.conflictType}
-
-등장 캐릭터:
-${characterDetails}`,
-          {
-            genre: synopsisResult.genre,
-            title: synopsisResult.title,
-            synopsis: synopsisResult.synopsis,
-            existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
-          },
-        ),
-      ]);
+        {
+          genre: synopsisResult.genre,
+          title: synopsisResult.title,
+          synopsis: synopsisResult.synopsis,
+          existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
+        },
+      );
 
       setStats(statsResponse.data.stats || []);
-      setFlags(flagsResponse.data.flags || []);
       setCurrentStep('system');
     } catch (err) {
       setError(err instanceof Error ? err.message : '시스템 생성에 실패했습니다.');
@@ -340,7 +318,6 @@ ${characterDetails}`;
         synopsis: synopsisResult.synopsis,
         existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
         existingStats: stats.map((s) => s.id),
-        existingFlags: flags.map((f) => f.flagName),
       };
 
       // 병렬로 6개 카테고리 생성 (스토리 오프닝 + 게임플레이 설정 + 이머전트 내러티브)
@@ -362,12 +339,12 @@ ${characterDetails}`;
         characters.length >= 1
           ? generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context)
           : Promise.resolve({ data: { characterRevelations: [] } }),
-        // 게임플레이 설정 생성 (플래그와 스탯 기반)
-        flags.length > 0
+        // 게임플레이 설정 생성 (스탯 기반)
+        stats.length > 0
           ? generateWithAI<GameplayConfigResult>('gameplay_config', scenarioInput, context)
           : Promise.resolve({ data: null }),
-        // 이머전트 내러티브 생성 (캐릭터와 플래그 기반)
-        characters.length >= 2 && flags.length > 0
+        // 이머전트 내러티브 생성 (캐릭터 기반)
+        characters.length >= 2
           ? generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context)
           : Promise.resolve({ data: null }),
       ]);
@@ -432,13 +409,6 @@ ${characterDetails}`;
         buffs: (traits.buffs || []).map((t) => convertTraitResult(t, 'positive')),
         debuffs: (traits.debuffs || []).map((t) => convertTraitResult(t, 'negative')),
       },
-      flagDictionary: flags.map((flag) => ({
-        flagName: flag.flagName,
-        description: flag.description || '',
-        type: flag.type || 'boolean',
-        initial: flag.type === 'count' ? 0 : false,
-        triggerCondition: flag.triggerCondition || '',
-      })),
       status: 'in_progress',
       // 스토리 오프닝 시스템 (Phase 7)
       storyOpening: storyOpening ? {
@@ -538,7 +508,7 @@ ${characterDetails}`;
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, flags, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -877,35 +847,18 @@ ${characterDetails}`;
       case 'system':
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  스탯 ({stats.length}개)
-                </h4>
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {stats.map((stat, idx) => (
-                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
-                      <div className="font-medium">{stat.name}</div>
-                      <div className="text-xs text-zinc-500">{stat.id} ({stat.min}-{stat.max})</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Flag className="w-4 h-4" />
-                  플래그 ({flags.length}개)
-                </h4>
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {flags.map((flag, idx) => (
-                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
-                      <div className="font-medium text-xs">{flag.flagName}</div>
-                      <div className="text-xs text-zinc-500">{flag.description}</div>
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                스탯 ({stats.length}개)
+              </h4>
+              <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                {stats.map((stat, idx) => (
+                  <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                    <div className="font-medium">{stat.name}</div>
+                    <div className="text-xs text-zinc-500">{stat.id} ({stat.min}-{stat.max})</div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1123,20 +1076,20 @@ ${characterDetails}`;
                 <div className="text-xs text-zinc-500">스탯</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">{flags.length}</div>
-                <div className="text-xs text-zinc-500">플래그</div>
-              </div>
-              <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">✓</div>
                 <div className="text-xs text-zinc-500">동적 엔딩</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">{storyOpening ? '1' : '0'}</div>
+                <div className="text-lg font-bold">{storyOpening ? '✓' : '-'}</div>
                 <div className="text-xs text-zinc-500">오프닝</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{hiddenRelationships.length}</div>
                 <div className="text-xs text-zinc-500">숨겨진 관계</div>
+              </div>
+              <div className="p-3 bg-zinc-800/30 rounded">
+                <div className="text-lg font-bold">{characterRevelations.length}</div>
+                <div className="text-xs text-zinc-500">캐릭터 비밀</div>
               </div>
             </div>
 

@@ -28,7 +28,6 @@ export type GenerationCategory =
   | 'characters'
   | 'relationships'
   | 'stats'
-  | 'flags'
   | 'endings'
   | 'traits'
   | 'keywords'
@@ -137,31 +136,6 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     required: ['stats'],
   },
 
-  flags: {
-    type: SchemaType.OBJECT,
-    properties: {
-      flags: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            flagName: { type: SchemaType.STRING, description: 'FLAG_ 접두사 대문자 ID' },
-            type: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              description: 'boolean 또는 count',
-              enum: ['boolean', 'count'],
-            },
-            description: { type: SchemaType.STRING, description: '플래그 설명' },
-            triggerCondition: { type: SchemaType.STRING, description: '발동 조건' },
-          },
-          required: ['flagName', 'type', 'description', 'triggerCondition'],
-        },
-      },
-    },
-    required: ['flags'],
-  },
-
   endings: {
     type: SchemaType.OBJECT,
     properties: {
@@ -193,12 +167,8 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
                     required: ['statId', 'comparison', 'value'],
                   },
                 },
-                flags: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                },
               },
-              required: ['stats', 'flags'],
+              required: ['stats'],
             },
           },
           required: ['endingId', 'title', 'description', 'isGoalSuccess', 'suggestedConditions'],
@@ -516,17 +486,28 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
           type: SchemaType.OBJECT,
           properties: {
             routeName: { type: SchemaType.STRING, description: '루트 이름 (예: 탈출, 항전, 협상)' },
-            flagScores: {
+            actionPatterns: {
               type: SchemaType.ARRAY,
               items: {
                 type: SchemaType.OBJECT,
                 properties: {
-                  flagName: { type: SchemaType.STRING, description: '플래그 이름' },
+                  description: { type: SchemaType.STRING, description: '패턴 설명 (예: 탈출 관련 행동)' },
+                  actionType: {
+                    type: SchemaType.STRING,
+                    format: 'enum',
+                    enum: ['choice', 'dialogue', 'exploration'],
+                    description: '액션 타입 (선택)',
+                  },
+                  targetKeywords: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING },
+                    description: '매칭할 키워드 (예: 탈출, 도망, 차량)',
+                  },
                   score: { type: SchemaType.INTEGER, description: '점수 (10~50)' },
                 },
-                required: ['flagName', 'score'],
+                required: ['description', 'targetKeywords', 'score'],
               },
-              description: '플래그별 점수',
+              description: '행동 패턴별 점수 (ActionHistory 기반)',
             },
             statScores: {
               type: SchemaType.ARRAY,
@@ -547,7 +528,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
               description: '스탯 조건별 점수 (선택)',
             },
           },
-          required: ['routeName', 'flagScores'],
+          required: ['routeName', 'actionPatterns'],
         },
         description: '루트별 점수 설정',
       },
@@ -606,10 +587,10 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
                   items: { type: SchemaType.STRING },
                   description: '발견해야 하는 관계 (예: "캐릭터A-캐릭터B")',
                 },
-                flagCombination: {
+                actionPatternKeywords: {
                   type: SchemaType.ARRAY,
                   items: { type: SchemaType.STRING },
-                  description: '획득해야 하는 플래그 조합',
+                  description: '플레이어 행동에 포함되어야 하는 키워드 조합',
                 },
                 statConditions: {
                   type: SchemaType.ARRAY,
@@ -689,7 +670,6 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   characters: 0.75, // 창의적 - 개성있는 캐릭터
   relationships: 0.5, // 중간 - 논리적이면서 흥미로운 관계
   stats: 0.3, // 구조적 - 일관된 게임 시스템
-  flags: 0.4, // 구조적 - 명확한 플래그 명명
   endings: 0.6, // 중간 - 다양하면서 일관된 엔딩
   traits: 0.5, // 중간 - 균형잡힌 특성
   keywords: 0.6, // 중간 - 적절한 키워드
@@ -712,7 +692,6 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   characters: 4000, // 여러 캐릭터 생성
   relationships: 3000, // 다수의 관계
   stats: 2000,
-  flags: 3000, // 8-12개 플래그
   endings: 4000, // 여러 엔딩 + 조건
   traits: 3000, // 버프/디버프 각 3-4개
   keywords: 1000, // 간단한 목록
@@ -738,7 +717,6 @@ interface AIGenerateRequestBody {
     synopsis?: string;
     existingCharacters?: string[];
     existingStats?: string[];
-    existingFlags?: string[];
   };
 }
 
@@ -756,7 +734,6 @@ const getCategoryPrompt = (
   <synopsis>${context.synopsis || '미정'}</synopsis>
   ${context.existingCharacters?.length ? `<existing_characters>${context.existingCharacters.join(', ')}</existing_characters>` : ''}
   ${context.existingStats?.length ? `<existing_stats>${context.existingStats.join(', ')}</existing_stats>` : ''}
-  ${context.existingFlags?.length ? `<existing_flags>${context.existingFlags.join(', ')}</existing_flags>` : ''}
 </scenario_context>`
     : '';
 
@@ -962,56 +939,6 @@ ${baseContext}
 </design_tips>`,
     },
 
-    flags: {
-      systemPrompt: `<role>게임 시스템 디자이너</role>
-
-<task>시나리오 진행을 추적할 이벤트 플래그를 설계합니다.</task>
-
-<guidelines>
-  <guideline>flagName은 FLAG_ 접두사 + 영문 대문자 (예: FLAG_SECRET_DISCOVERED)</guideline>
-  <guideline>type은 boolean(참/거짓) 또는 count(횟수)</guideline>
-  <guideline>description은 한글 50자 이내</guideline>
-  <guideline>triggerCondition은 플래그가 활성화되는 조건 설명</guideline>
-</guidelines>
-
-<route_system>
-게임에는 3가지 주요 루트가 있으며, 각 루트 플래그를 반드시 포함해야 합니다:
-
-<route name="탈출 (Escape)">
-위험을 피해 안전한 곳으로 이동하는 선택
-예시: FLAG_ESCAPE_ROUTE_FOUND, FLAG_VEHICLE_SECURED, FLAG_EXIT_DISCOVERED
-</route>
-
-<route name="항전 (Defense)">
-현재 위치를 지키고 방어하는 선택
-예시: FLAG_DEFENSES_COMPLETE, FLAG_RESOURCE_STOCKPILE, FLAG_TERRITORY_SECURED
-</route>
-
-<route name="협상 (Negotiation)">
-외부 세력과 협력하거나 대화로 해결하는 선택
-예시: FLAG_ALLY_NETWORK_FORMED, FLAG_PEACE_TREATY, FLAG_CONTACT_ESTABLISHED
-</route>
-</route_system>
-
-<other_flags>FLAG_SECRET_DISCOVERED, FLAG_BETRAYAL_REVEALED, FLAG_LEADER_CHOSEN, FLAG_CRITICAL_DECISION</other_flags>
-
-<design_tips>
-- 모든 플래그는 엔딩 조건에서 사용될 수 있어야 합니다.
-- 플래그명에서 의미를 명확히 알 수 있도록 작성하세요.
-- triggerCondition은 AI가 플래그를 부여할 시점을 판단하는 데 사용됩니다.
-</design_tips>`,
-      userPrompt: `<request>다음 시나리오에 적합한 8-12개의 플래그를 제안해주세요.</request>
-
-<scenario>${input}</scenario>
-${baseContext}
-
-<important_instructions>
-- 탈출/항전/협상 3가지 루트에 맞는 플래그를 각각 2개 이상 포함해주세요.
-- 각 플래그는 엔딩 조건으로 사용될 수 있어야 합니다.
-- triggerCondition을 구체적으로 작성하여 AI가 부여 시점을 명확히 알 수 있게 하세요.
-</important_instructions>`,
-    },
-
     endings: {
       systemPrompt: `<role>내러티브 디자이너</role>
 
@@ -1022,7 +949,7 @@ ${baseContext}
   <guideline>title은 한글 엔딩 제목</guideline>
   <guideline>description은 100-200자 엔딩 설명</guideline>
   <guideline>isGoalSuccess: true(목표 달성) 또는 false(실패)</guideline>
-  <guideline>suggestedConditions에 스탯과 플래그 조건 포함</guideline>
+  <guideline>suggestedConditions에 스탯 조건 포함</guideline>
 </guidelines>
 
 <comparison_operators>>=, <=, ==, >, <, !=</comparison_operators>
@@ -1033,16 +960,15 @@ ${baseContext}
 </ending_balance>
 
 <critical_constraint>
-**중요**: suggestedConditions에 사용하는 statId와 flagName은 반드시 시나리오에 이미 정의된 것만 사용해야 합니다.
+**중요**: suggestedConditions에 사용하는 statId는 반드시 시나리오에 이미 정의된 것만 사용해야 합니다.
 - 존재하지 않는 스탯 ID를 사용하면 게임에서 엔딩 조건 검증이 실패합니다.
-- 존재하지 않는 플래그를 사용하면 해당 엔딩에 도달할 수 없습니다.
-- context에서 제공되는 existing_stats와 existing_flags 목록을 참조하여 해당 ID만 사용하세요.
+- context에서 제공되는 existing_stats 목록을 참조하여 해당 ID만 사용하세요.
 </critical_constraint>
 
 <condition_design_tips>
-- 하나의 엔딩에 스탯 조건 1-2개와 플래그 조건 0-2개가 적당합니다.
+- 하나의 엔딩에 스탯 조건 1-3개가 적당합니다.
 - 동일 스탯에 상충되는 조건을 넣지 마세요 (예: >= 80 AND <= 20)
-- 좋은 엔딩은 높은 스탯 요구, 나쁜 엔딩은 낮은 스탯이나 특정 실패 플래그로 구분하세요.
+- 좋은 엔딩은 높은 스탯 요구, 나쁜 엔딩은 낮은 스탯으로 구분하세요.
 </condition_design_tips>
 
 <example>
@@ -1054,8 +980,7 @@ ${baseContext}
       "description": "위험을 뚫고 안전 지대에 도달했다. 모든 것을 잃었지만, 새로운 삶을 시작할 수 있는 희망이 있다.",
       "isGoalSuccess": true,
       "suggestedConditions": {
-        "stats": [{ "statId": "morale", "comparison": ">=", "value": 60 }],
-        "flags": ["FLAG_ESCAPE_VEHICLE_SECURED"]
+        "stats": [{ "statId": "morale", "comparison": ">=", "value": 60 }]
       }
     }
   ]
@@ -1068,7 +993,7 @@ ${baseContext}
 
 <important_instructions>
 - 좋은 엔딩과 나쁜 엔딩을 균형있게 포함해주세요.
-- **반드시** existing_stats와 existing_flags에 있는 ID만 사용하세요. 새로운 ID를 만들지 마세요.
+- **반드시** existing_stats에 있는 ID만 사용하세요. 새로운 ID를 만들지 마세요.
 - 조건이 논리적으로 충돌하지 않도록 설계하세요.
 </important_instructions>`,
     },
@@ -1448,7 +1373,7 @@ ${baseContext}
     gameplay_config: {
       systemPrompt: `<role>인터랙티브 게임 밸런스 설계자</role>
 
-<task>시나리오의 특성(장르, 총 일수, 플래그, 스탯)에 맞는 최적의 게임플레이 설정을 생성합니다.</task>
+<task>시나리오의 특성(장르, 총 일수, 스탯)에 맞는 최적의 게임플레이 설정을 생성합니다.</task>
 
 <gameplay_config_parameters>
 1. **routeActivationRatio** (0.3~0.5): 전체 게임 일수 중 루트 분기가 활성화되는 시점
@@ -1475,11 +1400,11 @@ ${baseContext}
 
 6. **warningStatThreshold**: 경고 표시 비율 (critical보다 높아야 함)
 
-7. **routeScores**: 루트별 점수 설정
-   - 각 루트에 관련된 플래그를 매핑
-   - 중요 플래그: 40-50점
-   - 보조 플래그: 20-30점
-   - 기본 플래그: 10-20점
+7. **routeScores**: 루트별 점수 설정 (ActionHistory 패턴 기반)
+   - 각 루트에 관련된 행동 패턴 키워드를 매핑
+   - 중요 패턴: 40-50점
+   - 보조 패턴: 20-30점
+   - 기본 패턴: 10-20점
 
 8. **tokenBudgetMultiplier** (0.8~1.5): AI 토큰 예산 배수
    - 복잡한 시나리오: 1.2-1.5
@@ -1492,8 +1417,8 @@ ${baseContext}
 
 <route_design_principles>
 - 일반적으로 3개의 루트를 설계합니다: 탈출형, 방어형, 협상형
-- 각 루트는 2-4개의 관련 플래그로 구성됩니다
-- 플래그 점수 합계가 가장 높은 루트가 현재 루트로 표시됩니다
+- 각 루트는 2-4개의 관련 행동 패턴(키워드)으로 구성됩니다
+- ActionHistory에서 패턴 점수 합계가 가장 높은 루트가 현재 루트로 표시됩니다
 - 시나리오 특성에 따라 루트 이름과 구성을 조정하세요
 </route_design_principles>
 
@@ -1513,16 +1438,16 @@ ${baseContext}
 
 <requirements>
 - 시나리오의 장르, 분위기, 페이스에 맞는 설정 선택
-- **반드시** existing_flags에 있는 플래그만 routeScores에 사용
+- routeScores에 시나리오 테마에 맞는 행동 패턴 키워드 설정
 - **반드시** existing_stats에 있는 스탯만 statScores에 사용 (사용하는 경우)
-- 플래그를 탈출/방어/협상 등의 루트로 분류
+- 행동 패턴을 탈출/방어/협상 등의 루트로 분류
 - 각 설정값에 대한 이유를 reasoning에 설명
 - customFallbackChoices는 시나리오 특성이 기본 장르 폴백과 맞지 않을 때만 제공
 </requirements>
 
 <critical>
-- routeScores의 flagName은 existing_flags 목록에 있는 값만 사용
 - statScores를 사용할 경우 existing_stats 목록에 있는 statId만 사용
+- targetKeywords는 시나리오 내용에서 자연스럽게 등장할 한글 키워드를 사용
 </critical>`,
     },
 
@@ -1536,7 +1461,7 @@ ${baseContext}
 
 <concept>
 이머전트 내러티브는 개발자가 직접 작성하지 않은 스토리 이벤트가 플레이어의 선택 조합에서 자연스럽게 "창발"하는 시스템입니다.
-예: 플레이어가 캐릭터 A와 B를 모두 만나고, 특정 플래그를 획득하면 → A와 B의 과거 관계가 드러나는 이벤트 발생
+예: 플레이어가 캐릭터 A와 B를 모두 만나고, 특정 행동 패턴을 보이면 → A와 B의 과거 관계가 드러나는 이벤트 발생
 </concept>
 
 <trigger_design>
@@ -1546,7 +1471,7 @@ ${baseContext}
 3. **conditions**: 발동 조건들
    - charactersMetTogether: 특정 캐릭터들을 모두 만났을 때
    - relationshipsDiscovered: 특정 관계를 발견했을 때
-   - flagCombination: 특정 플래그들이 모두 활성화되었을 때
+   - actionPatternKeywords: 플레이어 행동에 특정 키워드들이 포함되었을 때
    - statConditions: 스탯이 특정 조건을 만족할 때
    - dayRange: 특정 일차 범위에서만 발동
    - requiredTriggers: 선행 트리거가 발동된 후에만 발동
@@ -1584,7 +1509,7 @@ ${baseContext}
 - enabled는 항상 true로 설정
 - 3-6개의 트리거 설계
 - **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
-- **반드시** existing_flags 목록에 있는 플래그만 flagCombination에 사용
+- actionPatternKeywords는 시나리오 테마에 맞는 한글 키워드 사용
 - **반드시** existing_stats 목록에 있는 스탯만 statConditions에 사용
 - eventSeed는 구체적이고 AI가 이벤트 생성 시 참고할 수 있도록 작성 (150자 이내)
 - dynamicEventGuidelines는 전반적인 이벤트 생성 가이드라인 (200자 이내)
@@ -1593,7 +1518,7 @@ ${baseContext}
 
 <critical>
 - charactersMetTogether, involvedCharacters는 existing_characters에 있는 이름만 사용
-- flagCombination은 existing_flags에 있는 플래그만 사용
+- actionPatternKeywords는 시나리오 내용에서 자연스럽게 등장할 한글 키워드 사용
 - statConditions의 statId는 existing_stats에 있는 ID만 사용
 </critical>`,
     },

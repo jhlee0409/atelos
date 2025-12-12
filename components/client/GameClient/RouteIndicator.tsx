@@ -1,4 +1,4 @@
-import { SaveState, ScenarioData } from '@/types';
+import { SaveState, ScenarioData, ActionHistoryEntry } from '@/types';
 import { Compass, Shield, Users, DoorOpen } from 'lucide-react';
 import {
   isBeforeRouteActivation,
@@ -6,7 +6,6 @@ import {
   getEndingCheckDay,
   calculateRouteScores,
   getDominantRoute,
-  getRouteScores,
 } from '@/lib/gameplay-config';
 
 // 루트 타입 정의
@@ -55,8 +54,8 @@ const ROUTE_DISPLAY_CONFIG: Record<string, { icon: React.ReactNode; color: strin
 };
 
 // 루트 판정 로직 (동적 점수 계산)
-const determineRoute = (saveState: SaveState, scenario?: ScenarioData | null): RouteInfo => {
-  const { scenarioStats, flags } = saveState.context;
+const determineRoute = (saveState: SaveState, actionHistory: ActionHistoryEntry[], scenario?: ScenarioData | null): RouteInfo => {
+  const { scenarioStats } = saveState.context;
   const currentDay = saveState.context.currentDay ?? 1;
 
   // 루트 활성화 전: 아직 미정 (동적 계산)
@@ -69,9 +68,9 @@ const determineRoute = (saveState: SaveState, scenario?: ScenarioData | null): R
     };
   }
 
-  // 동적 루트 점수 계산 (시나리오의 routeScores 설정 사용)
+  // 동적 루트 점수 계산 (ActionHistory 패턴 기반)
   const routeScores = calculateRouteScores(
-    flags as Record<string, boolean | number>,
+    actionHistory,
     scenarioStats,
     scenario
   );
@@ -145,14 +144,16 @@ const DayProgressBar = ({
 
 export const RouteIndicator = ({
   saveState,
+  actionHistory = [],
   scenario,
   isCompact = false,
 }: {
   saveState: SaveState;
+  actionHistory?: ActionHistoryEntry[];
   scenario?: ScenarioData | null;
   isCompact?: boolean;
 }) => {
-  const routeInfo = determineRoute(saveState, scenario);
+  const routeInfo = determineRoute(saveState, actionHistory, scenario);
   const currentDay = saveState.context.currentDay ?? 1;
   const totalDays = getTotalDays(scenario);
   const endingCheckDay = getEndingCheckDay(scenario);

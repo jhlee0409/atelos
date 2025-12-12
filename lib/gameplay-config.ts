@@ -3,7 +3,7 @@
  * 하드코딩된 값들을 동적으로 계산하는 헬퍼 함수들
  */
 
-import type { GameplayConfig, ScenarioData, RouteScoreConfig } from '@/types';
+import type { GameplayConfig, ScenarioData, RouteScoreConfig, ActionHistoryEntry } from '@/types';
 
 // ============================================================================
 // 기본값 상수 (기존 하드코딩 값들을 여기로 이동)
@@ -34,29 +34,36 @@ export const DEFAULT_GAMEPLAY_CONFIG: Required<Omit<GameplayConfig, 'routeScores
   useGenreFallback: true,
 };
 
-// ZERO_HOUR 기본 루트 점수 (레거시 호환성)
+// 기본 루트 점수 설정 (ActionHistory 패턴 기반)
 export const DEFAULT_ROUTE_SCORES: RouteScoreConfig[] = [
   {
     routeName: '탈출',
-    flagScores: [
-      { flagName: 'FLAG_ESCAPE_VEHICLE_SECURED', score: 50 },
-      { flagName: 'FLAG_LEADER_SACRIFICE', score: 30 },
+    actionPatterns: [
+      { description: '탈출 관련 행동', targetKeywords: ['탈출', '도망', '떠나', '차량', '이동'], score: 20 },
+      { description: '외부 탐색', actionType: 'exploration', targetKeywords: ['출구', '입구', '외부'], score: 15 },
+    ],
+    statScores: [
+      { statId: 'cityStability', comparison: '<=', threshold: 30, score: 20 },
     ],
   },
   {
     routeName: '항전',
-    flagScores: [
-      { flagName: 'FLAG_DEFENSES_COMPLETE', score: 50 },
-      { flagName: 'FLAG_RESOURCE_MONOPOLY', score: 30 },
-      { flagName: 'FLAG_IDEOLOGY_ESTABLISHED', score: 20 },
+    actionPatterns: [
+      { description: '방어 관련 행동', targetKeywords: ['방어', '싸우', '저항', '무기', '경비'], score: 20 },
+      { description: '자원 확보', targetKeywords: ['물자', '자원', '비축', '보급'], score: 15 },
+    ],
+    statScores: [
+      { statId: 'groupCohesion', comparison: '>=', threshold: 70, score: 20 },
     ],
   },
   {
     routeName: '협상',
-    flagScores: [
-      { flagName: 'FLAG_ALLY_NETWORK_FORMED', score: 50 },
-      { flagName: 'FLAG_GOVERNMENT_CONTACT', score: 30 },
-      { flagName: 'FLAG_UNDERGROUND_HIDEOUT', score: 20 },
+    actionPatterns: [
+      { description: '협상/외교 행동', targetKeywords: ['협상', '대화', '동맹', '협력', '연합'], score: 20 },
+      { description: '정보 수집', actionType: 'dialogue', targetKeywords: ['정보', '소식', '연락'], score: 15 },
+    ],
+    statScores: [
+      { statId: 'groupCohesion', comparison: '>=', threshold: 50, score: 10 },
     ],
   },
 ];
@@ -208,14 +215,14 @@ export function getRouteScores(scenario?: ScenarioData | null): RouteScoreConfig
 }
 
 /**
- * 플래그 기반 루트 점수 계산
- * @param flags 현재 플래그 상태
+ * ActionHistory 패턴 기반 루트 점수 계산
+ * @param actionHistory 플레이어 행동 기록
  * @param stats 현재 스탯 상태 (스탯 조건용)
  * @param scenario 시나리오 데이터
  * @returns 각 루트별 점수 맵
  */
 export function calculateRouteScores(
-  flags: Record<string, boolean | number>,
+  actionHistory: ActionHistoryEntry[],
   stats: Record<string, number>,
   scenario?: ScenarioData | null
 ): Record<string, number> {
@@ -225,10 +232,31 @@ export function calculateRouteScores(
   for (const route of routeConfigs) {
     let score = 0;
 
-    // 플래그 점수 계산
-    for (const { flagName, score: flagScore } of route.flagScores) {
-      if (flags[flagName]) {
-        score += flagScore;
+    // ActionHistory 패턴 점수 계산
+    if (route.actionPatterns) {
+      for (const pattern of route.actionPatterns) {
+        let matchCount = 0;
+
+        for (const action of actionHistory) {
+          // 행동 유형 매칭 (지정된 경우)
+          if (pattern.actionType && action.actionType !== pattern.actionType) {
+            continue;
+          }
+
+          // 키워드 매칭
+          if (pattern.targetKeywords) {
+            const actionText = `${action.content} ${action.target || ''} ${action.narrativeSummary || ''}`.toLowerCase();
+            const hasKeyword = pattern.targetKeywords.some(keyword =>
+              actionText.includes(keyword.toLowerCase())
+            );
+            if (hasKeyword) {
+              matchCount++;
+            }
+          }
+        }
+
+        // 매칭된 행동 수에 따라 점수 부여 (최대 3회까지 인정)
+        score += Math.min(matchCount, 3) * pattern.score;
       }
     }
 
@@ -250,6 +278,12 @@ export function calculateRouteScores(
           score += statScore;
         }
       }
+    }
+
+    // 레거시 flagScores 지원 (하위 호환성)
+    if (route.flagScores && scenario?.flagDictionary) {
+      // 레거시 시나리오에서만 작동 - 새 시나리오에서는 무시됨
+      console.warn('⚠️ Legacy flagScores detected. Please migrate to actionPatterns.');
     }
 
     scores[route.routeName] = score;
