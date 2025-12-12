@@ -67,6 +67,17 @@ const getTrustBorderColor = (trustLevel: number): string => {
   return 'border-red-600';
 };
 
+// 신뢰도를 모호한 표현으로 변환 (숫자 노출 방지)
+const getTrustDescription = (trustLevel: number): { text: string; color: string } => {
+  if (trustLevel >= 60) return { text: '깊이 신뢰함', color: 'text-green-400' };
+  if (trustLevel >= 40) return { text: '신뢰함', color: 'text-green-400' };
+  if (trustLevel >= 20) return { text: '호감', color: 'text-green-500/70' };
+  if (trustLevel >= 0) return { text: '보통', color: 'text-zinc-500' };
+  if (trustLevel >= -20) return { text: '경계 중', color: 'text-zinc-400' };
+  if (trustLevel >= -40) return { text: '불신', color: 'text-red-400/70' };
+  return { text: '적대적', color: 'text-red-400' };
+};
+
 // 분위기에 따른 표시
 const getMoodDisplay = (mood: CharacterArc['currentMood']): { emoji: string; label: string; color: string } => {
   switch (mood) {
@@ -148,7 +159,7 @@ const CharacterCard = ({
   );
 };
 
-// 대화 주제 선택 (동적 주제 지원)
+// 대화 주제 선택 (동적 주제 지원 - 몰입형 UI)
 const TopicSelection = ({
   character,
   topics,
@@ -164,10 +175,11 @@ const TopicSelection = ({
 }) => {
   const moodDisplay = getMoodDisplay(character.currentMood || 'anxious');
   const trustLevel = character.trustLevel || 0;
+  const trustDesc = getTrustDescription(trustLevel);
 
   return (
     <div className="space-y-2">
-      {/* 캐릭터 정보 */}
+      {/* 캐릭터 정보 - 숫자 제거, 모호한 표현 사용 */}
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <span className="font-medium text-zinc-200">{character.characterName}</span>
@@ -175,15 +187,10 @@ const TopicSelection = ({
             {moodDisplay.emoji}
           </span>
         </div>
-        {/* 신뢰도 표시 */}
-        <div className={cn(
-          "text-[10px] px-2 py-0.5 rounded",
-          trustLevel >= 40 ? "bg-green-900/30 text-green-400" :
-          trustLevel >= 0 ? "bg-zinc-800 text-zinc-400" :
-          "bg-red-900/30 text-red-400"
-        )}>
-          신뢰도 {trustLevel > 0 ? '+' : ''}{trustLevel}
-        </div>
+        {/* 신뢰도: 숫자 대신 모호한 표현 */}
+        <span className={cn("text-[10px]", trustDesc.color)}>
+          {trustDesc.text}
+        </span>
       </div>
 
       {/* 대화 주제 목록 */}
@@ -191,7 +198,6 @@ const TopicSelection = ({
         const TopicIcon = getTopicIcon(topic.category);
         const isLocked = topic.trustRequired && trustLevel < topic.trustRequired;
         const isSecret = topic.isSecret;
-        const hasUnlockCondition = topic.unlockCondition;
 
         return (
           <button
@@ -204,9 +210,7 @@ const TopicSelection = ({
                 ? "border-zinc-800 bg-zinc-900/30 opacity-60 cursor-not-allowed"
                 : isSecret
                   ? "border-amber-800/50 bg-amber-950/20 hover:bg-amber-900/30 hover:border-amber-700/50"
-                  : hasUnlockCondition
-                    ? "border-blue-800/50 bg-blue-950/20 hover:bg-blue-900/30 hover:border-blue-700/50"
-                    : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-700/50 hover:border-zinc-600"
+                  : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-700/50 hover:border-zinc-600"
             )}
           >
             <div className="flex items-start gap-2">
@@ -214,8 +218,6 @@ const TopicSelection = ({
                 <Lock className="h-4 w-4 text-zinc-600 mt-0.5" />
               ) : isSecret ? (
                 <Eye className="h-4 w-4 text-amber-400 mt-0.5" />
-              ) : hasUnlockCondition ? (
-                <Sparkles className="h-4 w-4 text-blue-400 mt-0.5" />
               ) : (
                 <TopicIcon className="h-4 w-4 text-zinc-500 mt-0.5" />
               )}
@@ -224,31 +226,16 @@ const TopicSelection = ({
                   "text-sm",
                   isLocked ? "text-zinc-500" :
                   isSecret ? "text-amber-200" :
-                  hasUnlockCondition ? "text-blue-200" :
                   "text-zinc-200"
                 )}>
                   {topic.label}
                 </span>
 
-                {/* 힌트 표시 */}
-                {topic.impactHint && !isLocked && (
-                  <p className="text-[10px] text-zinc-500 mt-1">{topic.impactHint}</p>
-                )}
-
-                {/* 잠긴 경우 언락 조건 표시 */}
-                {isLocked && topic.trustRequired && (
-                  <p className="text-[10px] text-zinc-600 mt-1">
-                    신뢰도 {topic.trustRequired} 필요
+                {/* 잠긴 경우: 모호한 힌트만 표시 (숫자 제거) */}
+                {isLocked && (
+                  <p className="text-[10px] text-zinc-600 mt-1 italic">
+                    아직 이 이야기를 나눌 만큼 가깝지 않다
                   </p>
-                )}
-
-                {/* 언락 조건 뱃지 */}
-                {hasUnlockCondition && !isLocked && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-400">
-                      {topic.unlockCondition}
-                    </span>
-                  </div>
                 )}
               </div>
               {isLoading && !isLocked && (

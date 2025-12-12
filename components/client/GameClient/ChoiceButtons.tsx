@@ -186,16 +186,11 @@ export const ChoiceButtons = ({
           </div>
         )}
 
-        {/* 행동 콤보 표시 (시너지 보너스) */}
-        {actionSequence?.currentCombo && !isAPDepleted && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-900/30 bg-amber-950/20 px-3 py-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <div className="flex-1">
-              <span className="text-xs font-medium text-amber-300">{actionSequence.currentCombo}</span>
-              {actionSequence.comboBonus && (
-                <p className="text-[10px] text-amber-400/70 mt-0.5">{actionSequence.comboBonus}</p>
-              )}
-            </div>
+        {/* 행동 효과 표시 (몰입형 - 메카닉 이름 숨김) */}
+        {actionSequence?.comboBonus && !isAPDepleted && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-700/30 bg-zinc-900/50 px-3 py-2">
+            <Sparkles className="h-4 w-4 text-zinc-400" />
+            <p className="text-xs text-zinc-400 italic">{actionSequence.comboBonus}</p>
           </div>
         )}
 
