@@ -249,10 +249,13 @@ describe('엔딩 체크', () => {
     expect(ending).toBeNull();
   });
 
-  it('플래그 기반 엔딩', () => {
+  it('탈출 엔딩 조건 체크 (스탯 기반)', () => {
+    // 플래그 시스템 deprecated - 스탯 기반으로 엔딩 체크
     const escapeState = generatePlayerState({
-      statOverrides: { cityChaos: 50 },
-      flags: { FLAG_ESCAPE_VEHICLE_SECURED: true },
+      statOverrides: {
+        survivalFoundation: 65, // >= 60
+        cityChaos: 50, // < 80
+      },
     });
 
     const ending = checkEndingConditions(escapeState, mockEndingArchetypes);

@@ -81,7 +81,7 @@ NARRATIVE PHASE: ACT 2A - RISING ACTION (Route Branching)
 - 이전 선택들의 결과가 드러나기 시작할 것
 - 탈출/항전/협상 중 하나의 방향으로 기울어지는 선택 제시
 - 캐릭터 간 대립이 표면화될 것
-- 중요한 플래그 획득 기회 제공
+- 중요한 행동 패턴 기록 기회 제공
 
 서사 톤:
 - 긴장감 고조, 갈등 심화
@@ -93,10 +93,10 @@ NARRATIVE PHASE: ACT 2A - RISING ACTION (Route Branching)
 - 누군가를 희생하거나 포기해야 하는 상황
 - 선택에 따라 특정 캐릭터와 갈등 or 신뢰 형성
 
-루트 힌트 (플래그 기반):
-- 탈출 루트: 이동 수단 확보, 외부 연락처 확인
-- 항전 루트: 방어 시설 강화, 무기 확보
-- 협상 루트: 외부 세력과 접촉, 동맹 형성`,
+루트 힌트 (행동 패턴 기반):
+- 탈출 루트: 탈출, 이동, 차량 관련 행동
+- 항전 루트: 방어, 강화, 보호 관련 행동
+- 협상 루트: 협상, 대화, 동맹 관련 행동`,
 
   midpoint: `
 ### 📖 서사 단계: 2막 후반 - 전환점 (Day 5) ###
@@ -118,10 +118,10 @@ NARRATIVE PHASE: ACT 2B - MIDPOINT (Route Lock-in)
 - 명확한 득실이 있는 무거운 결정
 - 선택 후 특정 엔딩 루트로 고정됨
 
-이 시점의 주요 플래그:
-- FLAG_ESCAPE_VEHICLE_SECURED → 탈출 루트 가능
-- FLAG_DEFENSES_COMPLETE → 항전 루트 가능
-- FLAG_ALLY_NETWORK_FORMED → 협상 루트 가능`,
+이 시점의 주요 행동 패턴:
+- 탈출 관련 행동 누적 → 탈출 루트 가능
+- 방어 관련 행동 누적 → 항전 루트 가능
+- 협상 관련 행동 누적 → 협상 루트 가능`,
 
   climax: `
 ### 📖 서사 단계: 3막 - 결말 (Day 6-7) ###
@@ -146,7 +146,7 @@ NARRATIVE PHASE: ACT 3 - CLIMAX & RESOLUTION
 엔딩 힌트 (현재 상태 기반):
 - cityChaos ≤40 & communityCohesion ≥70 → "우리들의 법칙" (공동체 승리)
 - survivalFoundation ≥50 & communityCohesion ≥50 → "새로운 보안관" (질서 확립)
-- FLAG_ESCAPE_VEHICLE_SECURED → "탈출자들" (성공적 탈출)
+- 탈출 관련 행동 충분 → "탈출자들" (성공적 탈출)
 - 조건 미달 시 → "결단의 시간" (기본 엔딩)`
 };
 
@@ -297,10 +297,8 @@ const buildLitePrompt = (
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
 
-  const activeFlags = Object.entries(playerState.flags)
-    .filter(([, value]) => value)
-    .map(([key]) => key)
-    .join(', ');
+  // flags deprecated - using ActionHistory for tracking
+  const activeFlags = '';
 
   // 핵심 캐릭터 정보 포함 (품질 보장을 위해 모든 캐릭터 포함)
   const characterInfo = scenario.characters
@@ -404,13 +402,6 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
 
-FLAG ACQUISITION RULES (IMPORTANT - grant flags when conditions are met):
-${scenario.flagDictionary && scenario.flagDictionary.length > 0
-  ? scenario.flagDictionary.map(flag => `- **${flag.flagName}**: ${flag.triggerCondition || flag.description}`).join('\n')
-  : '- No flags defined for this scenario'}
-- Grant 1-2 flags per response when conditions are clearly met by player actions
-- flags_acquired array must contain the exact flag name (e.g., "FLAG_POWER_AWAKENED")
-
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
 ${genreGuide}
@@ -490,13 +481,8 @@ const buildFullPrompt = (
     })
     .join(', ');
 
-  const currentFlags = Object.entries(playerState.flags)
-    .filter(([, value]) => value)
-    .map(([key, value]) => {
-      const flagDef = scenario.flagDictionary?.find((f) => f.flagName === key);
-      return `${flagDef?.description || key}: ${value}`;
-    })
-    .join(', ');
+  // flags deprecated - using ActionHistory for tracking
+  const currentFlags = '';
 
   // 캐릭터 정보 구성 (Character Bible 형식)
   const characterBible = scenario.characters

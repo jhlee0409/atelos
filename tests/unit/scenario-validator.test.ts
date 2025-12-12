@@ -9,7 +9,7 @@ import {
   quickValidate,
   type ValidationResult,
 } from '@/lib/scenario-validator';
-import { mockScenario, mockCharacters, mockScenarioStats, mockFlagDictionary, mockEndingArchetypes } from '../fixtures/mock-scenario';
+import { mockScenario, mockCharacters, mockScenarioStats, mockEndingArchetypes } from '../fixtures/mock-scenario';
 import type { ScenarioData } from '@/types';
 
 // 테스트용 시나리오 생성 헬퍼
@@ -96,9 +96,12 @@ describe('validateScenario', () => {
     });
   });
 
-  describe('ending flag reference validation', () => {
-    it('should detect invalid flag reference in ending conditions', () => {
+  // 플래그 시스템은 ActionHistory로 대체됨 - 이 테스트는 하위 호환성 검증용
+  describe('ending flag reference validation (deprecated)', () => {
+    it('should skip flag validation when no flagDictionary exists', () => {
+      // 플래그 딕셔너리가 없는 시나리오에서는 플래그 검증을 건너뜀
       const scenario = createTestScenario({
+        flagDictionary: undefined, // 플래그 없음
         endingArchetypes: [
           {
             endingId: 'ENDING_TEST',
@@ -108,7 +111,7 @@ describe('validateScenario', () => {
             systemConditions: [
               {
                 type: 'required_flag',
-                flagName: 'FLAG_NONEXISTENT', // 존재하지 않는 플래그
+                flagName: 'FLAG_ANY', // 플래그 딕셔너리가 없으므로 검증 skip
               },
             ],
           },
@@ -116,16 +119,24 @@ describe('validateScenario', () => {
       });
 
       const result = validateScenario(scenario);
-
-      expect(result.isValid).toBe(false);
-      expect(result.summary.errors).toBeGreaterThan(0);
-
-      const endingIssues = filterIssuesByCategory(result, 'ending');
-      expect(endingIssues.some((i) => i.message.includes('FLAG_NONEXISTENT'))).toBe(true);
+      // flagDictionary가 없으면 플래그 참조 오류를 발생시키지 않음 (deprecated)
+      const flagErrors = result.issues.filter(
+        (i) => i.category === 'ending' && i.type === 'error' && i.message.includes('플래그')
+      );
+      expect(flagErrors.length).toBe(0);
     });
 
-    it('should pass for valid flag references', () => {
+    it('should validate flag reference only when flagDictionary exists', () => {
+      // 플래그 딕셔너리가 있는 경우에만 참조 검증
       const scenario = createTestScenario({
+        flagDictionary: [
+          {
+            flagName: 'FLAG_VALID',
+            description: '유효한 플래그',
+            type: 'boolean',
+            initial: false,
+          },
+        ],
         endingArchetypes: [
           {
             endingId: 'ENDING_TEST',
@@ -135,7 +146,7 @@ describe('validateScenario', () => {
             systemConditions: [
               {
                 type: 'required_flag',
-                flagName: 'FLAG_ESCAPE_VEHICLE_SECURED', // 존재하는 플래그
+                flagName: 'FLAG_VALID',
               },
             ],
           },
@@ -385,16 +396,36 @@ describe('validateScenario', () => {
     });
   });
 
-  describe('unused flag detection', () => {
-    it('should warn about unused flags', () => {
+  // 플래그 시스템은 ActionHistory로 대체됨 - 미사용 플래그 경고 테스트
+  describe('unused flag detection (deprecated)', () => {
+    it('should warn about unused flags when flagDictionary exists', () => {
       const scenario = createTestScenario({
         flagDictionary: [
-          ...mockFlagDictionary,
+          {
+            flagName: 'FLAG_USED_IN_ENDING',
+            description: '엔딩에서 사용되는 플래그',
+            type: 'boolean',
+            initial: false,
+          },
           {
             flagName: 'FLAG_NEVER_USED',
             description: '사용되지 않는 플래그',
             type: 'boolean',
             initial: false,
+          },
+        ],
+        endingArchetypes: [
+          {
+            endingId: 'ENDING_TEST',
+            title: '테스트 엔딩',
+            description: '테스트',
+            isGoalSuccess: true,
+            systemConditions: [
+              {
+                type: 'required_flag',
+                flagName: 'FLAG_USED_IN_ENDING',
+              },
+            ],
           },
         ],
       });
@@ -403,6 +434,17 @@ describe('validateScenario', () => {
       const flagWarnings = filterIssuesByCategory(result, 'flag');
 
       expect(flagWarnings.some((i) => i.message.includes('FLAG_NEVER_USED'))).toBe(true);
+    });
+
+    it('should not warn when no flagDictionary exists', () => {
+      const scenario = createTestScenario({
+        flagDictionary: undefined, // 플래그 없음
+      });
+
+      const result = validateScenario(scenario);
+      const flagWarnings = filterIssuesByCategory(result, 'flag');
+
+      expect(flagWarnings.length).toBe(0);
     });
   });
 });

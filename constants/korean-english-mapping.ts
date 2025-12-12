@@ -15,16 +15,11 @@ const STAT_NAME_FALLBACK: Record<string, string> = {
   crewSanity: '정신력',
 };
 
-// 플래그 이름 매핑 (폴백용)
+/**
+ * @deprecated Flags system removed - use ActionHistory for tracking player actions
+ */
 const FLAG_NAME_FALLBACK: Record<string, string> = {
-  FLAG_ESCAPE_VEHICLE_SECURED: '탈출 수단 확보',
-  FLAG_DEFENSES_COMPLETE: '방어 시설 완료',
-  FLAG_ALLY_NETWORK_FORMED: '동맹 네트워크 형성',
-  FLAG_GOVERNMENT_CONTACT: '정부 연락',
-  FLAG_LEADER_SACRIFICE: '리더 희생',
-  FLAG_RESOURCE_MONOPOLY: '자원 독점',
-  FLAG_IDEOLOGY_ESTABLISHED: '이념 확립',
-  FLAG_UNDERGROUND_HIDEOUT: '지하 은신처',
+  // Legacy flag names kept for backwards compatibility
 };
 
 // 역할 이름 매핑 (폴백용)
@@ -47,9 +42,7 @@ export const getKoreanStatName = (statId: string): string => {
 };
 
 /**
- * 영어 플래그 이름을 한국어로 변환
- * @param flagName 플래그 이름 (FLAG_ 접두사 포함 가능)
- * @returns 한국어 이름 또는 정리된 원본 이름
+ * @deprecated Flags system removed - use ActionHistory for tracking player actions
  */
 export const getKoreanFlagName = (flagName: string): string => {
   // FLAG_ 접두사 제거

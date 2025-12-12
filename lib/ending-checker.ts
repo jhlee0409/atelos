@@ -19,10 +19,16 @@ export const checkStatCondition = (
   return compareValues(statValue, condition.comparison, condition.value);
 };
 
+/**
+ * @deprecated Flags system removed - use ActionHistory for tracking player actions
+ */
 export const checkFlagCondition = (
   condition: Extract<SystemCondition, { type: 'required_flag' }>,
   flags: PlayerState['flags'],
 ): boolean => {
+  // Handle undefined/null flags - deprecated system fallback
+  if (!flags) return false;
+
   const flagValue = flags[condition.flagName];
   // For boolean flags, we check for true. For count flags, we just check for existence and > 0.
   if (typeof flagValue === 'boolean') {
@@ -47,7 +53,8 @@ export const checkEndingConditions = (
 ): EndingArchetype | null => {
   console.log('🔍 엔딩 조건 체크 시작...');
   console.log('📊 현재 스탯:', playerState.stats);
-  console.log('🏴 현재 플래그:', playerState.flags);
+  // @deprecated - flags system removed
+  console.log('🏴 현재 플래그:', playerState.flags || {});
   console.log('👥 생존자 수:', survivorCount ?? '정보 없음');
 
   // "결단의 날"과 같은 시간 제한 엔딩은 제외 (별도 처리)
@@ -69,8 +76,9 @@ export const checkEndingConditions = (
         const currentValue = playerState.stats[condition.statId];
         details = `스탯 ${condition.statId}: ${currentValue} ${condition.comparison} ${condition.value} = ${result}`;
       } else if (condition.type === 'required_flag') {
-        result = checkFlagCondition(condition, playerState.flags);
-        const currentValue = playerState.flags[condition.flagName];
+        // @deprecated - flag conditions are no longer actively used
+        result = checkFlagCondition(condition, playerState.flags || {});
+        const currentValue = playerState.flags?.[condition.flagName];
         details = `플래그 ${condition.flagName}: ${currentValue} = ${result}`;
       } else if (condition.type === 'survivor_count') {
         // 생존자 수 조건 체크 - survivorCount가 전달되지 않으면 조건을 통과시키지 않음
