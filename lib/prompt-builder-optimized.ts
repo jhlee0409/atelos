@@ -190,6 +190,7 @@ export const buildOptimizedGamePromptV2 = (
     actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용 (미사용, 타입 호환성)
     actionType?: import('@/types').ActionType; // v1.2: 행동 타입 (미사용, 타입 호환성)
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태 (미사용, 타입 호환성)
+    worldState?: import('@/types').WorldState; // v1.2: 월드 상태 (미사용, 타입 호환성)
   } = {},
 ): GamePromptData => {
   const {

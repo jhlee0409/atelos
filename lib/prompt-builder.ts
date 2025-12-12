@@ -1,10 +1,11 @@
-import { ScenarioData, PlayerState, Character, ActionContext } from '@/types';
+import { ScenarioData, PlayerState, Character, ActionContext, WorldState } from '@/types';
 import { UniversalMasterSystemPrompt } from '@/mocks/UniversalMasterSystemPrompt';
 import {
   formatGenreStyleForPrompt,
   getNarrativeStyleFromGenres,
 } from './genre-narrative-styles';
 import { formatContextForPrompt } from './context-manager';
+import { summarizeWorldState } from './world-state-manager';
 import {
   getTotalDays,
   getGameplayConfig,
@@ -230,6 +231,7 @@ export const buildOptimizedGamePrompt = (
     actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용
     actionType?: import('@/types').ActionType; // v1.2: 현재 행동 타입
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태
+    worldState?: WorldState; // v1.2: 월드 상태 (위치, 발견물)
   } = {},
 ): GamePromptData => {
   const {
@@ -549,6 +551,15 @@ ${dialogueClues.length > 0 ? `
     )
     .join(', ');
 
+  // v1.2: 월드 상태 요약 (파괴된 장소, 차단된 장소, 인벤토리)
+  let worldStateSection = '';
+  if (options.worldState) {
+    const summary = summarizeWorldState(options.worldState);
+    if (summary) {
+      worldStateSection = `\n월드 상태: ${summary}`;
+    }
+  }
+
   const systemPrompt = `Korean survival simulation AI for "${scenario.title}".
 
 Background: ${scenario.synopsis.substring(0, 300)}...
@@ -556,7 +567,7 @@ Background: ${scenario.synopsis.substring(0, 300)}...
 Characters: ${characterInfo}${characterArcSection}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
-Active Flags: ${activeFlags || 'None'}
+Active Flags: ${activeFlags || 'None'}${worldStateSection}
 Day: ${options.currentDay || 1}/${totalDays}
 
 CRITICAL LANGUAGE REQUIREMENTS:
