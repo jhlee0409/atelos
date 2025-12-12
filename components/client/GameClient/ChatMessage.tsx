@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Bell, User, Drama, Sunrise, MessageCircle, Quote } from 'lucide-react';
+import { Bell, User, Drama, Sunrise, MessageCircle, Quote, GitBranch, History } from 'lucide-react';
 import React from 'react';
 
 /**
@@ -65,9 +65,19 @@ const renderInlineMarkdown = (
   return result.length > 0 ? result : [text];
 };
 
+/**
+ * 2025 Enhanced: 이전 선택이 영향을 미쳤음을 나타내는 정보
+ */
+export interface ChoiceInfluence {
+  hasInfluence: boolean;
+  relatedChoice?: string;
+  dayNumber?: number;
+}
+
 export const ChatMessage = ({
   message,
   isLatest = false,
+  choiceInfluence,
 }: {
   message: {
     type: 'system' | 'player' | 'ai' | 'ai-dialogue' | 'ai-thought' | 'ai-narration';
@@ -75,6 +85,8 @@ export const ChatMessage = ({
     timestamp: number;
   };
   isLatest?: boolean;
+  /** 2025 Enhanced: 이전 선택이 현재 내러티브에 영향을 미쳤는지 표시 */
+  choiceInfluence?: ChoiceInfluence;
 }) => {
   const getMessageStyle = () => {
     switch (message.type) {
@@ -168,6 +180,20 @@ export const ChatMessage = ({
   return (
     <div className={cn(style.container, animationClass)}>
       <div className={style.bubble}>
+        {/* 2025 Enhanced: 이전 선택 영향 표시 */}
+        {choiceInfluence?.hasInfluence && message.type === 'ai' && (
+          <div
+            className="mb-2 flex items-center gap-1 text-[10px] text-amber-500/80 bg-amber-900/20 rounded px-2 py-1 -mx-1"
+            title={choiceInfluence.relatedChoice ? `관련 선택: ${choiceInfluence.relatedChoice}` : '이전 선택이 영향을 미쳤습니다'}
+          >
+            <History className="h-3 w-3" />
+            <span>
+              {choiceInfluence.dayNumber
+                ? `Day ${choiceInfluence.dayNumber}의 선택이 영향을 미쳤습니다`
+                : '이전 선택이 결과에 영향을 미쳤습니다'}
+            </span>
+          </div>
+        )}
         {style.showLabel && (
           <div className="mb-2 flex items-center text-xs font-semibold opacity-80">
             <IconComponent className="mr-1 h-3 w-3" />

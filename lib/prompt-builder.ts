@@ -10,6 +10,12 @@ import {
   getGameplayConfig,
   DEFAULT_GAMEPLAY_CONFIG,
 } from './gameplay-config';
+import {
+  formatPersonaForPrompt,
+  getCompactPersona,
+  calculateRecommendedTension,
+  DOKYUNG_PERSONA,
+} from './story-writer-persona';
 
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
@@ -278,6 +284,10 @@ const buildLitePrompt = (
   const narrativePhase = getNarrativePhase(currentDay, scenario);
   const phaseGuideline = NARRATIVE_PHASE_GUIDELINES[narrativePhase];
 
+  // 2025 Enhanced: 도경 페르소나의 긴장도 추천
+  const recentEvents = options.keyDecisions?.slice(-3)?.map((d: KeyDecision) => d.consequence) || [];
+  const tensionRecommendation = calculateRecommendedTension(currentDay, totalDays, recentEvents);
+
   // 장르별 서사 스타일 가져오기
   const genreStyle = getNarrativeStyleFromGenres(scenario.genre || []);
   const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
@@ -286,6 +296,9 @@ const buildLitePrompt = (
     includeDilemmas: true,
     includeWritingTechniques: false, // 토큰 절약
   });
+
+  // 2025 Enhanced: 압축된 페르소나 가이드
+  const personaGuide = getCompactPersona();
 
   // 회상 시스템 - 주요 결정 포맷팅
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
@@ -403,6 +416,13 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
+
+${personaGuide}
+
+### TENSION RECOMMENDATION (Drama Manager) ###
+- 현재 긴장도: ${tensionRecommendation.tensionLevel}/10
+- 감정 포커스: ${tensionRecommendation.emotionalFocus.join(', ')}
+- 권장사항: ${tensionRecommendation.recommendation}
 
 ${genreGuide}
 
