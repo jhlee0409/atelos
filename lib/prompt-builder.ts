@@ -446,6 +446,11 @@ ${synergyBonus[synergy.synergyType] || ''}
   if (options.actionContext?.discoveredClues && options.actionContext.discoveredClues.length > 0) {
     // 최근 5개 단서만 포함 (토큰 절약)
     const recentClues = options.actionContext.discoveredClues.slice(-5);
+
+    // 탐색에서 발견한 것과 대화에서 얻은 것 구분
+    const explorationClues = recentClues.filter(c => c.source.type === 'exploration');
+    const dialogueClues = recentClues.filter(c => c.source.type === 'dialogue');
+
     const clueTexts = recentClues.map(clue => {
       const sourceDesc = clue.source.type === 'dialogue'
         ? `${clue.source.characterName}와(과)의 대화`
@@ -458,13 +463,20 @@ ${synergyBonus[synergy.synergyType] || ''}
     discoveredInfoSection = `
 
 ### 📋 DISCOVERED INFORMATION (플레이어가 알아낸 정보 - v1.2) ###
-아래 정보는 플레이어가 직접 발견한 것입니다. 선택지를 생성할 때 이 정보를 활용한 새로운 옵션을 고려하세요.
+아래 정보는 플레이어가 직접 발견한 것입니다.
 
 ${clueTexts.join('\n')}
 
-**AI 지시:**
-- 플레이어가 알아낸 정보에 기반한 선택지를 포함시키세요
-- 발견한 정보가 선택에 영향을 줄 때 서사에 자연스럽게 반영하세요
+**AI 지시 (탐색-서사 연결 v1.2):**
+${explorationClues.length > 0 ? `
+- 탐색에서 발견한 물건/정보를 선택지에 활용하세요:
+  예: "창고에서 찾은 [아이템]을 사용한다" / "[장소]에서 본 것을 바탕으로..."
+- 발견물이 상황 해결에 도움이 되는 선택지를 추가하세요` : ''}
+${dialogueClues.length > 0 ? `
+- 대화에서 들은 정보를 근거로 판단하는 선택지를 만드세요:
+  예: "[캐릭터]가 말한 것이 맞다면..." / "[정보]를 믿고 행동한다"` : ''}
+- 플레이어가 모르는 정보는 선택지에 포함하지 마세요 (플레이어 지식 범위 준수)
+- 발견한 정보가 서사에 자연스럽게 언급되도록 하세요
 `;
   }
 

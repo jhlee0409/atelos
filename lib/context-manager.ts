@@ -80,6 +80,7 @@ export const createInitialContext = (
 
 /**
  * 탐색 결과 후 맥락 업데이트
+ * v1.2: significantDiscoveries 지원 추가
  */
 export const updateContextAfterExploration = (
   context: ActionContext,
@@ -87,7 +88,8 @@ export const updateContextAfterExploration = (
   narrative: string,
   rewards?: {
     statChanges?: Record<string, number>;
-    flagsAcquired?: string[];
+    flagsAcquired?: string[]; // @deprecated - use significantDiscoveries
+    significantDiscoveries?: string[]; // v1.2: 발견한 주요 사항들
     infoGained?: string;
   },
   currentDay: number = 1
@@ -105,6 +107,8 @@ export const updateContextAfterExploration = (
 
   // 단서 추가 (정보 획득 시)
   const newClues: DiscoveredClue[] = [...context.discoveredClues];
+
+  // v1.2: infoGained를 단서로 추가
   if (rewards?.infoGained) {
     newClues.push({
       clueId: `clue_${Date.now()}`,
@@ -114,8 +118,26 @@ export const updateContextAfterExploration = (
         locationId: locationName,
       },
       discoveredAt: { day: currentDay, actionIndex },
-      importance: rewards.flagsAcquired?.length ? 'high' : 'medium',
-      relatedFlags: rewards.flagsAcquired,
+      importance: rewards.significantDiscoveries?.length ? 'high' : 'medium',
+    });
+  }
+
+  // v1.2: significantDiscoveries도 개별 단서로 추가
+  if (rewards?.significantDiscoveries?.length) {
+    rewards.significantDiscoveries.forEach((discovery, idx) => {
+      // infoGained와 중복되지 않는 것만 추가
+      if (!rewards.infoGained || !rewards.infoGained.includes(discovery)) {
+        newClues.push({
+          clueId: `clue_${Date.now()}_${idx}`,
+          content: discovery,
+          source: {
+            type: 'exploration',
+            locationId: locationName,
+          },
+          discoveredAt: { day: currentDay, actionIndex: actionIndex + idx + 1 },
+          importance: 'medium',
+        });
+      }
     });
   }
 
