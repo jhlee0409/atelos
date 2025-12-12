@@ -12,6 +12,7 @@ import StoryOpeningContent from '@/components/admin/ScenarioEditor/StoryOpeningC
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
 import GameplayConfigContent from '@/components/admin/ScenarioEditor/GameplayConfigContent';
+import LocationsContent from '@/components/admin/ScenarioEditor/LocationsContent';
 import { DynamicEndingConfigContent } from '@/components/admin/ScenarioEditor/DynamicEndingConfigContent';
 import StickySidebar from '@/components/admin/ScenarioEditor/StickySidebar';
 import { toast } from 'sonner';
@@ -203,6 +204,12 @@ function ScenarioDetailContent() {
           </div>
           <div id="section-gameplay">
             <GameplayConfigContent
+              scenario={scenario}
+              setScenario={setScenario}
+            />
+          </div>
+          <div id="section-locations">
+            <LocationsContent
               scenario={scenario}
               setScenario={setScenario}
             />

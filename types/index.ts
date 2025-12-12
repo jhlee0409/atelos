@@ -593,6 +593,8 @@ export type ScenarioData = {
   gameplayConfig?: GameplayConfig;
   /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
+  /** 탐색 위치 설정 - 시나리오별 커스텀 탐색 장소 */
+  locations?: ScenarioLocation[];
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only
@@ -1009,6 +1011,51 @@ export interface ContextUpdate {
 // =============================================================================
 
 /**
+ * 위치 아이콘 타입
+ */
+export type LocationIcon =
+  | 'warehouse'   // 창고
+  | 'entrance'    // 입구
+  | 'medical'     // 의무실
+  | 'roof'        // 옥상
+  | 'basement'    // 지하
+  | 'quarters'    // 숙소
+  | 'office'      // 사무실
+  | 'corridor'    // 복도
+  | 'exterior'    // 외부
+  | 'hidden';     // 숨겨진 장소
+
+/**
+ * 시나리오 탐색 위치 정의 - ScenarioData에서 사용
+ * WorldLocation보다 단순화된 버전으로, 시나리오 에디터에서 설정
+ */
+export interface ScenarioLocation {
+  /** 위치 고유 ID */
+  locationId: string;
+  /** 위치 이름 (한글) */
+  name: string;
+  /** 위치 설명 */
+  description: string;
+  /** 아이콘 타입 */
+  icon: LocationIcon;
+  /** 초기 상태 */
+  initialStatus: 'available' | 'locked' | 'hidden';
+  /** 해금 조건 (locked/hidden일 때) */
+  unlockCondition?: {
+    /** 특정 Day 이후 자동 해금 */
+    requiredDay?: number;
+    /** 특정 위치 탐색 후 해금 */
+    requiredExploration?: string;
+  };
+  /** 위험도 (0-3, 높을수록 부정적 이벤트 확률 증가) */
+  dangerLevel?: 0 | 1 | 2 | 3;
+  /** 재탐색 쿨다운 (Day 단위, 0이면 즉시 재탐색 가능) */
+  explorationCooldown?: number;
+  /** 에디터용 편집 상태 */
+  isEditing?: boolean;
+}
+
+/**
  * 위치 상태 - 위치의 현재 상태를 추적
  */
 export type LocationStatus =
@@ -1073,7 +1120,7 @@ export interface WorldLocation {
   /** 현재 상태에 따른 설명 */
   currentDescription: string;
   /** 아이콘 타입 */
-  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters' | 'office' | 'corridor' | 'exterior' | 'hidden';
+  icon: LocationIcon;
   /** 위치 상태 */
   status: LocationStatus;
   /** 상태 사유 (파괴됨, 차단됨 등일 때) */

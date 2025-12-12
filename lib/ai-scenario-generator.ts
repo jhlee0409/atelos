@@ -15,7 +15,8 @@ export type GenerationCategory =
   | 'hidden_relationships'
   | 'character_revelations'
   | 'gameplay_config'
-  | 'emergent_narrative';
+  | 'emergent_narrative'
+  | 'locations';
 
 export interface GenerationContext {
   genre?: string[];
@@ -23,6 +24,7 @@ export interface GenerationContext {
   synopsis?: string;
   existingCharacters?: string[];
   existingStats?: string[];
+  totalDays?: number;
 }
 
 // 카테고리별 응답 타입
@@ -263,6 +265,29 @@ export interface EmergentNarrativeResult {
   enabled: boolean;
   triggers: StorySiftingTriggerResult[];
   dynamicEventGuidelines: string;
+  reasoning: string;
+}
+
+// =============================================================================
+// 탐색 위치 설정 (Locations Generation)
+// =============================================================================
+
+export interface ScenarioLocationResult {
+  locationId: string;
+  name: string;
+  description: string;
+  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters' | 'office' | 'corridor' | 'exterior' | 'hidden';
+  initialStatus: 'available' | 'locked' | 'hidden';
+  unlockCondition?: {
+    requiredDay?: number;
+    requiredExploration?: string;
+  };
+  dangerLevel?: 0 | 1 | 2 | 3;
+  explorationCooldown?: number;
+}
+
+export interface LocationsResult {
+  locations: ScenarioLocationResult[];
   reasoning: string;
 }
 

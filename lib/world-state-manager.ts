@@ -13,6 +13,7 @@ import {
   LocationStatus,
   SaveState,
   ScenarioData,
+  ScenarioLocation,
 } from '@/types';
 
 // =============================================================================
@@ -20,9 +21,51 @@ import {
 // =============================================================================
 
 /**
- * 시나리오에 맞는 기본 위치 생성
+ * ScenarioLocation을 WorldLocation으로 변환
+ */
+const convertScenarioLocationToWorldLocation = (
+  scenarioLoc: ScenarioLocation
+): WorldLocation => {
+  return {
+    locationId: scenarioLoc.locationId,
+    name: scenarioLoc.name,
+    baseDescription: scenarioLoc.description,
+    currentDescription: scenarioLoc.description,
+    icon: scenarioLoc.icon,
+    status: scenarioLoc.initialStatus as LocationStatus,
+    unlockCondition: scenarioLoc.unlockCondition
+      ? {
+          requiredDay: scenarioLoc.unlockCondition.requiredDay,
+          requiredExploration: scenarioLoc.unlockCondition.requiredExploration,
+        }
+      : undefined,
+    explorationCooldown: scenarioLoc.explorationCooldown ?? 1,
+    dangerLevel: scenarioLoc.dangerLevel ?? 0,
+    possibleDiscoveries: [], // 동적으로 생성됨
+  };
+};
+
+/**
+ * 시나리오 정의 위치를 WorldLocation[]으로 변환
+ */
+const createLocationsFromScenario = (
+  scenarioLocations: ScenarioLocation[]
+): WorldLocation[] => {
+  return scenarioLocations.map(convertScenarioLocationToWorldLocation);
+};
+
+/**
+ * 시나리오에 맞는 기본 위치 생성 (폴백용)
  */
 const createDefaultLocations = (scenario: ScenarioData): WorldLocation[] => {
+  // 시나리오에 커스텀 위치가 정의되어 있으면 사용
+  if (scenario.locations && scenario.locations.length > 0) {
+    console.log(`🗺️ 시나리오 정의 위치 ${scenario.locations.length}개 사용`);
+    return createLocationsFromScenario(scenario.locations);
+  }
+
+  // 폴백: 장르 기반 기본 위치 생성
+  console.log('🗺️ 장르 기반 기본 위치 생성');
   const genre = scenario.genre || [];
   const isSpaceScenario = genre.includes('SF') || genre.includes('우주');
   const isMilitaryScenario = genre.includes('밀리터리') || genre.includes('군사');
