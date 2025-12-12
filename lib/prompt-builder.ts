@@ -442,10 +442,20 @@ ${comboRewardGuide[actionSequence.currentCombo] || '플레이어의 전략적 �
             'caution': '플레이어가 신중하게 접근 중입니다. 숨겨진 정보나 힌트를 제공하세요.',
           };
 
+          // v1.2: infoUnlock 보너스 추가 (dialogue → choice, dialogue → exploration)
+          let infoUnlockGuide = '';
+          if (synergy.mechanicEffect?.infoUnlock) {
+            if (synergy.targetAction === 'choice') {
+              infoUnlockGuide = '\n**힌트 제공:** 선택지의 결과에 대해 미묘한 힌트를 서술에 자연스럽게 포함하세요 (직접적 예고 금지).';
+            } else if (synergy.targetAction === 'exploration') {
+              infoUnlockGuide = '\n**발견 가능성:** 대화에서 언급된 장소나 단서를 탐색 결과에 반영하세요. 숨겨진 정보가 드러날 수 있습니다.';
+            }
+          }
+
           actionEngagementSection += `
 ### 🔗 ACTION SYNERGY (행동 시너지) ###
 ${synergy.bonus}
-${synergyBonus[synergy.synergyType] || ''}
+${synergyBonus[synergy.synergyType] || ''}${infoUnlockGuide}
 `;
         }
       }
