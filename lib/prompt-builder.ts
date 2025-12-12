@@ -26,8 +26,6 @@ import {
 // v2.2: AI Narrative Engine (2025 Enhanced)
 import {
   calculateEndingProbabilities,
-  buildImprovementDirective,
-  quickQualityCheck,
   type EndingPrediction,
   type NarrativeSeed,
 } from './ai-narrative-engine';
