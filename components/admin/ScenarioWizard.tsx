@@ -32,6 +32,7 @@ import {
   Sparkles,
   RotateCcw,
   BookOpen,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -56,6 +57,8 @@ import {
   type CharacterRevelationsResult,
   type GameplayConfigResult,
   type EmergentNarrativeResult,
+  type LocationsResult,
+  type ScenarioLocationResult,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, Trait, DynamicEndingConfig } from '@/types';
 
@@ -107,6 +110,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [relationships, setRelationships] = useState<RelationshipResult[]>([]);
   const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
+  const [locations, setLocations] = useState<ScenarioLocationResult[]>([]);
 
   // 스토리 오프닝 시스템 (Phase 7)
   const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
@@ -248,7 +252,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, [synopsisResult]);
 
-  // 시스템(스탯/플래그) 생성
+  // 시스템(스탯/탐색위치) 생성
   const handleGenerateSystem = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -261,32 +265,38 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
         .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory}`)
         .join('\n');
 
-      // 스탯 생성
-      const statsResponse = await generateWithAI<{ stats: StatResult[] }>(
-        'stats',
-        `시나리오: ${synopsisResult.title}
+      const scenarioInput = `시나리오: ${synopsisResult.title}
 시놉시스: ${synopsisResult.synopsis}
 테마: ${synopsisResult.suggestedThemes.join(', ')}
 갈등: ${synopsisResult.conflictType}
+배경: ${synopsisResult.setting.place}, ${synopsisResult.setting.time}
 
 등장 캐릭터:
-${characterDetails}`,
-        {
-          genre: synopsisResult.genre,
-          title: synopsisResult.title,
-          synopsis: synopsisResult.synopsis,
-          existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
-        },
-      );
+${characterDetails}`;
+
+      const context = {
+        genre: synopsisResult.genre,
+        title: synopsisResult.title,
+        synopsis: synopsisResult.synopsis,
+        existingCharacters: characters.map((c) => `${c.characterName} (${c.roleName})`),
+        totalDays: targetLength === 'short' ? 5 : targetLength === 'long' ? 10 : 7,
+      };
+
+      // 스탯과 탐색 위치를 병렬로 생성
+      const [statsResponse, locationsResponse] = await Promise.all([
+        generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context),
+        generateWithAI<LocationsResult>('locations', scenarioInput, context),
+      ]);
 
       setStats(statsResponse.data.stats || []);
+      setLocations(locationsResponse.data.locations || []);
       setCurrentStep('system');
     } catch (err) {
       setError(err instanceof Error ? err.message : '시스템 생성에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [synopsisResult, characters]);
+  }, [synopsisResult, characters, targetLength]);
 
   // 스토리 오프닝 생성 (Phase 7)
   const handleGenerateStoryOpening = useCallback(async () => {
@@ -477,6 +487,17 @@ ${characterDetails}`;
         useGenreFallback: gameplayConfig.useGenreFallback,
         customFallbackChoices: gameplayConfig.customFallbackChoices,
       } : undefined,
+      // 탐색 위치 설정
+      locations: locations.length > 0 ? locations.map((loc) => ({
+        locationId: loc.locationId,
+        name: loc.name,
+        description: loc.description,
+        icon: loc.icon,
+        initialStatus: loc.initialStatus,
+        unlockCondition: loc.unlockCondition,
+        dangerLevel: loc.dangerLevel,
+        explorationCooldown: loc.explorationCooldown,
+      })) : undefined,
       // 동적 결말 시스템 (기본 활성화)
       dynamicEndingConfig: {
         enabled: true,
@@ -838,7 +859,7 @@ ${characterDetails}`;
                 ) : (
                   <ChevronRight className="w-4 h-4 mr-2" />
                 )}
-                스탯/플래그 생성
+                시스템 생성
               </Button>
             </div>
           </div>
@@ -857,6 +878,25 @@ ${characterDetails}`;
                   <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
                     <div className="font-medium">{stat.name}</div>
                     <div className="text-xs text-zinc-500">{stat.id} ({stat.min}-{stat.max})</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                탐색 위치 ({locations.length}개)
+              </h4>
+              <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                {locations.map((loc, idx) => (
+                  <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                    <div className="font-medium">{loc.name}</div>
+                    <div className="text-xs text-zinc-500">
+                      {loc.initialStatus === 'available' ? '접근 가능' :
+                       loc.initialStatus === 'locked' ? `Day ${loc.unlockCondition?.requiredDay || '?'} 해금` :
+                       '숨김'}
+                    </div>
                   </div>
                 ))}
               </div>
