@@ -63,12 +63,9 @@ OUTPUT:
     "scenarioStats": {},
     "flags_acquired": [],
     "survivorStatus": [],
-    "hiddenRelationships_change": [],
-    "shouldAdvanceTime": false
+    "hiddenRelationships_change": []
   }
-}
-
-TIME: shouldAdvanceTime=false (default), true ONLY for major day-ending events.`;
+}`;
 
 // 초경량 프롬프트 (150-200 토큰) - JSON 형식 명시
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.

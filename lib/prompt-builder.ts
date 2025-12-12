@@ -619,21 +619,9 @@ Output JSON:
     "scenarioStats": {"statId": change_amount},
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"],
-    "shouldAdvanceTime": false
+    "flags_acquired": ["FLAG_NAME"]
   }
 }
-
-TIME PROGRESSION GUIDELINES (IMPORTANT):
-- **shouldAdvanceTime: false** (default): For regular dialogue, discussions, minor interactions
-- **shouldAdvanceTime: true**: ONLY for major events that conclude the day:
-  * Major battle or confrontation resolved
-  * Important negotiation completed
-  * Critical resource secured
-  * Significant journey/travel completed
-  * Major construction/project finished
-- Multiple conversations happen within a single day - don't rush time!
-- Let players make 2-4 decisions before a day passes
 
 STAT CHANGE GUIDELINES (CRITICAL):
 - **NORMAL actions** (dialogue, minor exploration): ±5 to ±10

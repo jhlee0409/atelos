@@ -734,7 +734,6 @@ export interface AIResponse {
     hiddenRelationships_change: any[]; // Type can be refined if needed
     /** @deprecated Flags system removed. */
     flags_acquired?: string[];
-    shouldAdvanceTime?: boolean; // AI가 시간 진행 여부를 결정
   };
 }
 

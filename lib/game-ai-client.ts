@@ -176,7 +176,7 @@ export const validateKoreanContent = (
 export const extractKoreanContent = (text: string): string => {
   // JSON 키 패턴 제거 (예: "log":, "dilemma":, "choice_a": 등)
   let cleaned = text
-    .replace(/"(log|dilemma|prompt|choice_a|choice_b|statChanges|scenarioStats|survivorStatus|hiddenRelationships_change|flags_acquired|shouldAdvanceTime|name|newStatus|pair|change)":/gi, '')
+    .replace(/"(log|dilemma|prompt|choice_a|choice_b|statChanges|scenarioStats|survivorStatus|hiddenRelationships_change|flags_acquired|name|newStatus|pair|change)":/gi, '')
     // 영문 stat ID 제거 (예: cityChaos, communityCohesion 등)
     .replace(/\b(cityChaos|communityCohesion|survivalFoundation|citizenTrust|resourceLevel|safetyLevel|defenseCapability|communityMorale)\b/gi, '')
     // FLAG_ 패턴 제거

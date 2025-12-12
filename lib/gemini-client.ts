@@ -169,10 +169,6 @@ const extractFieldsWithRegex = <T>(text: string): T | null => {
       }
     }
 
-    // shouldAdvanceTime 추출
-    const shouldAdvanceMatch = text.match(/"shouldAdvanceTime"\s*:\s*(true|false)/);
-    const shouldAdvanceTime = shouldAdvanceMatch ? shouldAdvanceMatch[1] === 'true' : false;
-
     const result = {
       log,
       dilemma: {
@@ -185,7 +181,6 @@ const extractFieldsWithRegex = <T>(text: string): T | null => {
         survivorStatus,
         hiddenRelationships_change: [],
         flags_acquired,
-        shouldAdvanceTime,
       },
     };
 

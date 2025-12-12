@@ -303,20 +303,10 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
-      // [2025 Enhanced] 주인공 지식 시스템 초기화
-      protagonistKnowledge: {
-        metCharacters: [],
-        discoveredRelationships: [],
-        hintedRelationships: [],
-        informationPieces: [],
-      },
-      // [2025 Enhanced] 숨겨진 NPC 관계 상태 초기화
-      npcRelationshipStates: scenario.storyOpening?.hiddenNPCRelationships?.map((rel) => ({
-        relationId: rel.relationId,
-        visibility: rel.visibility || 'hidden',
-      })) || [],
-      // [2025 Enhanced] 발동된 스토리 트리거 초기화
-      triggeredStoryEvents: [],
+      // TODO: [2025 Enhanced] 미래 구현 예정
+      // - protagonistKnowledge: 주인공 지식 시스템
+      // - npcRelationshipStates: 숨겨진 NPC 관계 상태
+      // - triggeredStoryEvents: 발동된 스토리 트리거
     },
     community: {
       survivors: charactersWithTraits.map((c) => ({
@@ -422,7 +412,6 @@ const updateSaveState = (
     survivorStatus,
     flags_acquired,
     hiddenRelationships_change,
-    shouldAdvanceTime,
   } = aiResponse.statChanges;
 
   // 시나리오에서 알려진 캐릭터 이름 목록 생성 (관계 파싱에 사용)
