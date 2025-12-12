@@ -16,6 +16,20 @@ import {
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { getRouteActivationDay, getEndingCheckDay } from './gameplay-config';
 
+// ClueId 카운터 (충돌 방지)
+let clueIdCounter = 0;
+
+/**
+ * 고유한 clueId 생성 (충돌 방지)
+ * @param source 출처 타입 ('exploration', 'dialogue', 'choice')
+ * @param identifier 추가 식별자 (locationId, characterName 등)
+ */
+const generateClueId = (source: string, identifier: string): string => {
+  clueIdCounter++;
+  const randomPart = Math.random().toString(36).substring(2, 6);
+  return `clue_${source}_${identifier}_${Date.now()}_${clueIdCounter}_${randomPart}`;
+};
+
 // =============================================================================
 // 초기 맥락 생성
 // =============================================================================
@@ -29,10 +43,13 @@ export const createInitialContext = (
 ): ActionContext => {
   const currentDay = saveState.context.currentDay || 1;
 
+  // v1.2: 시나리오 설정에서 초기 위치 가져오기
+  const initialLocation = scenario.storyOpening?.openingLocation || '본부';
+
   // 캐릭터 초기 위치/상태 설정
   const characterPresences: CharacterPresence[] = scenario.characters.map((char) => ({
     characterName: char.characterName,
-    currentLocation: '본부', // 기본 위치
+    currentLocation: initialLocation,
     availableForDialogue: true,
     currentActivity: '대기 중',
   }));
@@ -41,7 +58,7 @@ export const createInitialContext = (
   const availableLocations: DynamicLocation[] = [
     {
       locationId: 'main_area',
-      name: '본부',
+      name: initialLocation,
       description: '현재 머물고 있는 주요 거점입니다.',
       available: true,
       type: 'interior',
@@ -49,14 +66,14 @@ export const createInitialContext = (
     {
       locationId: 'surroundings',
       name: '주변 구역',
-      description: '본부 근처를 둘러볼 수 있습니다.',
+      description: `${initialLocation} 근처를 둘러볼 수 있습니다.`,
       available: true,
       type: 'exterior',
     },
   ];
 
   return {
-    currentLocation: '본부',
+    currentLocation: initialLocation,
     currentSituation: scenario.synopsis.substring(0, 200),
     todayActions: {
       explorations: [],
@@ -80,6 +97,7 @@ export const createInitialContext = (
 
 /**
  * 탐색 결과 후 맥락 업데이트
+ * v1.2: significantDiscoveries 지원 추가
  */
 export const updateContextAfterExploration = (
   context: ActionContext,
@@ -87,7 +105,8 @@ export const updateContextAfterExploration = (
   narrative: string,
   rewards?: {
     statChanges?: Record<string, number>;
-    flagsAcquired?: string[];
+    flagsAcquired?: string[]; // @deprecated - use significantDiscoveries
+    significantDiscoveries?: string[]; // v1.2: 발견한 주요 사항들
     infoGained?: string;
   },
   currentDay: number = 1
@@ -105,22 +124,43 @@ export const updateContextAfterExploration = (
 
   // 단서 추가 (정보 획득 시)
   const newClues: DiscoveredClue[] = [...context.discoveredClues];
+
+  // v1.2: infoGained를 단서로 추가
   if (rewards?.infoGained) {
     newClues.push({
-      clueId: `clue_${Date.now()}`,
+      clueId: generateClueId('exploration', locationName),
       content: rewards.infoGained,
       source: {
         type: 'exploration',
         locationId: locationName,
       },
       discoveredAt: { day: currentDay, actionIndex },
-      importance: rewards.flagsAcquired?.length ? 'high' : 'medium',
-      relatedFlags: rewards.flagsAcquired,
+      importance: rewards.significantDiscoveries?.length ? 'high' : 'medium',
+    });
+  }
+
+  // v1.2: significantDiscoveries도 개별 단서로 추가
+  if (rewards?.significantDiscoveries?.length) {
+    rewards.significantDiscoveries.forEach((discovery, idx) => {
+      // infoGained와 중복되지 않는 것만 추가
+      if (!rewards.infoGained || !rewards.infoGained.includes(discovery)) {
+        newClues.push({
+          clueId: generateClueId('exploration', `${locationName}_${idx}`),
+          content: discovery,
+          source: {
+            type: 'exploration',
+            locationId: locationName,
+          },
+          discoveredAt: { day: currentDay, actionIndex: actionIndex + idx + 1 },
+          importance: 'medium',
+        });
+      }
     });
   }
 
   return {
     ...context,
+    currentLocation: locationName, // v1.2: 탐색 시 현재 위치 업데이트
     todayActions: newTodayActions,
     discoveredClues: newClues,
     lastUpdated: { day: currentDay, actionIndex },
@@ -153,7 +193,7 @@ export const updateContextAfterDialogue = (
   const newClues: DiscoveredClue[] = [...context.discoveredClues];
   if (infoGained) {
     newClues.push({
-      clueId: `clue_${Date.now()}`,
+      clueId: generateClueId('dialogue', characterName),
       content: infoGained,
       source: {
         type: 'dialogue',
@@ -528,6 +568,9 @@ export const buildCluesSummary = (context: ActionContext): string => {
  */
 export const formatContextForPrompt = (context: ActionContext): string => {
   return `
+## 현재 위치
+${context.currentLocation}
+
 ## 오늘의 맥락
 ${buildContextSummary(context)}
 

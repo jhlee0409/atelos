@@ -160,8 +160,7 @@ You MUST output ONLY valid JSON in this exact structure:
     "scenarioStats": {"statId_from_STAT_ID_LIST": change_amount},
     "survivorStatus": [{"name": "한글캐릭터이름", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "한글이름A-한글이름B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"],
-    "shouldAdvanceTime": false
+    "flags_acquired": ["FLAG_NAME"]
   }
 }
 

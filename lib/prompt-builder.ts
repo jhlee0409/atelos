@@ -1,10 +1,11 @@
-import { ScenarioData, PlayerState, Character, ActionContext } from '@/types';
+import { ScenarioData, PlayerState, Character, ActionContext, WorldState } from '@/types';
 import { UniversalMasterSystemPrompt } from '@/mocks/UniversalMasterSystemPrompt';
 import {
   formatGenreStyleForPrompt,
   getNarrativeStyleFromGenres,
 } from './genre-narrative-styles';
 import { formatContextForPrompt } from './context-manager';
+import { summarizeWorldState } from './world-state-manager';
 import {
   getTotalDays,
   getGameplayConfig,
@@ -26,8 +27,6 @@ import {
 // v2.2: AI Narrative Engine (2025 Enhanced)
 import {
   calculateEndingProbabilities,
-  buildImprovementDirective,
-  quickQualityCheck,
   type EndingPrediction,
   type NarrativeSeed,
 } from './ai-narrative-engine';
@@ -229,6 +228,11 @@ export const buildOptimizedGamePrompt = (
     currentDay?: number;
     keyDecisions?: KeyDecision[];
     actionContext?: ActionContext; // 맥락 연결 시스템
+    actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용
+    actionType?: import('@/types').ActionType; // v1.2: 현재 행동 타입
+    characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태
+    worldState?: WorldState; // v1.2: 월드 상태 (위치, 발견물)
+    metCharacters?: string[]; // v1.2: 만난 캐릭터 (프롬프트 필터링용)
   } = {},
 ): GamePromptData => {
   const {
@@ -321,10 +325,23 @@ const buildLitePrompt = (
   });
 
   // v2.1: 동적 페르소나 시스템 (정적 한계 극복)
-  const actionHistory = options.actionContext?.todayActions?.map((a: { type: string; description: string }) => ({
-    type: a.type,
-    description: a.description,
-  })) || [];
+  // Fix: todayActions는 객체이므로 배열로 변환 필요
+  const actionHistory: Array<{ type: string; description: string }> = [];
+  const todayActions = options.actionContext?.todayActions;
+  if (todayActions) {
+    // 탐색 기록
+    todayActions.explorations?.forEach(e => {
+      actionHistory.push({ type: 'exploration', description: `${e.location}: ${e.result}` });
+    });
+    // 대화 기록
+    todayActions.dialogues?.forEach(d => {
+      actionHistory.push({ type: 'dialogue', description: `${d.character}와(과) ${d.topic} 대화: ${d.outcome}` });
+    });
+    // 선택 기록
+    todayActions.choices?.forEach(c => {
+      actionHistory.push({ type: 'choice', description: `${c.choice}: ${c.consequence}` });
+    });
+  }
   const playerPattern = analyzePlayerBehavior(actionHistory);
   const tensionState: CumulativeTensionState = options.tensionState || createInitialTensionState();
 
@@ -429,16 +446,65 @@ ${comboRewardGuide[actionSequence.currentCombo] || '플레이어의 전략적 �
             'caution': '플레이어가 신중하게 접근 중입니다. 숨겨진 정보나 힌트를 제공하세요.',
           };
 
+          // v1.2: infoUnlock 보너스 추가 (dialogue → choice, dialogue → exploration)
+          let infoUnlockGuide = '';
+          if (synergy.mechanicEffect?.infoUnlock) {
+            if (synergy.targetAction === 'choice') {
+              infoUnlockGuide = '\n**힌트 제공:** 선택지의 결과에 대해 미묘한 힌트를 서술에 자연스럽게 포함하세요 (직접적 예고 금지).';
+            } else if (synergy.targetAction === 'exploration') {
+              infoUnlockGuide = '\n**발견 가능성:** 대화에서 언급된 장소나 단서를 탐색 결과에 반영하세요. 숨겨진 정보가 드러날 수 있습니다.';
+            }
+          }
+
           actionEngagementSection += `
 ### 🔗 ACTION SYNERGY (행동 시너지) ###
 ${synergy.bonus}
-${synergyBonus[synergy.synergyType] || ''}
+${synergyBonus[synergy.synergyType] || ''}${infoUnlockGuide}
 `;
         }
       }
     }
   } catch (e) {
     console.warn('⚠️ Action Engagement 분석 실패:', e);
+  }
+
+  // v1.2: 발견한 정보(discoveredClues) 프롬프트 포함
+  let discoveredInfoSection = '';
+  if (options.actionContext?.discoveredClues && options.actionContext.discoveredClues.length > 0) {
+    // 최근 5개 단서만 포함 (토큰 절약)
+    const recentClues = options.actionContext.discoveredClues.slice(-5);
+
+    // 탐색에서 발견한 것과 대화에서 얻은 것 구분
+    const explorationClues = recentClues.filter(c => c.source.type === 'exploration');
+    const dialogueClues = recentClues.filter(c => c.source.type === 'dialogue');
+
+    const clueTexts = recentClues.map(clue => {
+      const sourceDesc = clue.source.type === 'dialogue'
+        ? `${clue.source.characterName}와(과)의 대화`
+        : clue.source.type === 'exploration'
+          ? `${clue.source.locationId} 탐색`
+          : '선택 결과';
+      return `- [${sourceDesc}] ${clue.content}`;
+    });
+
+    discoveredInfoSection = `
+
+### 📋 DISCOVERED INFORMATION (플레이어가 알아낸 정보 - v1.2) ###
+아래 정보는 플레이어가 직접 발견한 것입니다.
+
+${clueTexts.join('\n')}
+
+**AI 지시 (탐색-서사 연결 v1.2):**
+${explorationClues.length > 0 ? `
+- 탐색에서 발견한 물건/정보를 선택지에 활용하세요:
+  예: "창고에서 찾은 [아이템]을 사용한다" / "[장소]에서 본 것을 바탕으로..."
+- 발견물이 상황 해결에 도움이 되는 선택지를 추가하세요` : ''}
+${dialogueClues.length > 0 ? `
+- 대화에서 들은 정보를 근거로 판단하는 선택지를 만드세요:
+  예: "[캐릭터]가 말한 것이 맞다면..." / "[정보]를 믿고 행동한다"` : ''}
+- 플레이어가 모르는 정보는 선택지에 포함하지 마세요 (플레이어 지식 범위 준수)
+- 발견한 정보가 서사에 자연스럽게 언급되도록 하세요
+`;
   }
 
   // 회상 시스템 - 주요 결정 포맷팅
@@ -454,15 +520,50 @@ ${synergyBonus[synergy.synergyType] || ''}
   // flags deprecated - using ActionHistory for tracking
   const activeFlags = '';
 
-  // 핵심 캐릭터 정보 포함 (품질 보장을 위해 모든 캐릭터 포함)
+  // v1.2: 만난 캐릭터만 필터링 (빈 배열이면 모두 허용 - 레거시 호환)
+  const metCharacters = options.metCharacters || [];
+  const hasMetFilter = metCharacters.length > 0;
+
+  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시
   const characterInfo = scenario.characters
+    .filter((char) => char.characterName !== '(플레이어)')
     .map((char) => {
       const mainTrait =
         char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
-      const backstory = char.backstory.substring(0, 30) + '...'; // 간략화
-      return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
+      const backstory = char.backstory.substring(0, 30) + '...';
+      const isMet = !hasMetFilter || metCharacters.includes(char.characterName);
+      // 만난 캐릭터는 이름 표시, 아닌 캐릭터는 역할만 표시
+      if (isMet) {
+        return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
+      } else {
+        return `[미등장](${char.roleName}): ${mainTrait}`;
+      }
     })
     .join(' | ');
+
+  // 만난 캐릭터 목록을 AI에 명시적으로 전달
+  const metCharactersSection = hasMetFilter
+    ? `\n**만난 캐릭터**: ${metCharacters.join(', ')} (이 캐릭터만 이름으로 언급. 나머지는 "낯선 사람", "누군가" 등으로 표현)`
+    : '';
+
+  // v1.2: 캐릭터 발전 상태 (만난 캐릭터만)
+  let characterArcSection = '';
+  if (options.characterArcs && options.characterArcs.length > 0) {
+    const filteredArcs = hasMetFilter
+      ? options.characterArcs.filter((arc) => metCharacters.includes(arc.characterName))
+      : options.characterArcs;
+    const arcSummaries = filteredArcs.map(arc => {
+      const trustDesc = arc.trustLevel >= 50 ? '신뢰' : arc.trustLevel >= 0 ? '중립' : '경계';
+      const moodKorean: Record<string, string> = {
+        'hopeful': '희망적', 'anxious': '불안', 'angry': '분노',
+        'resigned': '체념', 'determined': '결의'
+      };
+      return `${arc.characterName}: ${trustDesc}(${arc.trustLevel}), ${moodKorean[arc.currentMood] || arc.currentMood}`;
+    }).join(' | ');
+    if (arcSummaries) {
+      characterArcSection = `\n캐릭터 상태: ${arcSummaries}`;
+    }
+  }
 
   // 관계 정보 간략화
   const relationships = scenario.initialRelationships
@@ -472,14 +573,23 @@ ${synergyBonus[synergy.synergyType] || ''}
     )
     .join(', ');
 
+  // v1.2: 월드 상태 요약 (파괴된 장소, 차단된 장소, 인벤토리)
+  let worldStateSection = '';
+  if (options.worldState) {
+    const summary = summarizeWorldState(options.worldState);
+    if (summary) {
+      worldStateSection = `\n월드 상태: ${summary}`;
+    }
+  }
+
   const systemPrompt = `Korean survival simulation AI for "${scenario.title}".
 
 Background: ${scenario.synopsis.substring(0, 300)}...
 
-Characters: ${characterInfo}
+Characters: ${characterInfo}${characterArcSection}${metCharactersSection}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
-Active Flags: ${activeFlags || 'None'}
+Active Flags: ${activeFlags || 'None'}${worldStateSection}
 Day: ${options.currentDay || 1}/${totalDays}
 
 CRITICAL LANGUAGE REQUIREMENTS:
@@ -532,20 +642,9 @@ Output JSON:
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
     "flags_acquired": ["FLAG_NAME"],
-    "shouldAdvanceTime": false
+    "locations_discovered": [{"name": "장소명", "description": "장소 설명"}]
   }
 }
-
-TIME PROGRESSION GUIDELINES (IMPORTANT):
-- **shouldAdvanceTime: false** (default): For regular dialogue, discussions, minor interactions
-- **shouldAdvanceTime: true**: ONLY for major events that conclude the day:
-  * Major battle or confrontation resolved
-  * Important negotiation completed
-  * Critical resource secured
-  * Significant journey/travel completed
-  * Major construction/project finished
-- Multiple conversations happen within a single day - don't rush time!
-- Let players make 2-4 decisions before a day passes
 
 STAT CHANGE GUIDELINES (CRITICAL):
 - **NORMAL actions** (dialogue, minor exploration): ±5 to ±10
@@ -555,6 +654,13 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Stats: cityChaos (↓ is good), communityCohesion (↑ is good), survivalFoundation (↑ is good)
 - Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
+
+LOCATIONS_DISCOVERED GUIDELINES (동적 장소 발견):
+- 서사에서 새로운 장소가 언급되거나 이동 가능해지면 locations_discovered에 추가
+- 예: 대화 중 "창고가 있다던데..." → {"name": "창고", "description": "물자가 보관된 곳"}
+- 예: 탐색 중 새 통로 발견 → {"name": "지하 통로", "description": "어둡고 습한 지하 통로"}
+- 이미 알려진 장소는 중복 추가하지 말 것
+- 플레이어가 실제로 방문 가능해진 장소만 추가
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
@@ -567,7 +673,8 @@ ${genreGuide}
 ${phaseGuideline}
 ${keyDecisionsSection}
 ${narrativeSeedsSection}
-${actionEngagementSection}`;
+${actionEngagementSection}
+${discoveredInfoSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext

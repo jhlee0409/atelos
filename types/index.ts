@@ -593,12 +593,17 @@ export type ScenarioData = {
   gameplayConfig?: GameplayConfig;
   /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
-  /** 탐색 위치 설정 - 시나리오별 커스텀 탐색 장소 */
-  locations?: ScenarioLocation[];
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only
   // =============================================================================
+  /**
+   * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+   * 이제 위치는 storyOpening.openingLocation에서 시작 위치만 설정하고,
+   * 나머지는 AI 서사를 통해 동적으로 발견됩니다.
+   * locations_discovered 필드로 새 장소가 추가됩니다.
+   */
+  locations?: ScenarioLocation[];
   /** @deprecated Use dynamicEndingConfig.endingDay instead */
   endCondition?: EndCondition;
   /** @deprecated Use dynamicEndingConfig instead */
@@ -734,7 +739,11 @@ export interface AIResponse {
     hiddenRelationships_change: any[]; // Type can be refined if needed
     /** @deprecated Flags system removed. */
     flags_acquired?: string[];
-    shouldAdvanceTime?: boolean; // AI가 시간 진행 여부를 결정
+    /** v1.2: 동적 위치 시스템 - 서사에서 발견/언급된 새 장소 */
+    locations_discovered?: Array<{
+      name: string;
+      description?: string;
+    }>;
   };
 }
 
@@ -836,8 +845,9 @@ export interface FreeTextInput {
 
 /**
  * 행동 유형 - 플레이어가 수행할 수 있는 모든 행동 종류
+ * v1.2: freeText를 choice로 통합 (isCustomInput 플래그로 구분)
  */
-export type ActionType = 'choice' | 'dialogue' | 'exploration' | 'freeText';
+export type ActionType = 'choice' | 'dialogue' | 'exploration';
 
 /**
  * 행동 기록 - 각 행동의 상세 정보를 기록
@@ -854,6 +864,8 @@ export interface ActionRecord {
   cost: number;
   /** 행동 수행 시점의 Day */
   day: number;
+  /** 사용자 직접 입력 여부 (v1.2: freeText 통합) */
+  isCustomInput?: boolean;
   /** 행동 결과 요약 */
   result?: {
     /** 스탯 변화 */
@@ -1028,6 +1040,10 @@ export type LocationIcon =
 /**
  * 시나리오 탐색 위치 정의 - ScenarioData에서 사용
  * WorldLocation보다 단순화된 버전으로, 시나리오 에디터에서 설정
+ *
+ * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
+ * 이제 위치는 AI 서사를 통해 동적으로 발견됩니다.
+ * 레거시 호환성을 위해 유지되지만 새 시나리오에서는 사용하지 마세요.
  */
 export interface ScenarioLocation {
   /** 위치 고유 ID */
@@ -1261,6 +1277,7 @@ export interface WorldStateUpdateResult {
 /**
  * 행동 기록 엔트리 - 플레이어의 모든 행동을 기록
  * 엔딩 생성 시 AI가 분석하여 결말에 반영
+ * v1.2: freeText를 choice로 통합
  */
 export interface ActionHistoryEntry {
   /** 행동이 발생한 일차 */
@@ -1269,14 +1286,17 @@ export interface ActionHistoryEntry {
   /** ISO 타임스탬프 */
   timestamp: string;
 
-  /** 행동 유형 */
-  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText';
+  /** 행동 유형 (v1.2: freeText 제거) */
+  actionType: 'choice' | 'dialogue' | 'exploration';
 
   /** 플레이어가 선택/입력한 내용 */
   content: string;
 
   /** 대상 (캐릭터명 또는 장소명) */
   target?: string;
+
+  /** 사용자 직접 입력 여부 (v1.2: freeText 통합) */
+  isCustomInput?: boolean;
 
   /** 행동의 결과 */
   consequence: {

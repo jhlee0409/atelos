@@ -10,6 +10,7 @@
 
 import type { ScenarioData, PlayerState, Character } from '@/types';
 import type { KeyDecision, AIResponse, SaveState } from './game-ai-client';
+import { compareValues } from '@/constants/comparison-operators';
 
 // =============================================================================
 // 1. Self-Evaluation System (자기 평가 시스템)
@@ -474,14 +475,8 @@ export function calculateEndingProbabilities(
           const statValue = stats[condition.required_stat.statId] || 0;
           const { comparison, value } = condition.required_stat;
 
-          let satisfied = false;
-          switch (comparison) {
-            case '>=': satisfied = statValue >= value; break;
-            case '<=': satisfied = statValue <= value; break;
-            case '>': satisfied = statValue > value; break;
-            case '<': satisfied = statValue < value; break;
-            case '==': satisfied = statValue === value; break;
-          }
+          // Fix: compareValues로 영단어('greater_equal')와 기호('>=') 모두 지원
+          const satisfied = compareValues(statValue, comparison, value);
 
           if (satisfied) {
             score += 20;

@@ -176,7 +176,7 @@ export const validateKoreanContent = (
 export const extractKoreanContent = (text: string): string => {
   // JSON 키 패턴 제거 (예: "log":, "dilemma":, "choice_a": 등)
   let cleaned = text
-    .replace(/"(log|dilemma|prompt|choice_a|choice_b|statChanges|scenarioStats|survivorStatus|hiddenRelationships_change|flags_acquired|shouldAdvanceTime|name|newStatus|pair|change)":/gi, '')
+    .replace(/"(log|dilemma|prompt|choice_a|choice_b|statChanges|scenarioStats|survivorStatus|hiddenRelationships_change|flags_acquired|name|newStatus|pair|change)":/gi, '')
     // 영문 stat ID 제거 (예: cityChaos, communityCohesion 등)
     .replace(/\b(cityChaos|communityCohesion|survivalFoundation|citizenTrust|resourceLevel|safetyLevel|defenseCapability|communityMorale)\b/gi, '')
     // FLAG_ 패턴 제거
@@ -643,6 +643,12 @@ export const generateGameResponse = async (
           includeRelationships: dynamicSettings.includeRelationships,
           keyDecisions: saveState.keyDecisions,
           actionContext: saveState.context.actionContext,
+          // v1.2: 시너지 분석용 데이터 전달
+          actionsThisDay: saveState.context.actionsThisDay || [],
+          actionType: 'choice',
+          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
+          worldState: saveState.context.worldState, // v1.2: 월드 상태
+          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
         },
       );
     } else {
@@ -671,6 +677,12 @@ export const generateGameResponse = async (
           currentDay: saveState.context.currentDay || 1,
           keyDecisions: saveState.keyDecisions,
           actionContext: saveState.context.actionContext,
+          // v1.2: 시너지 분석용 데이터 전달
+          actionsThisDay: saveState.context.actionsThisDay || [],
+          actionType: 'choice', // choice 핸들러에서 호출되므로 choice
+          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
+          worldState: saveState.context.worldState, // v1.2: 월드 상태
+          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
         },
       );
     }

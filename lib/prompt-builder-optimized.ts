@@ -63,12 +63,9 @@ OUTPUT:
     "scenarioStats": {},
     "flags_acquired": [],
     "survivorStatus": [],
-    "hiddenRelationships_change": [],
-    "shouldAdvanceTime": false
+    "hiddenRelationships_change": []
   }
-}
-
-TIME: shouldAdvanceTime=false (default), true ONLY for major day-ending events.`;
+}`;
 
 // 초경량 프롬프트 (150-200 토큰) - JSON 형식 명시
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.
@@ -187,6 +184,11 @@ export const buildOptimizedGamePromptV2 = (
     includeRelationships?: boolean;
     keyDecisions?: KeyDecision[];
     actionContext?: ActionContext;
+    actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용 (미사용, 타입 호환성)
+    actionType?: import('@/types').ActionType; // v1.2: 행동 타입 (미사용, 타입 호환성)
+    characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태 (미사용, 타입 호환성)
+    worldState?: import('@/types').WorldState; // v1.2: 월드 상태 (미사용, 타입 호환성)
+    metCharacters?: string[]; // v1.2: 만난 캐릭터 (미사용, 타입 호환성)
   } = {},
 ): GamePromptData => {
   const {
