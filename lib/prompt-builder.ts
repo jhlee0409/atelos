@@ -23,6 +23,15 @@ import {
   type CumulativeTensionState,
 } from './story-writer-persona';
 
+// v2.2: AI Narrative Engine (2025 Enhanced)
+import {
+  calculateEndingProbabilities,
+  buildImprovementDirective,
+  quickQualityCheck,
+  type EndingPrediction,
+  type NarrativeSeed,
+} from './ai-narrative-engine';
+
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
 // ===========================================
@@ -331,6 +340,47 @@ const buildLitePrompt = (
   // 2025 Enhanced: 압축된 페르소나 가이드 (기본)
   const personaGuide = getCompactPersona();
 
+  // v2.2: AI Narrative Engine - 엔딩 예측 및 복선 시스템
+  let narrativeSeedsSection = '';
+  if (currentDay >= 3) { // Day 3부터 엔딩 예측 활성화
+    try {
+      const mockSaveState = {
+        context: {
+          scenarioId: scenario.scenarioId,
+          scenarioStats: playerState.stats,
+          flags: playerState.flags,
+          currentDay,
+        },
+        community: { survivors: [], hiddenRelationships: playerState.relationships || {} },
+        log: '',
+        dilemma: { prompt: '', choice_a: '', choice_b: '' },
+        keyDecisions: options.keyDecisions || [],
+      };
+
+      const endingPrediction = calculateEndingProbabilities(scenario, mockSaveState);
+
+      // 복선 지시 생성 (high/medium urgency만)
+      const urgentSeeds = endingPrediction.seedsForCurrentTurn.filter(
+        s => s.urgency === 'high' || s.urgency === 'medium'
+      );
+
+      if (urgentSeeds.length > 0) {
+        narrativeSeedsSection = `
+
+### 🎯 NARRATIVE SEEDS (복선 심기 - Day ${currentDay}) ###
+현재 예측 엔딩: ${endingPrediction.mostLikelyEnding.name} (${endingPrediction.mostLikelyEnding.probability}%)
+궤적: ${endingPrediction.currentTrajectory === 'positive' ? '긍정적' : endingPrediction.currentTrajectory === 'negative' ? '부정적' : '불확실'}
+
+**이번 응답에 자연스럽게 포함할 복선:**
+${urgentSeeds.map(s => `- [${s.urgency.toUpperCase()}] ${s.implementation}`).join('\n')}
+`;
+      }
+    } catch (e) {
+      // 엔딩 예측 실패 시 무시
+      console.warn('⚠️ 엔딩 예측 실패:', e);
+    }
+  }
+
   // 회상 시스템 - 주요 결정 포맷팅
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
     options.keyDecisions,
@@ -455,7 +505,8 @@ ${dynamicPersonaGuide}
 ${genreGuide}
 
 ${phaseGuideline}
-${keyDecisionsSection}`;
+${keyDecisionsSection}
+${narrativeSeedsSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
