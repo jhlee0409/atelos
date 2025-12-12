@@ -728,74 +728,15 @@ Custom colors defined in `tailwind.config.ts`:
 3. If collision detected, system auto-clears protagonist name (AI uses pronouns instead)
 4. Check `firstCharacterToMeet` matches an actual character in `scenario.characters`
 
-## 🚨 Development Checklist (MANDATORY)
+## 🚨 개발 규칙 (MANDATORY)
 
-**이 체크리스트는 기능 구현/개선 시 반드시 따라야 합니다.**
+### 핵심 원칙
+1. **수정 전 읽기**: 코드를 충분히 이해한 후 수정
+2. **영향 추적**: grep으로 모든 사용처 확인
+3. **3-Way 통합**: AI 생성 → Admin → 게임 전체 확인
+4. **검증 필수**: `pnpm build && pnpm test`
 
-### 기능 구현 완료 후 자동 검증 단계
-
-모든 기능 구현/개선 작업 후, 다음을 **자동으로** 수행:
-
-#### 1. 타입 일관성 검증
-- [ ] 새로 추가한 타입이 `types/index.ts`에 정의되어 있는가?
-- [ ] 해당 타입을 사용하는 모든 파일에서 import 되었는가?
-- [ ] Optional 필드(`?`)와 required 필드가 일관되게 처리되는가?
-
-#### 2. 함수 호출 체인 검증
-- [ ] 새로운 파라미터를 추가했다면, 호출하는 **모든 곳**에서 전달되는가?
-- [ ] 함수 시그니처 변경 시, 모든 호출부가 업데이트 되었는가?
-- [ ] API 함수 호출 시그니처가 올바른가?
-
-#### 3. 데이터 흐름 검증
-```
-GameClient.tsx → lib/game-builder.ts → lib/gemini-client.ts
-                                     → lib/genre-narrative-styles.ts
-```
-- [ ] 새로운 상태/데이터가 이 체인 전체에서 올바르게 전달되는가?
-- [ ] 상태 업데이트가 모든 관련 핸들러에서 동일하게 처리되는가?
-
-#### 4. 핸들러 일관성 검증
-GameClient의 4개 주요 핸들러에 동일한 로직이 필요한 경우:
-- [ ] `handlePlayerChoice()` - 선택지 처리
-- [ ] `handleDialogueSelect()` - 대화 처리
-- [ ] `handleExplore()` - 탐색 처리
-- [ ] `handleFreeTextSubmit()` - 자유 입력 처리
-
-#### 5. AI 프롬프트 통합 검증
-새로운 컨텍스트/데이터를 AI에 전달해야 하는 경우:
-- [ ] 프롬프트 빌더에서 해당 데이터를 포함하는가?
-- [ ] 장르 스타일이 적절히 적용되는가?
-
-#### 6. UI 컴포넌트 연동 검증
-상태 변경이 UI에 반영되어야 하는 경우:
-- [ ] 관련 UI 컴포넌트에 props가 전달되는가?
-- [ ] 상태 변경 시 리렌더링이 발생하는가?
-
-#### 7. 폴백/에러 처리 검증
-- [ ] AI 호출 실패 시 폴백 로직이 있는가?
-- [ ] Optional 데이터 접근 시 null/undefined 체크가 있는가?
-
-#### 8. 테스트 검증
-- [ ] 새 기능에 대한 단위 테스트가 작성되었는가?
-- [ ] 기존 테스트가 통과하는가? (`pnpm test`)
-
-### 체크리스트 적용 예시
-
-```
-❌ 잘못된 패턴:
-"새 타입 추가했고, 컴포넌트 만들었습니다. 빌드 성공!"
-
-✅ 올바른 패턴:
-"새 타입 추가 완료. 검증 결과:
-- types/index.ts: ✅ 타입 정의됨
-- GameClient.tsx: ✅ 초기화 및 업데이트 로직 추가
-- 4개 핸들러: ✅ 모두 context 업데이트 호출
-- lib/gemini-client.ts: ✅ 프롬프트에 전달
-- tests/unit/: ✅ 테스트 추가됨
-모든 통합 지점 확인 완료."
-```
-
-### 현재 시스템 핵심 통합 지점
+### 시스템 통합 지점 (빠른 참조)
 
 | 시스템 | 초기화 | 업데이트 | AI 전달 | UI 표시 |
 |--------|--------|----------|---------|---------|
@@ -803,489 +744,55 @@ GameClient의 4개 주요 핸들러에 동일한 로직이 필요한 경우:
 | ActionContext | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | N/A |
 | WorldState | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | `ExplorationPanel` |
 | Character Arc | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `CharacterArcPanel` |
-| Key Decisions | N/A | `handlePlayerChoice` | `gemini-client.ts` | `KeyDecisionPanel` |
 | Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |
-| ProtagonistKnowledge | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | N/A |
-| GameplayConfig | N/A | N/A | `gameplay-config.ts` | `RouteIndicator`, `EndingProgress`, `StatsBar` |
 
-### 🔗 전체 시스템 통합 검증 (3-Way Integration)
-
-**ATELOS는 세 가지 핵심 시스템이 긴밀하게 연결되어 있습니다. 새로운 기능/데이터를 추가할 때 반드시 세 시스템 모두에서 통합을 확인해야 합니다.**
+### 3-Way Integration
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ATELOS 시스템 통합 다이어그램                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐  │
-│  │ 1. AI 시나리오   │ → │ 2. Admin Editor │ → │ 3. 게임      │  │
-│  │    생성 시스템   │    │    (수정/저장)   │    │   플레이    │  │
-│  └─────────────────┘    └─────────────────┘    └─────────────┘  │
-│                                                                 │
-│  - ai-generate/route.ts   - ScenarioEditor/*    - GameClient   │
-│  - ai-scenario-generator  - BaseContent         - game-builder │
-│  - CATEGORY_SCHEMAS       - SystemRulesContent  - gameplay-config│
-│                           - GameplayConfigContent - RouteIndicator│
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+AI 생성 (ai-generate/route.ts) → Admin (ScenarioEditor/*) → 게임 (GameClient)
 ```
 
-#### 새로운 ScenarioData 필드 추가 시 필수 체크리스트
+**새 ScenarioData 필드 추가 시:**
+1. `types/index.ts` - 타입 정의
+2. `ai-generate/route.ts` - AI 생성 카테고리
+3. `ScenarioEditor/*` - Admin UI
+4. `GameClient` / `lib/*` - 게임 사용
 
-**예시: `gameplayConfig` 필드를 추가하는 경우**
-
-| 단계 | 확인 사항 | 체크 |
-|------|----------|------|
-| **1. 타입 정의** | `types/index.ts`에 타입이 정의되었는가? | [ ] |
-| **2. AI 생성** | `ai-generate/route.ts`에 생성 카테고리가 추가되었는가? | [ ] |
-|  | `ai-scenario-generator.ts`에 결과 타입이 추가되었는가? | [ ] |
-|  | AI가 생성한 데이터가 ScenarioData에 올바르게 매핑되는가? | [ ] |
-| **3. Admin 편집** | Admin Editor에 수정 UI가 추가되었는가? | [ ] |
-|  | 저장 시 Firebase에 올바르게 저장되는가? | [ ] |
-|  | 시나리오 불러오기 시 데이터가 로드되는가? | [ ] |
-| **4. 게임 사용** | GameClient에서 해당 데이터를 사용하는가? | [ ] |
-|  | 기본값(defaults)이 정의되어 있는가? (선택적 필드의 경우) | [ ] |
-|  | 관련 UI 컴포넌트에 전달되는가? | [ ] |
-| **5. 유틸리티** | 헬퍼 함수가 필요한 경우 `lib/` 에 추가되었는가? | [ ] |
-|  | 다른 파일에서 import하여 사용 가능한가? | [ ] |
-
-#### 통합 검증 예시
-
-```
-❌ 불완전한 구현:
-"GameplayConfig 타입을 추가하고, Admin Editor UI를 만들었습니다."
-→ AI 생성 시스템과 게임 플레이 시스템에서 사용하지 않음!
-
-✅ 완전한 구현:
-"GameplayConfig 전체 통합 완료:
-1. types/index.ts: ✅ GameplayConfig, RouteScoreConfig 타입 정의
-2. ai-generate/route.ts: ✅ 'gameplay_config' 카테고리 추가
-   - CATEGORY_SCHEMAS에 스키마 정의
-   - CATEGORY_TEMPERATURE, CATEGORY_MAX_TOKENS 설정
-   - getCategoryPrompt에 프롬프트 템플릿 추가
-3. ai-scenario-generator.ts: ✅ GameplayConfigResult 타입 및 CATEGORY_INFO 추가
-4. GameplayConfigContent.tsx: ✅ Admin Editor UI 컴포넌트
-5. admin/[scenarioId]/page.tsx: ✅ 편집 페이지에 섹션 추가
-6. lib/gameplay-config.ts: ✅ 헬퍼 함수 및 기본값
-7. GameClient.tsx: ✅ getActionPointsPerDay, canCheckEnding 등 사용
-8. RouteIndicator.tsx: ✅ calculateRouteScores 사용
-9. EndingProgress.tsx: ✅ getEndingCheckDay 사용
-모든 시스템에서 gameplayConfig가 사용됨을 확인했습니다."
-```
-
-#### ScenarioData 필드별 통합 현황
+### ScenarioData 필드별 통합 현황
 
 | 필드 | AI 생성 | Admin 편집 | 게임 사용 |
 |------|---------|------------|----------|
 | `title`, `synopsis`, `playerGoal` | scenario_overview | BaseContent | GameClient |
 | `characters` | characters | CharacterContent | GameClient |
-| `initialRelationships` | relationships | CharacterContent | GameClient |
-| `scenarioStats` | stats | SystemRulesContent | StatsBar, GameClient |
-| `flagDictionary` | flags | SystemRulesContent | RouteIndicator, GameClient |
+| `scenarioStats` | stats | SystemRulesContent | StatsBar |
+| `flagDictionary` | flags | SystemRulesContent | RouteIndicator |
 | `endingArchetypes` | endings | CoreStoryElementsContent | ending-checker |
-| `traitPool` | traits | SystemRulesContent | GameClient |
 | `storyOpening` | story_opening | StoryOpeningContent | GameClient |
-| `gameplayConfig` | gameplay_config | GameplayConfigContent | gameplay-config utils |
-
-**⚠️ 새 필드 추가 시 위 테이블의 모든 열이 채워져야 합니다!**
-
-## 🧪 테스트 전략 (Test-Aware Development)
-
-**LLM 기반 개발에 최적화된 실용적 테스트 전략입니다.**
-
-### 테스트 적용 기준
-
-| 구분 | 테스트 필수 | 테스트 선택 |
-|------|-------------|-------------|
-| **핵심 비즈니스 로직** | ✅ | |
-| (ending-checker, simulation-utils) | | |
-| **API 엔드포인트** | ✅ | |
-| **유틸리티 함수** | ✅ | |
-| **UI 컴포넌트** | | ✅ |
-| **AI 생성 기능** | | ✅ (출력 비결정적) |
-| **스타일/레이아웃** | | ❌ 불필요 |
-
-### 개발 워크플로우
-
-#### 1단계: 구현 계획 공유
-
-구현 전 무엇을 만들지 명확히 설명:
-
-```
-📋 구현 계획:
-- 목표: 스토리 오프닝 재생성 버튼 추가
-- 변경 파일: ScenarioEditor/index.tsx, ai-generate/route.ts
-- 영향 범위: 기존 시나리오 편집 기능
-```
-
-#### 2단계: 구현
-
-LLM으로 빠르게 구현 진행
-
-#### 3단계: 핵심 테스트 작성 (해당 시)
-
-핵심 로직 변경 시에만 테스트 추가:
-
-```typescript
-// 핵심 로직 예시 - 테스트 필수
-describe('checkEndingConditions', () => {
-  it('should trigger ending when all conditions met', () => {
-    // ...
-  });
-});
-```
-
-#### 4단계: 검증
-
-```bash
-pnpm build       # 빌드 성공 확인
-pnpm test        # 기존 테스트 통과 확인
-```
-
-### 테스트 파일 위치
-
-| 테스트 유형 | 위치 | 용도 |
-|------------|------|------|
-| Unit Tests | `tests/unit/` | 핵심 함수/모듈 테스트 |
-| Integration Tests | `tests/integration/` | 시스템 간 통합 테스트 |
-| AI Quality Tests | `tests/ai-quality/` | AI 응답 품질 테스트 |
-
-### 테스트 작성 시 가이드라인
-
-1. **테스트 이름은 명확하게**: `should [동작] when [조건]`
-2. **AAA 패턴 사용**: Arrange → Act → Assert
-3. **엣지 케이스 포함**: 빈 값, null, 경계값 등
-4. **Mock 적절히 사용**: 외부 의존성은 mock 처리
-5. **독립적인 테스트**: 테스트 간 의존성 없이 독립 실행 가능
-
-### 핵심 원칙
-
-```
-✅ 올바른 패턴:
-"엔딩 체커 로직 수정 → 테스트 추가 → 검증"
-"UI 버튼 추가 → 빌드 확인 → 수동 테스트"
-
-❌ 피해야 할 패턴:
-"모든 기능에 테스트 먼저 작성" (과도한 오버헤드)
-"테스트 없이 핵심 로직 수정" (위험)
-```
-
-## 📝 문서화 규칙 (Documentation Rules)
-
-**기능 구현/개선 후 반드시 관련 문서를 업데이트해야 합니다.**
-
-### 필수 업데이트 대상
-
-| 변경 유형 | 업데이트 대상 |
-|----------|---------------|
-| 새로운 시스템/기능 추가 | CLAUDE.md (Project Structure, High-Level Architecture) |
-| 새로운 유틸리티 함수 추가 | CLAUDE.md (lib/ 섹션에 파일 설명 추가) |
-| 타입 정의 변경 | CLAUDE.md (Type System 섹션) |
-| API 엔드포인트 추가 | CLAUDE.md (API Routes 테이블) |
-| 환경 변수 추가 | CLAUDE.md (Environment Setup) |
-| 디버깅 팁 발견 | CLAUDE.md (Common Debugging) |
-| 주요 기능 완성 | README.md (Features 섹션) |
-
-### 문서 업데이트 체크리스트
-
-기능 구현 완료 후 다음을 확인:
-
-- [ ] **CLAUDE.md**: 새 파일/함수가 Project Structure에 반영되었는가?
-- [ ] **CLAUDE.md**: 새 시스템이 High-Level Architecture에 설명되었는가?
-- [ ] **CLAUDE.md**: 핵심 통합 지점 테이블이 업데이트 되었는가?
-- [ ] **README.md**: 사용자에게 보이는 새 기능이 Features에 추가되었는가?
-
-### 문서화 예시
-
-```
-✅ 올바른 패턴:
-"시나리오 검증 시스템 구현 완료.
-- lib/scenario-validator.ts 추가
-- CLAUDE.md: lib/ 섹션에 scenario-validator.ts 설명 추가
-- CLAUDE.md: Admin 섹션에 검증 시스템 설명 추가"
-
-❌ 잘못된 패턴:
-"시나리오 검증 시스템 구현 완료. 빌드 성공!"
-(문서 업데이트 없음)
-```
-
-## 🔥 ATELOS 최적화 개발 프로세스 (MANDATORY)
-
-**이 프로세스는 모든 작업에서 반드시 따라야 합니다. 실수를 최소화하고 최고 품질의 결과물을 보장합니다.**
-
-### 핵심 원칙: "분석 → 계획 → 확인 → 실행 → 검증"
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ATELOS 개발 프로세스 흐름                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ① 분석      ② 계획       ③ 확인      ④ 실행      ⑤ 검증       │
-│  ────────→ ────────→ ────────→ ────────→ ────────→            │
-│                                                                 │
-│  문제 이해    영향 범위     사용자와     코드 수정    빌드/테스트   │
-│  코드 파악    파일 나열     계획 공유    한 파일씩    체크리스트    │
-│                           승인 요청                             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### Phase 1: 분석 (ANALYZE) - 수정 전 필수
-
-**⚠️ 코드 수정 전에 반드시 다음을 수행:**
-
-#### 1.1 문제/요청 이해
-```
-📋 요청 분석:
-- 사용자 요청: [요청 내용]
-- 핵심 목표: [달성해야 할 것]
-- 예상 결과물: [완료 시 상태]
-```
-
-#### 1.2 관련 코드 파악 (읽기 우선)
-```
-📂 영향받는 파일 분석:
-1. [파일1.ts] - 역할: [설명], 수정 필요: [예/아니오]
-2. [파일2.ts] - 역할: [설명], 수정 필요: [예/아니오]
-...
-```
-
-#### 1.3 데이터 흐름 추적
-ATELOS의 핵심 흐름을 따라 영향 범위 파악:
-```
-데이터 흐름 체크:
-□ AI 생성 시스템 (ai-generate/route.ts)
-□ Admin Editor (ScenarioEditor/*)
-□ 게임 플레이 (GameClient, game-builder)
-□ 유틸리티 (lib/*)
-□ 타입 정의 (types/index.ts)
-```
-
----
-
-### Phase 2: 계획 (PLAN) - 수정 계획 수립
-
-#### 2.1 수정 계획 작성
-```
-📝 수정 계획:
-
-1단계: [파일명] - [수정 내용 요약]
-   - 변경: [구체적인 변경사항]
-   - 이유: [왜 이 변경이 필요한지]
-
-2단계: [파일명] - [수정 내용 요약]
-   ...
-
-예상 위험:
-- [잠재적 문제점과 대응 방안]
-
-검증 방법:
-- [어떻게 검증할 것인지]
-```
-
-#### 2.2 체크포인트 설정
-복잡한 작업의 경우 중간 확인 지점 설정:
-```
-🔖 체크포인트:
-□ CP1: [1단계 완료 후 확인할 내용]
-□ CP2: [2단계 완료 후 확인할 내용]
-□ CP3: [최종 검증]
-```
-
----
-
-### Phase 3: 확인 (CONFIRM) - 사용자 승인
-
-**복잡한 작업(3개 이상 파일 수정)의 경우:**
-```
-⏸️ 계획 검토 요청:
-위 분석과 계획이 맞는지 확인해주세요.
-진행해도 될까요?
-```
-
-**간단한 작업의 경우:**
-분석과 계획을 제시하고 바로 진행하되, 각 수정마다 설명 제공
-
----
-
-### Phase 4: 실행 (EXECUTE) - 한 번에 하나씩
-
-#### 4.1 순차적 수정
-```
-🔧 수정 진행: [N/총개수]
-
-파일: [파일경로]
-변경 내용:
-- [구체적인 변경 설명]
-
-[코드 수정 실행]
-
-✅ 완료: [간단한 확인 메시지]
-```
-
-#### 4.2 핸들러 일관성 (GameClient 수정 시)
-4개 핸들러 모두 확인 필수:
-```
-🔄 핸들러 일관성 체크:
-□ handlePlayerChoice() - [적용/해당없음]
-□ handleDialogueSelect() - [적용/해당없음]
-□ handleExplore() - [적용/해당없음]
-□ handleFreeTextSubmit() - [적용/해당없음]
-```
-
----
-
-### Phase 5: 검증 (VERIFY) - 완료 후 필수
-
-#### 5.1 빌드 검증
-```bash
-pnpm build
-```
-
-#### 5.2 테스트 검증
-```bash
-pnpm test
-```
-
-#### 5.3 통합 체크리스트
-```
-✅ 최종 검증 결과:
-
-타입 일관성:
-□ types/index.ts 업데이트됨
-□ 모든 import 확인됨
-
-함수 호출 체인:
-□ 모든 호출부에서 새 파라미터 전달
-□ API 시그니처 일치
-
-3-Way 통합 (해당 시):
-□ AI 생성 시스템
-□ Admin Editor
-□ 게임 플레이
-
-빌드/테스트:
-□ pnpm build 성공
-□ pnpm test 통과
-```
-
----
-
-### 패턴 인식: 흔한 실수 방지
-
-#### ⚠️ 주의해야 할 패턴
-
-| 상황 | 흔한 실수 | 올바른 접근 |
-|------|----------|-------------|
-| 새 파라미터 추가 | 일부 호출부만 수정 | **모든** 호출부 grep으로 찾아 수정 |
-| 타입 변경 | types/index.ts만 수정 | 사용하는 **모든** 파일 확인 |
-| GameClient 로직 추가 | 한 핸들러만 수정 | **4개 핸들러** 모두 확인 |
-| AI 프롬프트 수정 | 프롬프트만 수정 | **응답 파싱 로직**도 확인 |
-| 새 시나리오 필드 | 게임에서만 사용 | AI 생성 + Admin + 게임 **3곳** 모두 |
-
-#### 🔍 수정 전 자동 체크 질문
-
-1. **"이 파일을 사용하는 다른 곳이 있나?"**
-   ```bash
-   # 항상 grep으로 확인
-   grep -r "함수명\|타입명" --include="*.ts" --include="*.tsx"
-   ```
-
-2. **"이 변경이 다른 시스템에 영향을 주나?"**
-   - AI 생성 → Admin Editor → 게임 플레이 체인 확인
-
-3. **"Optional 필드인가, Required 필드인가?"**
-   - Optional: 기본값과 null 체크 필요
-   - Required: 모든 곳에서 값 제공 필요
-
----
-
-### 작업 유형별 빠른 참조
-
-#### 버그 수정
-```
-1. 문제 재현 조건 파악
-2. 관련 코드 읽기 (최소 3단계 호출 체인)
-3. 근본 원인 파악
-4. 수정 계획 수립
-5. 수정 및 검증
-```
-
-#### 새 기능 추가
-```
-1. 3-Way 통합 체크리스트 참조
-2. 타입 정의부터 시작
-3. AI 생성 → Admin → 게임 순서로 구현
-4. 각 단계마다 검증
-```
-
-#### 리팩토링
-```
-1. 영향받는 모든 파일 나열
-2. 테스트 먼저 실행 (기준점)
-3. 작은 단위로 수정
-4. 매 수정 후 테스트
-```
-
----
-
-### 사용자 피드백 통합
-
-**작업 중 문제 발견 시:**
-```
-⚠️ 발견된 문제:
-- 문제: [설명]
-- 위치: [파일:라인]
-- 제안: [해결 방안]
-
-계속 진행할까요, 아니면 먼저 이 문제를 해결할까요?
-```
-
-**불확실한 부분이 있을 때:**
-```
-❓ 확인 필요:
-- [질문 내용]
-- 옵션 A: [설명]
-- 옵션 B: [설명]
-
-어떤 방향으로 진행할까요?
-```
-
----
-
-### 완료 보고 템플릿
-
-```
-✅ 작업 완료 보고
-
-## 요약
-[한 줄 요약]
-
-## 변경 사항
-1. [파일1]: [변경 내용]
-2. [파일2]: [변경 내용]
-
-## 검증 결과
-- 빌드: ✅ 성공
-- 테스트: ✅ 통과
-- 통합 체크: ✅ 완료
-
-## 다음 단계 (해당 시)
-- [추가 작업이 필요한 경우]
-```
-
----
-
-### 이 프로세스의 핵심 가치
-
-```
-🎯 목표: 한 번에 제대로, 실수 없이
-
-1. 읽기 우선: 코드를 충분히 이해한 후 수정
-2. 영향 추적: 모든 연관 지점 파악
-3. 순차 실행: 한 번에 하나씩, 검증하며 진행
-4. 완전한 통합: 3-Way 시스템 전체 확인
-5. 투명한 소통: 계획과 진행 상황 명확히 공유
-```
+| `gameplayConfig` | gameplay_config | GameplayConfigContent | gameplay-config |
+
+### GameClient 핸들러 일관성
+
+4개 핸들러에 동일 로직 필요 시 모두 수정:
+- `handlePlayerChoice()`
+- `handleDialogueSelect()`
+- `handleExplore()`
+- `handleFreeTextSubmit()`
+
+### 흔한 실수 방지
+
+| 상황 | 올바른 접근 |
+|------|-------------|
+| 새 파라미터 추가 | grep으로 **모든** 호출부 찾아 수정 |
+| 타입 변경 | 사용하는 **모든** 파일 확인 |
+| GameClient 수정 | **4개 핸들러** 모두 확인 |
+| AI 프롬프트 수정 | **응답 파싱 로직**도 확인 |
+| 새 시나리오 필드 | 3-Way 통합 **3곳** 모두 |
+
+### 테스트 기준
+
+| 구분 | 테스트 |
+|------|--------|
+| 핵심 로직 (ending-checker 등) | 필수 |
+| API 엔드포인트 | 필수 |
+| UI 컴포넌트 | 선택 |
+| AI 생성 기능 | 선택 |
