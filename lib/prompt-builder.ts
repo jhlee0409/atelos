@@ -323,10 +323,23 @@ const buildLitePrompt = (
   });
 
   // v2.1: 동적 페르소나 시스템 (정적 한계 극복)
-  const actionHistory = options.actionContext?.todayActions?.map((a: { type: string; description: string }) => ({
-    type: a.type,
-    description: a.description,
-  })) || [];
+  // Fix: todayActions는 객체이므로 배열로 변환 필요
+  const actionHistory: Array<{ type: string; description: string }> = [];
+  const todayActions = options.actionContext?.todayActions;
+  if (todayActions) {
+    // 탐색 기록
+    todayActions.explorations?.forEach(e => {
+      actionHistory.push({ type: 'exploration', description: `${e.location}: ${e.result}` });
+    });
+    // 대화 기록
+    todayActions.dialogues?.forEach(d => {
+      actionHistory.push({ type: 'dialogue', description: `${d.character}와(과) ${d.topic} 대화: ${d.outcome}` });
+    });
+    // 선택 기록
+    todayActions.choices?.forEach(c => {
+      actionHistory.push({ type: 'choice', description: `${c.choice}: ${c.consequence}` });
+    });
+  }
   const playerPattern = analyzePlayerBehavior(actionHistory);
   const tensionState: CumulativeTensionState = options.tensionState || createInitialTensionState();
 

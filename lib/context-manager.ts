@@ -16,6 +16,20 @@ import {
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { getRouteActivationDay, getEndingCheckDay } from './gameplay-config';
 
+// ClueId 카운터 (충돌 방지)
+let clueIdCounter = 0;
+
+/**
+ * 고유한 clueId 생성 (충돌 방지)
+ * @param source 출처 타입 ('exploration', 'dialogue', 'choice')
+ * @param identifier 추가 식별자 (locationId, characterName 등)
+ */
+const generateClueId = (source: string, identifier: string): string => {
+  clueIdCounter++;
+  const randomPart = Math.random().toString(36).substring(2, 6);
+  return `clue_${source}_${identifier}_${Date.now()}_${clueIdCounter}_${randomPart}`;
+};
+
 // =============================================================================
 // 초기 맥락 생성
 // =============================================================================
@@ -111,7 +125,7 @@ export const updateContextAfterExploration = (
   // v1.2: infoGained를 단서로 추가
   if (rewards?.infoGained) {
     newClues.push({
-      clueId: `clue_${Date.now()}`,
+      clueId: generateClueId('exploration', locationName),
       content: rewards.infoGained,
       source: {
         type: 'exploration',
@@ -128,7 +142,7 @@ export const updateContextAfterExploration = (
       // infoGained와 중복되지 않는 것만 추가
       if (!rewards.infoGained || !rewards.infoGained.includes(discovery)) {
         newClues.push({
-          clueId: `clue_${Date.now()}_${idx}`,
+          clueId: generateClueId('exploration', `${locationName}_${idx}`),
           content: discovery,
           source: {
             type: 'exploration',
@@ -175,7 +189,7 @@ export const updateContextAfterDialogue = (
   const newClues: DiscoveredClue[] = [...context.discoveredClues];
   if (infoGained) {
     newClues.push({
-      clueId: `clue_${Date.now()}`,
+      clueId: generateClueId('dialogue', characterName),
       content: infoGained,
       source: {
         type: 'dialogue',
