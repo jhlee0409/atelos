@@ -2,6 +2,7 @@
   "project": "Dynamic Ending System",
   "version": "1.0.0",
   "created": "2025-12-11",
+  "lastUpdated": "2025-12-12",
   "status": "in_progress",
   "sdt_principles": {
     "autonomy": "플레이어 선택이 결말에 반영됨을 체감",
@@ -12,20 +13,20 @@
     {
       "id": 1,
       "name": "Type Definitions",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
-        { "task": "Add ActionHistoryEntry type", "file": "types/index.ts", "done": false },
-        { "task": "Add DynamicEndingConfig type", "file": "types/index.ts", "done": false },
-        { "task": "Add DynamicEndingResult type", "file": "types/index.ts", "done": false },
-        { "task": "Add CharacterFate type", "file": "types/index.ts", "done": false },
-        { "task": "Add GoalAchievementLevel type", "file": "types/index.ts", "done": false },
-        { "task": "Extend ScenarioData type", "file": "types/index.ts", "done": false }
+        { "task": "Add ActionHistoryEntry type", "file": "types/index.ts", "done": true },
+        { "task": "Add DynamicEndingConfig type", "file": "types/index.ts", "done": true },
+        { "task": "Add DynamicEndingResult type", "file": "types/index.ts", "done": true },
+        { "task": "Add CharacterFate type", "file": "types/index.ts", "done": true },
+        { "task": "Add GoalAchievementLevel type", "file": "types/index.ts", "done": true },
+        { "task": "Extend ScenarioData type", "file": "types/index.ts", "done": true }
       ]
     },
     {
       "id": 2,
       "name": "ActionHistory Collection",
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
         { "task": "Add actionHistory state to GameClient", "file": "components/client/GameClient/index.tsx", "done": false },
         { "task": "Update handlePlayerChoice", "file": "components/client/GameClient/index.tsx", "done": false },
@@ -37,11 +38,11 @@
     {
       "id": 3,
       "name": "Ending Generation API",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
-        { "task": "Create route.ts with SDT prompt", "file": "app/api/generate-ending/route.ts", "done": false },
-        { "task": "Define JSON schema for Gemini", "file": "app/api/generate-ending/route.ts", "done": false },
-        { "task": "Implement response validation", "file": "app/api/generate-ending/route.ts", "done": false }
+        { "task": "Create route.ts with SDT prompt", "file": "app/api/generate-ending/route.ts", "done": true },
+        { "task": "Define JSON schema for Gemini", "file": "app/api/generate-ending/route.ts", "done": true },
+        { "task": "Implement response validation", "file": "app/api/generate-ending/route.ts", "done": true }
       ]
     },
     {
@@ -97,5 +98,12 @@
     "app/admin/[scenarioId]/page.tsx",
     "components/client/GameClient/DynamicEndingDisplay.tsx",
     "components/admin/ScenarioWizard.tsx"
+  ],
+  "commits": [
+    {
+      "hash": "0ea89a1",
+      "message": "feat: Add Dynamic Ending System types and documentation",
+      "date": "2025-12-12"
+    }
   ]
 }

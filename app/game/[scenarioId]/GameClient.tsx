@@ -27,7 +27,7 @@ import { callGeminiAPI, parseGeminiJsonResponse } from '@/lib/gemini-client';
 import { StatsBar } from '@/components/client/GameClient/StatsBar';
 import { ChatHistory } from '@/components/client/GameClient/ChatHistory';
 import { ChoiceButtons } from '@/components/client/GameClient/ChoiceButtons';
-import { SaveState, AIResponse, PlayerAction, ActionType, ActionRecord } from '@/types';
+import { SaveState, AIResponse, PlayerAction, ActionType, ActionRecord, ActionHistoryEntry, DynamicEndingResult } from '@/types';
 import { checkEndingConditions } from '@/lib/ending-checker';
 import {
   generateFallbackInitialChoices,
@@ -999,6 +999,38 @@ export default function GameClient({ scenario }: GameClientProps) {
   const [isDialogueLoading, setIsDialogueLoading] = useState(false);
   const [isExplorationLoading, setIsExplorationLoading] = useState(false);
 
+  // Dynamic Ending System: 행동 기록 및 동적 결말
+  const [actionHistory, setActionHistory] = useState<ActionHistoryEntry[]>([]);
+  const [dynamicEnding, setDynamicEnding] = useState<DynamicEndingResult | null>(null);
+  const [isGeneratingEnding, setIsGeneratingEnding] = useState(false);
+
+  /**
+   * ActionHistory에 행동 기록 추가
+   * SDT 기반 동적 결말 생성을 위한 데이터 수집
+   */
+  const addToActionHistory = (
+    actionType: ActionHistoryEntry['actionType'],
+    content: string,
+    consequence: ActionHistoryEntry['consequence'],
+    narrativeSummary: string,
+    target?: string,
+    moralAlignment?: ActionHistoryEntry['moralAlignment']
+  ) => {
+    const entry: ActionHistoryEntry = {
+      day: saveState.context.currentDay ?? 1,
+      timestamp: new Date().toISOString(),
+      actionType,
+      content,
+      target,
+      consequence,
+      narrativeSummary,
+      moralAlignment,
+    };
+
+    setActionHistory(prev => [...prev, entry]);
+    console.log('📝 ActionHistory 기록:', actionType, content.slice(0, 50) + '...');
+  };
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     const chatContainer = document.getElementById('chat-container');
@@ -1346,6 +1378,52 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       recordKeyDecision();
 
+      // Dynamic Ending System: ActionHistory 기록
+      {
+        // 스탯 변화 추출
+        const statsChanged = Object.entries(cleanedResponse.statChanges.scenarioStats || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: updatedSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        // 관계 변화 추출
+        const relationshipsChanged = (cleanedResponse.statChanges.hiddenRelationships_change || [])
+          .filter((r: { characterPair?: string; delta?: number }) => r.delta && r.delta !== 0)
+          .map((r: { characterPair?: string; delta?: number }) => {
+            const char = r.characterPair?.replace('플레이어-', '') || '';
+            return {
+              character: char,
+              delta: r.delta || 0,
+              newValue: updatedSaveState.community.hiddenRelationships[`플레이어-${char}`] ?? 0,
+            };
+          });
+
+        // 도덕적 성격 판단 (간단한 휴리스틱)
+        const determineMoralAlignment = (choice: string): ActionHistoryEntry['moralAlignment'] => {
+          const lc = choice.toLowerCase();
+          if (lc.includes('희생') || lc.includes('보호') || lc.includes('도움') || lc.includes('구출')) return 'selfless';
+          if (lc.includes('자원') || lc.includes('효율') || lc.includes('전략')) return 'pragmatic';
+          if (lc.includes('혼자') || lc.includes('포기') || lc.includes('탈출')) return 'selfish';
+          return 'neutral';
+        };
+
+        addToActionHistory(
+          'choice',
+          choiceDetails,
+          {
+            statsChanged,
+            relationshipsChanged,
+            significantEvents: cleanedResponse.statChanges.flags_acquired || [],
+          },
+          cleanedResponse.log.slice(0, 200),
+          undefined,
+          determineMoralAlignment(choiceDetails)
+        );
+      }
+
       // 맥락 연결 시스템: 선택 결과로 맥락 업데이트
       if (updatedSaveState.context.actionContext) {
         const currentDay = updatedSaveState.context.currentDay || 1;
@@ -1557,6 +1635,28 @@ export default function GameClient({ scenario }: GameClientProps) {
           timestamp: Date.now() + 2,
         });
       }
+
+      // Dynamic Ending System: ActionHistory 기록 (대화)
+      addToActionHistory(
+        'dialogue',
+        `${topic.label}`,
+        {
+          statsChanged: [],
+          relationshipsChanged: dialogueResponse.relationshipChange
+            ? [{
+                character: characterName,
+                delta: dialogueResponse.relationshipChange,
+                newValue: newSaveState.community.hiddenRelationships[
+                  ['(플레이어)', characterName].sort().join('-')
+                ] ?? 0,
+              }]
+            : [],
+          significantEvents: dialogueResponse.infoGained ? [`정보 획득: ${dialogueResponse.infoGained.slice(0, 50)}`] : [],
+        },
+        dialogueResponse.dialogue.slice(0, 200),
+        characterName,
+        'neutral'
+      );
 
       // 맥락 연결 시스템: 대화 결과로 맥락 업데이트
       if (newSaveState.context.actionContext) {
@@ -1803,6 +1903,35 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
       }
 
+      // Dynamic Ending System: ActionHistory 기록 (탐색)
+      {
+        const statsChanged = Object.entries(explorationResult.rewards?.statChanges || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: newSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        const significantEvents = [
+          ...(explorationResult.rewards?.flagsAcquired || []),
+          ...(worldStateResult?.newDiscoveries.map(d => `발견: ${d.name}`) || []),
+        ];
+
+        addToActionHistory(
+          'exploration',
+          `${location.name} 탐색`,
+          {
+            statsChanged,
+            relationshipsChanged: [],
+            significantEvents,
+          },
+          explorationResult.narrative.slice(0, 200),
+          location.name,
+          'pragmatic'
+        );
+      }
+
       // 맥락 연결 시스템: 탐색 결과로 맥락 업데이트
       if (newSaveState.context.actionContext) {
         const currentDay = newSaveState.context.currentDay || 1;
@@ -1977,6 +2106,50 @@ export default function GameClient({ scenario }: GameClientProps) {
         cleanedResponse,
         scenario,
       );
+
+      // Dynamic Ending System: ActionHistory 기록 (자유 입력)
+      {
+        const statsChanged = Object.entries(cleanedResponse.statChanges?.scenarioStats || {})
+          .filter(([, delta]) => delta !== 0)
+          .map(([statId, delta]) => ({
+            statId,
+            delta: delta as number,
+            newValue: updatedSaveState.context.scenarioStats[statId] ?? 0,
+          }));
+
+        const relationshipsChanged = (cleanedResponse.statChanges?.hiddenRelationships_change || [])
+          .filter((r: { characterPair?: string; delta?: number }) => r.delta && r.delta !== 0)
+          .map((r: { characterPair?: string; delta?: number }) => {
+            const char = r.characterPair?.replace('플레이어-', '') || '';
+            return {
+              character: char,
+              delta: r.delta || 0,
+              newValue: updatedSaveState.community.hiddenRelationships[`플레이어-${char}`] ?? 0,
+            };
+          });
+
+        // 도덕적 성격 판단
+        const determineMoralAlignment = (input: string): ActionHistoryEntry['moralAlignment'] => {
+          const lc = input.toLowerCase();
+          if (lc.includes('희생') || lc.includes('보호') || lc.includes('도움')) return 'selfless';
+          if (lc.includes('자원') || lc.includes('효율') || lc.includes('전략')) return 'pragmatic';
+          if (lc.includes('혼자') || lc.includes('포기')) return 'selfish';
+          return 'neutral';
+        };
+
+        addToActionHistory(
+          'freeText',
+          text,
+          {
+            statsChanged,
+            relationshipsChanged,
+            significantEvents: cleanedResponse.statChanges?.flags_acquired || [],
+          },
+          cleanedResponse.log.slice(0, 200),
+          undefined,
+          determineMoralAlignment(text)
+        );
+      }
 
       // 맥락 연결 시스템: 자유 입력 결과로 맥락 업데이트
       if (updatedSaveState.context.actionContext) {
