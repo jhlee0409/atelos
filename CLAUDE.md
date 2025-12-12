@@ -343,7 +343,8 @@ Per-day action budget management:
 - `actionPoints`: Current remaining actions
 - `maxActionPoints`: Maximum actions per day
 - `ActionRecord`: Records of actions taken
-- Actions consume points: choice (1), dialogue (1), exploration (1), freeText (1)
+- Actions consume points: choice (1), dialogue (1), exploration (1)
+- v1.2: freeText가 choice로 통합됨 (ActionRecord.isCustomInput으로 구분)
 
 #### Action Engagement System (`lib/action-engagement-system.ts`)
 
@@ -410,6 +411,7 @@ AI가 일관된 작가 페르소나로 서사를 생성:
 Maintains context across actions:
 - `ActionContext`: Current situation, location, today's actions
 - `DiscoveredClue`: Information pieces found during play
+  - v1.2: 발견한 정보가 AI 프롬프트에 포함되어 선택지 생성에 활용됨
 - `CharacterPresence`: Character locations and availability
 - `DynamicLocation`: Situation-dependent exploration options
 
@@ -831,6 +833,7 @@ Custom colors defined in `tailwind.config.ts`:
 |--------|--------|----------|---------|---------|
 | Action Points | `createInitialSaveState` | 4개 핸들러 | N/A | `ChoiceButtons`, `TimelineProgress` |
 | ActionContext | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | N/A |
+| DiscoveredClues | `context-manager.ts` | dialogue/exploration 핸들러 | `prompt-builder.ts` (v1.2) | `chatHistory` |
 | WorldState | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | `ExplorationPanel` |
 | Character Arc | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `CharacterArcPanel` |
 | Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |

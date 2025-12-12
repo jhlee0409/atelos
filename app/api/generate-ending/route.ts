@@ -264,10 +264,10 @@ ${scenario.characters.map(c => `- ${c.characterName} (${c.roleName}): ${c.backst
 ## 행동 통계
 - 총 행동 수: ${actionHistory.length}회
 - 행동 유형 분포:
-  - 선택: ${actionHistory.filter(a => a.actionType === 'choice').length}회
+  - 선택: ${actionHistory.filter(a => a.actionType === 'choice' && !a.isCustomInput).length}회
+  - 직접 입력: ${actionHistory.filter(a => a.actionType === 'choice' && a.isCustomInput).length}회
   - 대화: ${actionHistory.filter(a => a.actionType === 'dialogue').length}회
   - 탐색: ${actionHistory.filter(a => a.actionType === 'exploration').length}회
-  - 자유 입력: ${actionHistory.filter(a => a.actionType === 'freeText').length}회
 
 ## 도덕적 패턴
 - 지배적 패턴: ${dominantMoral}

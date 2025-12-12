@@ -989,6 +989,7 @@ export default function GameClient({ scenario }: GameClientProps) {
   /**
    * ActionHistory에 행동 기록 추가
    * SDT 기반 동적 결말 생성을 위한 데이터 수집
+   * v1.2: isCustomInput 파라미터 추가 (freeText 통합)
    */
   const addToActionHistory = (
     actionType: ActionHistoryEntry['actionType'],
@@ -996,11 +997,13 @@ export default function GameClient({ scenario }: GameClientProps) {
     consequence: ActionHistoryEntry['consequence'],
     narrativeSummary: string,
     target?: string,
-    moralAlignment?: ActionHistoryEntry['moralAlignment']
+    moralAlignment?: ActionHistoryEntry['moralAlignment'],
+    isCustomInput?: boolean
   ) => {
     const entry: ActionHistoryEntry = {
       day: saveState.context.currentDay ?? 1,
       timestamp: new Date().toISOString(),
+      isCustomInput,
       actionType,
       content,
       target,
@@ -1259,7 +1262,8 @@ export default function GameClient({ scenario }: GameClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenario.scenarioId, triggeredEnding]); // 시나리오 ID 변경 시 또는 엔딩 상태 변경 시 실행
 
-  const handlePlayerChoice = async (choiceDetails: string) => {
+  // v1.2: handlePlayerChoice에 isCustomInput 통합 (handleFreeTextSubmit 흡수)
+  const handlePlayerChoice = async (choiceDetails: string, isCustomInput: boolean = false) => {
     // 초기 딜레마 생성 전에는 선택 불가
     if (!initialDilemmaGenerated.current || isLoading) return;
 
@@ -1289,6 +1293,11 @@ export default function GameClient({ scenario }: GameClientProps) {
       choiceDetails,
       choiceId as 'choice_a' | 'choice_b',
     );
+
+    // v1.2: 직접 입력인 경우 행동 설명 수정
+    if (isCustomInput) {
+      playerAction.actionDescription = `플레이어 자유 행동: ${choiceDetails}`;
+    }
 
     try {
       // 비용 효율적인 AI 설정 가져오기
@@ -1466,7 +1475,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           },
           cleanedResponse.log.slice(0, 200),
           undefined,
-          determineMoralAlignment(choiceDetails)
+          determineMoralAlignment(choiceDetails),
+          isCustomInput // v1.2: 직접 입력 여부 기록
         );
       }
 
@@ -2097,214 +2107,7 @@ export default function GameClient({ scenario }: GameClientProps) {
     }
   };
 
-  // Phase 3: 자유 텍스트 입력 핸들러
-  const handleFreeTextSubmit = async (text: string) => {
-    if (!text.trim()) return;
-
-    // 행동 게이지 부족 체크 (동적 비용 적용 - 클라이막스 가중)
-    if (hasInsufficientAP(saveState, 'freeText', scenario)) {
-      console.warn('⚠️ AP 부족: freeText 행동 불가');
-      setError('오늘의 행동력을 모두 사용했습니다.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    // 자유 입력을 플레이어 행동으로 처리
-    const newSaveState = { ...saveState };
-    newSaveState.chatHistory.push({
-      type: 'player',
-      content: text,
-      timestamp: Date.now(),
-    });
-    setSaveState(newSaveState);
-
-    // createPlayerAction으로 자유 텍스트를 행동으로 변환
-    const playerAction = createPlayerAction(text, 'choice_a');
-    playerAction.actionDescription = `플레이어 자유 행동: ${text}`;
-
-    try {
-      const aiSettings = getOptimalAISettings(
-        newSaveState.context.currentDay || 1,
-        'medium',
-        0,
-        scenario,
-      );
-
-      const aiResponse = await generateGameResponse(
-        newSaveState,
-        playerAction,
-        scenario,
-        aiSettings.useLiteVersion,
-      );
-
-      const { cleanedResponse, hasLanguageIssues, languageIssues } =
-        cleanAndValidateAIResponse(aiResponse);
-
-      if (hasLanguageIssues) {
-        setLanguageWarning(
-          `언어 혼용 문제가 감지되어 자동으로 정리했습니다: ${languageIssues.join(', ')}`,
-        );
-        setTimeout(() => setLanguageWarning(null), 3000);
-      }
-
-      if (
-        !validateGameResponse(
-          cleanedResponse,
-          scenario,
-          aiSettings.useLiteVersion,
-        )
-      ) {
-        throw new Error('AI 응답이 유효하지 않습니다.');
-      }
-
-      const updatedSaveState = updateSaveState(
-        newSaveState,
-        cleanedResponse,
-        scenario,
-      );
-
-      // Dynamic Ending System: ActionHistory 기록 (자유 입력)
-      {
-        const statsChanged = Object.entries(cleanedResponse.statChanges?.scenarioStats || {})
-          .filter(([, delta]) => delta !== 0)
-          .map(([statId, delta]) => ({
-            statId,
-            delta: delta as number,
-            newValue: updatedSaveState.context.scenarioStats[statId] ?? 0,
-          }));
-
-        const relationshipsChanged = (cleanedResponse.statChanges?.hiddenRelationships_change || [])
-          .filter((r: { characterPair?: string; delta?: number }) => r.delta && r.delta !== 0)
-          .map((r: { characterPair?: string; delta?: number }) => {
-            const char = r.characterPair?.replace('플레이어-', '') || '';
-            return {
-              character: char,
-              delta: r.delta || 0,
-              newValue: updatedSaveState.community.hiddenRelationships[`플레이어-${char}`] ?? 0,
-            };
-          });
-
-        // 도덕적 성격 판단
-        const determineMoralAlignment = (input: string): ActionHistoryEntry['moralAlignment'] => {
-          const lc = input.toLowerCase();
-          if (lc.includes('희생') || lc.includes('보호') || lc.includes('도움')) return 'selfless';
-          if (lc.includes('자원') || lc.includes('효율') || lc.includes('전략')) return 'pragmatic';
-          if (lc.includes('혼자') || lc.includes('포기')) return 'selfish';
-          return 'neutral';
-        };
-
-        addToActionHistory(
-          'freeText',
-          text,
-          {
-            statsChanged,
-            relationshipsChanged,
-            significantEvents: cleanedResponse.statChanges?.flags_acquired || [],
-          },
-          cleanedResponse.log.slice(0, 200),
-          undefined,
-          determineMoralAlignment(text)
-        );
-      }
-
-      // 맥락 연결 시스템: 자유 입력 결과로 맥락 업데이트
-      if (updatedSaveState.context.actionContext) {
-        const currentDay = updatedSaveState.context.currentDay || 1;
-        updatedSaveState.context.actionContext = updateContextAfterChoice(
-          updatedSaveState.context.actionContext,
-          text,
-          cleanedResponse.log,
-          currentDay
-        );
-        console.log(`📝 맥락 업데이트: 자유 입력 "${text.substring(0, 30)}..." 결과 반영`);
-      }
-
-      // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용 - 클라이막스 가중)
-      const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
-        updatedSaveState,
-        scenario,
-        'freeText',
-        text,
-        {
-          statChanges: cleanedResponse.statChanges?.scenarioStats,
-          flagsAcquired: cleanedResponse.statChanges?.flags_acquired,
-        }
-      );
-
-      setSaveState(stateAfterAP);
-
-      // 동적 비용 피드백 (클라이막스 가중이면 서사적 메시지로 표시)
-      if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
-        console.log(`✍️ 자유 행동 비용 조정: ${apCostInfo.bonus}`);
-      }
-
-      if (shouldAdvanceDay) {
-        console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);
-      }
-
-      // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
-      const currentDay = stateAfterAP.context.currentDay || 1;
-      const survivorCount = stateAfterAP.community.survivors.length;
-
-      if (canCheckEnding(currentDay, scenario)) {
-        const currentPlayerState: PlayerState = {
-          stats: stateAfterAP.context.scenarioStats,
-          flags: stateAfterAP.context.flags,
-          traits: [],
-          relationships: stateAfterAP.community.hiddenRelationships,
-        };
-
-        let ending = checkEndingConditions(
-          currentPlayerState,
-          scenario.endingArchetypes,
-          survivorCount,
-        );
-
-        if (ending) {
-          console.log(`🎯 Day ${currentDay} 자유 입력 후 엔딩 조건 만족: ${ending.title}`);
-        }
-
-        // 시간제한 엔딩 체크 (handlePlayerChoice와 동일)
-        if (!ending && scenario.endCondition.type === 'time_limit') {
-          const timeLimit = scenario.endCondition.value || 0;
-          const currentHours = stateAfterAP.context.remainingHours || Infinity;
-          const isTimeUp =
-            scenario.endCondition.unit === 'days'
-              ? currentDay > timeLimit
-              : currentHours <= 0;
-
-          if (isTimeUp) {
-            console.log(`⏰ 시간 제한 도달! Day ${currentDay}/${timeLimit}`);
-            ending = checkEndingConditions(currentPlayerState, scenario.endingArchetypes, survivorCount);
-            if (!ending) {
-              ending = scenario.endingArchetypes.find((e) => e.endingId === 'ENDING_TIME_UP') || null;
-            }
-            if (!ending) {
-              const totalDays = scenario.endCondition.value || 7;
-              ending = {
-                endingId: 'DEFAULT_TIME_UP',
-                title: '결단의 시간',
-                description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다.`,
-                systemConditions: [],
-                isGoalSuccess: false,
-              };
-            }
-          }
-        }
-
-        if (ending) {
-          setTriggeredEnding(ending);
-        }
-      }
-    } catch (err) {
-      console.error('자유 입력 처리 오류:', err);
-      setError('행동을 처리하는 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // v1.2: handleFreeTextSubmit 제거됨 - handlePlayerChoice(text, true)로 통합
 
   // 동적 엔딩 생성 중 로딩 표시
   if (isGeneratingEnding) {
@@ -2424,11 +2227,10 @@ export default function GameClient({ scenario }: GameClientProps) {
           isInitialLoading={isInitialDilemmaLoading}
           onOpenDialogue={() => setGameMode('dialogue')}
           onOpenExploration={() => setGameMode('exploration')}
-          onFreeTextSubmit={handleFreeTextSubmit}
           gameMode={gameMode}
           enableDialogue={true}
           enableExploration={true}
-          enableFreeText={true}
+          enableCustomInput={true}
         />
       )}
     </div>

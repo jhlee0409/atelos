@@ -836,8 +836,9 @@ export interface FreeTextInput {
 
 /**
  * 행동 유형 - 플레이어가 수행할 수 있는 모든 행동 종류
+ * v1.2: freeText를 choice로 통합 (isCustomInput 플래그로 구분)
  */
-export type ActionType = 'choice' | 'dialogue' | 'exploration' | 'freeText';
+export type ActionType = 'choice' | 'dialogue' | 'exploration';
 
 /**
  * 행동 기록 - 각 행동의 상세 정보를 기록
@@ -854,6 +855,8 @@ export interface ActionRecord {
   cost: number;
   /** 행동 수행 시점의 Day */
   day: number;
+  /** 사용자 직접 입력 여부 (v1.2: freeText 통합) */
+  isCustomInput?: boolean;
   /** 행동 결과 요약 */
   result?: {
     /** 스탯 변화 */
@@ -1261,6 +1264,7 @@ export interface WorldStateUpdateResult {
 /**
  * 행동 기록 엔트리 - 플레이어의 모든 행동을 기록
  * 엔딩 생성 시 AI가 분석하여 결말에 반영
+ * v1.2: freeText를 choice로 통합
  */
 export interface ActionHistoryEntry {
   /** 행동이 발생한 일차 */
@@ -1269,14 +1273,17 @@ export interface ActionHistoryEntry {
   /** ISO 타임스탬프 */
   timestamp: string;
 
-  /** 행동 유형 */
-  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText';
+  /** 행동 유형 (v1.2: freeText 제거) */
+  actionType: 'choice' | 'dialogue' | 'exploration';
 
   /** 플레이어가 선택/입력한 내용 */
   content: string;
 
   /** 대상 (캐릭터명 또는 장소명) */
   target?: string;
+
+  /** 사용자 직접 입력 여부 (v1.2: freeText 통합) */
+  isCustomInput?: boolean;
 
   /** 행동의 결과 */
   consequence: {

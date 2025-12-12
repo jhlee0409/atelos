@@ -7,17 +7,16 @@ import {
   type ActionSequence,
 } from '@/lib/action-engagement-system';
 
-type ExpandedPanel = 'none' | 'choice' | 'freeText';
+type ExpandedPanel = 'none' | 'choice' | 'customInput';
 
 /** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
 const DEFAULT_ACTION_POINTS = 3;
 
-/** 행동 유형별 AP 비용 */
+/** 행동 유형별 AP 비용 (v1.2: freeText -> choice 통합) */
 const ACTION_COSTS: Record<ActionType, number> = {
   choice: 1,
   dialogue: 1,
   exploration: 1,
-  freeText: 1,
 };
 
 export const ChoiceButtons = ({
@@ -30,39 +29,36 @@ export const ChoiceButtons = ({
   isInitialLoading = false,
   onOpenDialogue,
   onOpenExploration,
-  onFreeTextSubmit,
   gameMode = 'choice',
   enableDialogue = true,
   enableExploration = true,
-  enableFreeText = true,
+  enableCustomInput = true,
 }: {
   isLoading: boolean;
   error: string | null;
   saveState: SaveState;
   scenario?: ScenarioData;
   isUrgent: boolean;
-  handlePlayerChoice: (choice: string) => void;
+  handlePlayerChoice: (choice: string, isCustomInput?: boolean) => void;
   isInitialLoading?: boolean;
   onOpenDialogue?: () => void;
   onOpenExploration?: () => void;
-  onFreeTextSubmit?: (text: string) => void;
   gameMode?: GameMode;
   enableDialogue?: boolean;
   enableExploration?: boolean;
-  enableFreeText?: boolean;
+  enableCustomInput?: boolean;
 }) => {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>('none');
-  const [freeText, setFreeText] = useState('');
-  const freeTextRef = useRef<HTMLTextAreaElement>(null);
+  const [customInputText, setCustomInputText] = useState('');
+  const customInputRef = useRef<HTMLTextAreaElement>(null);
 
   // AP 관련 계산
   const currentAP = saveState.context.actionPoints ?? DEFAULT_ACTION_POINTS;
 
-  // 각 행동별 AP 충족 여부
+  // 각 행동별 AP 충족 여부 (v1.2: 직접 입력도 choice AP 사용)
   const canDoChoice = currentAP >= ACTION_COSTS.choice;
   const canDoDialogue = currentAP >= ACTION_COSTS.dialogue;
   const canDoExploration = currentAP >= ACTION_COSTS.exploration;
-  const canDoFreeText = currentAP >= ACTION_COSTS.freeText;
 
   // AP 부족 상태
   const isAPDepleted = currentAP === 0;
@@ -76,17 +72,18 @@ export const ChoiceButtons = ({
     return analyzeActionSequence(recentActions, currentDay);
   }, [saveState.context.actionsThisDay, saveState.context.currentDay, scenario]);
 
-  // 자유 입력 필드 포커스
+  // 직접 입력 필드 포커스
   useEffect(() => {
-    if (expandedPanel === 'freeText' && freeTextRef.current) {
-      freeTextRef.current.focus();
+    if (expandedPanel === 'customInput' && customInputRef.current) {
+      customInputRef.current.focus();
     }
   }, [expandedPanel]);
 
-  const handleFreeTextSubmit = () => {
-    if (freeText.trim() && onFreeTextSubmit) {
-      onFreeTextSubmit(freeText.trim());
-      setFreeText('');
+  // v1.2: 직접 입력도 handlePlayerChoice로 통합
+  const handleCustomInputSubmit = () => {
+    if (customInputText.trim()) {
+      handlePlayerChoice(customInputText.trim(), true);
+      setCustomInputText('');
       setExpandedPanel('none');
     }
   };
@@ -98,13 +95,13 @@ export const ChoiceButtons = ({
 
   const handleBack = () => {
     setExpandedPanel('none');
-    setFreeText('');
+    setCustomInputText('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleFreeTextSubmit();
+      handleCustomInputSubmit();
     }
   };
 
@@ -222,10 +219,10 @@ export const ChoiceButtons = ({
                     label="탐색"
                   />
                 )}
-                {enableFreeText && onFreeTextSubmit && (
+                {enableCustomInput && (
                   <ActionIconButton
-                    onClick={() => setExpandedPanel('freeText')}
-                    disabled={isLoading || !canDoFreeText}
+                    onClick={() => setExpandedPanel('customInput')}
+                    disabled={isLoading || !canDoChoice}
                     icon={<Pencil className="h-4 w-4" />}
                     label="기타"
                   />
@@ -265,13 +262,13 @@ export const ChoiceButtons = ({
               </div>
             )}
 
-            {/* 자유 입력 확장 패널 */}
-            {expandedPanel === 'freeText' && (
+            {/* 직접 입력 확장 패널 (v1.2: choice로 통합) */}
+            {expandedPanel === 'customInput' && (
               <div className="space-y-3">
                 <textarea
-                  ref={freeTextRef}
-                  value={freeText}
-                  onChange={(e) => setFreeText(e.target.value)}
+                  ref={customInputRef}
+                  value={customInputText}
+                  onChange={(e) => setCustomInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="어떤 행동을 할까?"
                   className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
@@ -288,8 +285,8 @@ export const ChoiceButtons = ({
                     돌아가기
                   </button>
                   <button
-                    onClick={handleFreeTextSubmit}
-                    disabled={!freeText.trim() || isLoading}
+                    onClick={handleCustomInputSubmit}
+                    disabled={!customInputText.trim() || isLoading}
                     className="rounded bg-zinc-700 px-4 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     행동하기

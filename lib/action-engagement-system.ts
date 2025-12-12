@@ -1,5 +1,5 @@
 /**
- * Action Engagement System v1.1
+ * Action Engagement System v1.2
  *
  * 행동 게이지와 액션 풀을 개선하여 전략적 깊이와 몰입감을 높이는 시스템
  *
@@ -8,6 +8,10 @@
  * 2. 행동 시너지 시스템 (선행 행동이 후속 행동에 영향) - prompt-builder에서 AI에 전달
  * 3. 동적 대화 주제 (발견/신뢰도/맥락 기반 언락) - CharacterDialoguePanel에서 사용
  * 4. 콤보 시스템 (연속 행동 패턴 감지) - ChoiceButtons, prompt-builder에서 사용
+ *
+ * v1.2 변경사항:
+ * - freeText를 choice로 통합 (ActionType 단순화)
+ * - isCustomInput 플래그로 사용자 직접 입력 구분
  */
 
 import type {
@@ -73,7 +77,6 @@ const BASE_AP_COSTS: Record<ActionType, number> = {
   choice: 1,
   dialogue: 1,
   exploration: 1,
-  freeText: 1,
 };
 
 /**
@@ -137,14 +140,12 @@ export function calculateDynamicAPCost(
     }
   }
 
-  // === 자유 입력 비용 조정 ===
-  if (actionType === 'freeText') {
-    // 클라이막스 (마지막 2일) → 자유 행동에 더 큰 비중
-    if (currentDay >= totalDays - 1) {
-      adjustedCost = 1.5;
-      reason = '결정적 순간';
-      bonus = '이야기의 끝이 가까워 모든 행동이 중요해졌다';
-    }
+  // === 선택 비용 조정 (사용자 직접 입력 포함) ===
+  // 클라이막스 (마지막 2일) → 선택에 더 큰 비중
+  if (actionType === 'choice' && currentDay >= totalDays - 1) {
+    adjustedCost = Math.max(adjustedCost, 1.5);
+    reason = '결정적 순간';
+    bonus = '이야기의 끝이 가까워 모든 행동이 중요해졌다';
   }
 
   // === 선행 행동 보너스 (시너지) ===

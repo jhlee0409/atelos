@@ -441,6 +441,33 @@ ${synergyBonus[synergy.synergyType] || ''}
     console.warn('⚠️ Action Engagement 분석 실패:', e);
   }
 
+  // v1.2: 발견한 정보(discoveredClues) 프롬프트 포함
+  let discoveredInfoSection = '';
+  if (options.actionContext?.discoveredClues && options.actionContext.discoveredClues.length > 0) {
+    // 최근 5개 단서만 포함 (토큰 절약)
+    const recentClues = options.actionContext.discoveredClues.slice(-5);
+    const clueTexts = recentClues.map(clue => {
+      const sourceDesc = clue.source.type === 'dialogue'
+        ? `${clue.source.characterName}와(과)의 대화`
+        : clue.source.type === 'exploration'
+          ? `${clue.source.locationId} 탐색`
+          : '선택 결과';
+      return `- [${sourceDesc}] ${clue.content}`;
+    });
+
+    discoveredInfoSection = `
+
+### 📋 DISCOVERED INFORMATION (플레이어가 알아낸 정보 - v1.2) ###
+아래 정보는 플레이어가 직접 발견한 것입니다. 선택지를 생성할 때 이 정보를 활용한 새로운 옵션을 고려하세요.
+
+${clueTexts.join('\n')}
+
+**AI 지시:**
+- 플레이어가 알아낸 정보에 기반한 선택지를 포함시키세요
+- 발견한 정보가 선택에 영향을 줄 때 서사에 자연스럽게 반영하세요
+`;
+  }
+
   // 회상 시스템 - 주요 결정 포맷팅
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
     options.keyDecisions,
@@ -567,7 +594,8 @@ ${genreGuide}
 ${phaseGuideline}
 ${keyDecisionsSection}
 ${narrativeSeedsSection}
-${actionEngagementSection}`;
+${actionEngagementSection}
+${discoveredInfoSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
