@@ -57,6 +57,7 @@ import {
   updateLocationStatus,
 } from '@/lib/world-state-manager';
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
+import { calculateDynamicAPCost, type DynamicAPCost } from '@/lib/action-engagement-system';
 import type { WorldState, WorldLocation } from '@/types';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
@@ -78,29 +79,28 @@ const LEGACY_STAT_MAPPING: Record<string, string> = {
 /** 일일 기본 행동 포인트 (폴백용 - 시나리오별 설정은 getActionPointsPerDay 사용) */
 const ACTION_POINTS_PER_DAY = 3;
 
-/** 행동 유형별 비용 (Phase 1: 모든 행동 1 AP) */
-const ACTION_COSTS: Record<ActionType, number> = {
-  choice: 1,
-  dialogue: 1,
-  exploration: 1,
-  freeText: 1,
-};
+/** 기본 행동 비용 (동적 비용 계산 실패 시 폴백) */
+const DEFAULT_ACTION_COST = 1;
 
 /**
  * 행동 포인트 소모 및 Day 전환 처리
- * 모든 행동 핸들러에서 공통으로 사용
+ * 동적 AP 비용 시스템 적용 (신뢰도, 상황 기반)
  */
 const consumeActionPoint = (
   currentSaveState: SaveState,
+  scenario: ScenarioData,
   actionType: ActionType,
   target?: string,
   result?: ActionRecord['result']
-): { newState: SaveState; shouldAdvanceDay: boolean; newDay?: number } => {
+): { newState: SaveState; shouldAdvanceDay: boolean; newDay?: number; apCostInfo?: DynamicAPCost } => {
   const newState: SaveState = JSON.parse(JSON.stringify(currentSaveState));
   const currentAP = newState.context.actionPoints ?? ACTION_POINTS_PER_DAY;
   const maxAP = newState.context.maxActionPoints ?? ACTION_POINTS_PER_DAY;
   const currentDay = newState.context.currentDay ?? 1;
-  const cost = ACTION_COSTS[actionType];
+
+  // 동적 AP 비용 계산
+  const apCostInfo = calculateDynamicAPCost(actionType, currentSaveState, scenario, target);
+  const cost = apCostInfo.adjustedCost;
 
   // 행동 기록 초기화 (없는 경우)
   if (!newState.context.actionsThisDay) {
@@ -125,7 +125,9 @@ const consumeActionPoint = (
   // 하위 호환성: turnsInCurrentDay도 동기화 (deprecated)
   newState.context.turnsInCurrentDay = (newState.context.turnsInCurrentDay ?? 0) + 1;
 
-  console.log(`⚡ AP 소모: ${actionType} | ${currentAP} -> ${newAP} (비용: ${cost})`);
+  // 동적 비용 정보 로깅
+  const costDetail = apCostInfo.bonus ? `[${apCostInfo.reason}] ${apCostInfo.bonus}` : `[${apCostInfo.reason}]`;
+  console.log(`⚡ AP 소모: ${actionType} | ${currentAP} -> ${newAP} (비용: ${cost}) ${costDetail}`);
 
   // Day 전환 체크
   const shouldAdvanceDay = newAP <= 0;
@@ -172,18 +174,26 @@ const consumeActionPoint = (
 
     console.log(`🌅 Day 전환: Day ${currentDay} -> Day ${newDay}`);
 
-    return { newState, shouldAdvanceDay: true, newDay };
+    return { newState, shouldAdvanceDay: true, newDay, apCostInfo };
   }
 
-  return { newState, shouldAdvanceDay: false };
+  return { newState, shouldAdvanceDay: false, apCostInfo };
 };
 
 /**
- * 현재 AP 부족 여부 체크
+ * 현재 AP 부족 여부 체크 (동적 비용 적용)
  */
-const hasInsufficientAP = (saveState: SaveState, actionType: ActionType): boolean => {
+const hasInsufficientAP = (
+  saveState: SaveState,
+  actionType: ActionType,
+  scenario?: ScenarioData,
+  target?: string
+): boolean => {
   const currentAP = saveState.context.actionPoints ?? ACTION_POINTS_PER_DAY;
-  const cost = ACTION_COSTS[actionType];
+  // 시나리오가 있으면 동적 비용 계산, 없으면 기본 비용 사용
+  const cost = scenario
+    ? calculateDynamicAPCost(actionType, saveState, scenario, target).adjustedCost
+    : DEFAULT_ACTION_COST;
   return currentAP < cost;
 };
 
@@ -1253,8 +1263,8 @@ export default function GameClient({ scenario }: GameClientProps) {
     // 초기 딜레마 생성 전에는 선택 불가
     if (!initialDilemmaGenerated.current || isLoading) return;
 
-    // 행동 게이지 부족 체크
-    if (hasInsufficientAP(saveState, 'choice')) {
+    // 행동 게이지 부족 체크 (동적 비용 적용)
+    if (hasInsufficientAP(saveState, 'choice', scenario)) {
       console.warn('⚠️ AP 부족: choice 행동 불가');
       setError('오늘의 행동력을 모두 사용했습니다. 다음 날을 기다려주세요.');
       return;
@@ -1472,9 +1482,10 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`📝 맥락 업데이트: "${choiceDetails.substring(0, 30)}..." 선택 결과 반영`);
       }
 
-      // 행동 게이지 소모 및 Day 전환 처리
-      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+      // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용)
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
         updatedSaveState,
+        scenario,
         'choice',
         choiceDetails,
         {
@@ -1617,8 +1628,8 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   // Phase 3: 캐릭터 대화 핸들러
   const handleDialogueSelect = async (characterName: string, topic: DialogueTopic) => {
-    // 행동 게이지 부족 체크
-    if (hasInsufficientAP(saveState, 'dialogue')) {
+    // 행동 게이지 부족 체크 (동적 비용 적용 - 신뢰도 기반)
+    if (hasInsufficientAP(saveState, 'dialogue', scenario, characterName)) {
       console.warn('⚠️ AP 부족: dialogue 행동 불가');
       setError('오늘의 행동력을 모두 사용했습니다.');
       return;
@@ -1720,11 +1731,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`📝 맥락 업데이트: ${characterName}와 "${topic.label}" 대화 반영`);
       }
 
-      // 행동 게이지 소모 및 Day 전환 처리
-      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+      // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용 - 신뢰도 기반)
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
         newSaveState,
+        scenario,
         'dialogue',
-        `${characterName}:${topic.label}`,
+        characterName,  // 대화 대상 캐릭터명 (동적 비용 계산용)
         {
           relationshipChanges: dialogueResponse.relationshipChange
             ? { [characterName]: dialogueResponse.relationshipChange }
@@ -1735,6 +1747,11 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 대화 후 선택 모드로 복귀
+
+      // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
+      if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
+        console.log(`💬 대화 비용 조정: ${apCostInfo.bonus}`);
+      }
 
       if (shouldAdvanceDay) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
@@ -1804,8 +1821,8 @@ export default function GameClient({ scenario }: GameClientProps) {
 
   // Phase 3: 탐색 핸들러 (WorldState 통합)
   const handleExplore = async (location: ExplorationLocation) => {
-    // 행동 게이지 부족 체크
-    if (hasInsufficientAP(saveState, 'exploration')) {
+    // 행동 게이지 부족 체크 (동적 비용 적용 - 재방문/위험 구역)
+    if (hasInsufficientAP(saveState, 'exploration', scenario, location.locationId)) {
       console.warn('⚠️ AP 부족: exploration 행동 불가');
       setError('오늘의 행동력을 모두 사용했습니다.');
       return;
@@ -1993,8 +2010,10 @@ export default function GameClient({ scenario }: GameClientProps) {
         ...(explorationResult.rewards?.flagsAcquired || []),
       ].filter((flag, i, arr) => arr.indexOf(flag) === i);
 
-      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+      // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용 - 재방문/위험 구역)
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
         newSaveState,
+        scenario,
         'exploration',
         location.locationId,
         {
@@ -2006,6 +2025,11 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 탐색 후 선택 모드로 복귀
+
+      // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
+      if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
+        console.log(`🗺️ 탐색 비용 조정: ${apCostInfo.bonus}`);
+      }
 
       if (shouldAdvanceDay) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
@@ -2077,8 +2101,8 @@ export default function GameClient({ scenario }: GameClientProps) {
   const handleFreeTextSubmit = async (text: string) => {
     if (!text.trim()) return;
 
-    // 행동 게이지 부족 체크
-    if (hasInsufficientAP(saveState, 'freeText')) {
+    // 행동 게이지 부족 체크 (동적 비용 적용 - 클라이막스 가중)
+    if (hasInsufficientAP(saveState, 'freeText', scenario)) {
       console.warn('⚠️ AP 부족: freeText 행동 불가');
       setError('오늘의 행동력을 모두 사용했습니다.');
       return;
@@ -2197,9 +2221,10 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`📝 맥락 업데이트: 자유 입력 "${text.substring(0, 30)}..." 결과 반영`);
       }
 
-      // 행동 게이지 소모 및 Day 전환 처리
-      const { newState: stateAfterAP, shouldAdvanceDay, newDay } = consumeActionPoint(
+      // 행동 게이지 소모 및 Day 전환 처리 (동적 비용 적용 - 클라이막스 가중)
+      const { newState: stateAfterAP, shouldAdvanceDay, newDay, apCostInfo } = consumeActionPoint(
         updatedSaveState,
+        scenario,
         'freeText',
         text,
         {
@@ -2209,6 +2234,11 @@ export default function GameClient({ scenario }: GameClientProps) {
       );
 
       setSaveState(stateAfterAP);
+
+      // 동적 비용 피드백 (클라이막스 가중이면 서사적 메시지로 표시)
+      if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
+        console.log(`✍️ 자유 행동 비용 조정: ${apCostInfo.bonus}`);
+      }
 
       if (shouldAdvanceDay) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (자유 입력)`);

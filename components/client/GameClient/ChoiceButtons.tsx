@@ -1,10 +1,9 @@
 import { cn } from '@/lib/utils';
 import { SaveState, GameMode, ActionType, ScenarioData } from '@/types';
-import { AlertTriangle, MessageCircle, Pencil, MapPin, Zap, ArrowLeft, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Pencil, MapPin, Zap, ArrowLeft, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   analyzeActionSequence,
-  getRecommendedActions,
   type ActionSequence,
 } from '@/lib/action-engagement-system';
 
@@ -76,12 +75,6 @@ export const ChoiceButtons = ({
     const currentDay = saveState.context.currentDay || 1;
     return analyzeActionSequence(recentActions, currentDay);
   }, [saveState.context.actionsThisDay, saveState.context.currentDay, scenario]);
-
-  // 추천 행동 (시나리오가 있을 때만)
-  const recommendations = useMemo(() => {
-    if (!scenario) return [];
-    return getRecommendedActions(saveState, scenario).slice(0, 2);
-  }, [saveState, scenario]);
 
   // 자유 입력 필드 포커스
   useEffect(() => {
