@@ -643,6 +643,9 @@ export const generateGameResponse = async (
           includeRelationships: dynamicSettings.includeRelationships,
           keyDecisions: saveState.keyDecisions,
           actionContext: saveState.context.actionContext,
+          // v1.2: 시너지 분석용 데이터 전달
+          actionsThisDay: saveState.context.actionsThisDay || [],
+          actionType: 'choice',
         },
       );
     } else {
@@ -671,6 +674,9 @@ export const generateGameResponse = async (
           currentDay: saveState.context.currentDay || 1,
           keyDecisions: saveState.keyDecisions,
           actionContext: saveState.context.actionContext,
+          // v1.2: 시너지 분석용 데이터 전달
+          actionsThisDay: saveState.context.actionsThisDay || [],
+          actionType: 'choice', // choice 핸들러에서 호출되므로 choice
         },
       );
     }

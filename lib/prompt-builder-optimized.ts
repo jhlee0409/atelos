@@ -187,6 +187,8 @@ export const buildOptimizedGamePromptV2 = (
     includeRelationships?: boolean;
     keyDecisions?: KeyDecision[];
     actionContext?: ActionContext;
+    actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용 (미사용, 타입 호환성)
+    actionType?: import('@/types').ActionType; // v1.2: 행동 타입 (미사용, 타입 호환성)
   } = {},
 ): GamePromptData => {
   const {

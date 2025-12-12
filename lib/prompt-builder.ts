@@ -229,6 +229,8 @@ export const buildOptimizedGamePrompt = (
     currentDay?: number;
     keyDecisions?: KeyDecision[];
     actionContext?: ActionContext; // 맥락 연결 시스템
+    actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용
+    actionType?: import('@/types').ActionType; // v1.2: 현재 행동 타입
   } = {},
 ): GamePromptData => {
   const {
