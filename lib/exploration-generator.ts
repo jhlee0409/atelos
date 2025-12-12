@@ -42,12 +42,6 @@ const buildExplorationPrompt = (
   // 사용 가능한 스탯 ID들
   const availableStatIds = scenario.scenarioStats.map((s) => s.id);
 
-  // 사용 가능한 플래그들
-  const availableFlags = scenario.flagDictionary
-    .filter((f) => !saveState.context.flags[f.flagName])
-    .slice(0, 5)
-    .map((f) => f.flagName);
-
   // 오늘의 맥락 (이전 행동들)
   const contextSummary = actionContext ? buildContextSummary(actionContext) : '첫 탐색';
   const cluesSummary = actionContext ? buildCluesSummary(actionContext) : '없음';
@@ -106,9 +100,6 @@ ${discoverableItemsStr}
 ## 사용 가능한 스탯 ID
 ${availableStatIds.join(', ')}
 
-## 부여 가능한 플래그 (선택적)
-${availableFlags.length > 0 ? availableFlags.join(', ') : '없음'}
-
 ## 출력 형식 (JSON만 출력)
 {
   "narrative": "탐색 결과 서사 (2-3문장, 구체적 발견물 포함)",
@@ -119,7 +110,7 @@ ${availableFlags.length > 0 ? availableFlags.join(', ') : '없음'}
   },
   "rewards": {
     "statChanges": { "스탯ID": 변화량 } 또는 null,
-    "flagsAcquired": ["플래그명"] 또는 null,
+    "significantDiscoveries": ["발견한 중요 사항"] 또는 null,
     "infoGained": "구체적인 획득 정보 (예: '지하 통로가 창고 뒤편에 있다')" 또는 null
   }
 }

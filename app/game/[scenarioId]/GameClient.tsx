@@ -202,13 +202,8 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     {} as { [key: string]: number },
   );
 
-  const flags = scenario.flagDictionary.reduce(
-    (acc, flag) => {
-      acc[flag.flagName] = flag.initial;
-      return acc;
-    },
-    {} as { [key: string]: boolean | number },
-  );
+  // @deprecated - flags system removed, kept empty for backwards compatibility
+  const flags: { [key: string]: boolean | number } = {};
 
   const hiddenRelationships = scenario.initialRelationships.reduce(
     (acc, rel) => {
@@ -707,32 +702,8 @@ const updateSaveState = (
     });
   }
 
-  // Add new flags, preventing duplicates
-  if (flags_acquired && flags_acquired.length > 0) {
-    console.log('🏴 획득 플래그 처리 시작:', flags_acquired);
-    flags_acquired.forEach((flag: string) => {
-      if (newSaveState.context.flags[flag] === undefined) {
-        const flagDef = scenario.flagDictionary.find(
-          (f: ScenarioFlag) => f.flagName === flag,
-        );
-        if (flagDef?.type === 'count') {
-          newSaveState.context.flags[flag] = 1;
-        } else {
-          newSaveState.context.flags[flag] = true;
-        }
-        // 새로운 플래그 획득 추적
-        trackedFlagsAcquired.push(flag);
-        console.log(
-          `🚩 새로운 플래그 획득: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
-        );
-      } else if (typeof newSaveState.context.flags[flag] === 'number') {
-        (newSaveState.context.flags[flag] as number) += 1;
-        console.log(
-          `🚩 기존 플래그 카운트 증가: ${flag} | 값: ${newSaveState.context.flags[flag]}`,
-        );
-      }
-    });
-  }
+  // @deprecated - flags system removed, using ActionHistory instead
+  // flags_acquired is logged as significantEvents in ActionHistory
 
   // =============================================================================
   // 기존 Day 전환 로직 제거됨 (Phase 4: 행동 게이지 시스템으로 대체)
@@ -1959,16 +1930,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           }
         }
 
-        // 플래그 획득
-        if (explorationResult.rewards.flagsAcquired) {
-          for (const flag of explorationResult.rewards.flagsAcquired) {
-            if (newSaveState.context.flags[flag] === undefined) {
-              const flagDef = scenario.flagDictionary.find(f => f.flagName === flag);
-              newSaveState.context.flags[flag] = flagDef?.type === 'count' ? 1 : true;
-              console.log(`🚩 탐색 플래그 획득: ${flag}`);
-            }
-          }
-        }
+        // @deprecated - flags system removed
+        // significantDiscoveries logged in ActionHistory instead
 
         // 정보 획득 (WorldState에서 이미 구체적 발견물을 추가했으므로 중복 방지)
         if (explorationResult.rewards.infoGained && !worldStateResult?.newDiscoveries.length) {
@@ -1990,8 +1953,9 @@ export default function GameClient({ scenario }: GameClientProps) {
             newValue: newSaveState.context.scenarioStats[statId] ?? 0,
           }));
 
+        // significantEvents now comes from significantDiscoveries
         const significantEvents = [
-          ...(explorationResult.rewards?.flagsAcquired || []),
+          ...(explorationResult.rewards?.significantDiscoveries || []),
           ...(worldStateResult?.newDiscoveries.map(d => `발견: ${d.name}`) || []),
         ];
 
