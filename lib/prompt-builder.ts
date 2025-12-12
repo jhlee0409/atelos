@@ -32,6 +32,14 @@ import {
   type NarrativeSeed,
 } from './ai-narrative-engine';
 
+// v2.3: Action Engagement System (전략적 플레이 보상)
+import {
+  analyzeActionSequence,
+  getActionSynergy,
+  type ActionSequence,
+  type ActionSynergy,
+} from './action-engagement-system';
+
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
 // ===========================================
@@ -381,6 +389,58 @@ ${urgentSeeds.map(s => `- [${s.urgency.toUpperCase()}] ${s.implementation}`).joi
     }
   }
 
+  // v2.3: Action Engagement System - 시너지/콤보 분석
+  let actionEngagementSection = '';
+  try {
+    const recentActions = options.actionsThisDay || [];
+    if (recentActions.length > 0) {
+      const actionSequence = analyzeActionSequence(recentActions, currentDay);
+
+      // 콤보 달성 시 AI에게 보상 지시
+      if (actionSequence.currentCombo) {
+        const comboRewardGuide: Record<string, string> = {
+          '정보수집': '플레이어가 다양한 경로로 정보를 수집했습니다. 이번 선택지에서 숨겨진 옵션이나 더 나은 결과를 제공하세요.',
+          '신중함': '플레이어가 먼저 상황을 파악하고 조언을 구했습니다. 현명한 접근을 인정하고 예상치 못한 기회를 주세요.',
+          '결단력': '플레이어가 빠른 결정으로 상황을 주도하고 있습니다. 스탯 변화를 +5 추가로 부여하세요.',
+        };
+
+        actionEngagementSection = `
+
+### ⚡ STRATEGIC PLAY BONUS (전략적 플레이 보상 - v2.3) ###
+플레이어가 "${actionSequence.currentCombo}" 콤보를 달성했습니다!
+${actionSequence.comboBonus}
+
+**AI 지시:**
+${comboRewardGuide[actionSequence.currentCombo] || '플레이어의 전략적 행동에 적절한 보상을 제공하세요.'}
+`;
+      }
+
+      // 직전 행동과의 시너지 체크
+      if (recentActions.length >= 1) {
+        const lastAction = recentActions[recentActions.length - 1];
+        const currentActionType = options.actionType || 'choice';
+
+        const synergy = getActionSynergy(lastAction.actionType, currentActionType);
+        if (synergy && !actionSequence.currentCombo) {
+          const synergyBonus: Record<string, string> = {
+            'insight': '직전 대화에서 얻은 정보를 이 선택에 자연스럽게 반영하세요. 플레이어가 알게 된 사실을 활용한 서술을 포함하세요.',
+            'preparation': '직전 탐색에서 발견한 것이 도움이 됩니다. 스탯 변화에 +3~+5 보너스를 추가하세요.',
+            'momentum': '연속 결정으로 상황이 빠르게 전개되고 있습니다. 긴박한 분위기를 살려주세요.',
+            'caution': '플레이어가 신중하게 접근 중입니다. 숨겨진 정보나 힌트를 제공하세요.',
+          };
+
+          actionEngagementSection += `
+### 🔗 ACTION SYNERGY (행동 시너지) ###
+${synergy.bonus}
+${synergyBonus[synergy.synergyType] || ''}
+`;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Action Engagement 분석 실패:', e);
+  }
+
   // 회상 시스템 - 주요 결정 포맷팅
   const keyDecisionsSection = formatKeyDecisionsForPrompt(
     options.keyDecisions,
@@ -506,7 +566,8 @@ ${genreGuide}
 
 ${phaseGuideline}
 ${keyDecisionsSection}
-${narrativeSeedsSection}`;
+${narrativeSeedsSection}
+${actionEngagementSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
