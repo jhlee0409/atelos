@@ -9,6 +9,12 @@
  * - Emotion Analysis & Tracking
  * - Drama Manager 통합
  * - Korean Narrative Excellence
+ *
+ * v2.1: 동적 페르소나 시스템
+ * - 장르별 페르소나 변주
+ * - 컨텍스트 기반 감정 표현 선택
+ * - 누적 텐션 추적
+ * - 플레이어 행동 패턴 반영
  */
 
 export interface StoryWriterPersona {
@@ -560,6 +566,498 @@ function extractKeywords(text: string): string[] {
 
   // 중복 제거하고 최대 5개만 반환
   return [...new Set(words)].slice(0, 5);
+}
+
+// =============================================================================
+// v2.1: 동적 페르소나 시스템
+// =============================================================================
+
+/**
+ * 장르별 감정 표현 풀 (Genre-specific Emotion Pools)
+ * 정적 리스트의 한계를 극복하기 위한 확장된 감정 표현
+ */
+export const GENRE_EMOTION_POOLS: Record<string, {
+  innerThoughts: string[];
+  physicalExpressions: string[];
+  atmosphereWords: string[];
+  tensionPhrases: string[];
+}> = {
+  스릴러: {
+    innerThoughts: [
+      '불안이 가슴을 옥죄었다',
+      '뭔가 잘못됐다는 직감이 들었다',
+      '숨을 참으며 기다렸다',
+      '의심의 눈초리가 느껴졌다',
+      '배신감에 치가 떨렸다',
+      '진실이 두려웠다',
+      '믿고 싶지 않았다',
+      '함정이라는 생각이 스쳤다',
+    ],
+    physicalExpressions: [
+      '심장이 미친 듯이 뛰었다',
+      '손에 땀이 배었다',
+      '목이 바짝 말랐다',
+      '온몸이 얼어붙었다',
+      '식은땀이 등을 타고 흘렀다',
+      '호흡이 가빠졌다',
+      '다리가 후들거렸다',
+      '눈을 떼지 못했다',
+    ],
+    atmosphereWords: ['어둠', '그림자', '침묵', '비', '안개', '밤', '숨소리'],
+    tensionPhrases: [
+      '시간이 없었다',
+      '돌이킬 수 없었다',
+      '선택해야 했다',
+      '누군가 지켜보고 있었다',
+    ],
+  },
+  호러: {
+    innerThoughts: [
+      '공포가 뼛속까지 스며들었다',
+      '도망쳐야 한다는 본능이 외쳤다',
+      '이건 현실이 아니길 바랐다',
+      '미쳐가는 것 같았다',
+      '혼자라는 사실이 두려웠다',
+      '뭔가가 다가오고 있었다',
+      '눈을 감아도 보였다',
+      '악몽에서 깨어나고 싶었다',
+    ],
+    physicalExpressions: [
+      '온몸에 소름이 돋았다',
+      '숨을 멈췄다',
+      '눈을 크게 떴다',
+      '입에서 비명이 터져 나왔다',
+      '몸이 굳어버렸다',
+      '손이 떨려 멈출 수 없었다',
+      '피가 얼어붙는 것 같았다',
+      '발이 땅에 붙은 듯했다',
+    ],
+    atmosphereWords: ['어둠', '썩은', '차가운', '축축한', '고요', '속삭임', '그림자'],
+    tensionPhrases: [
+      '뒤를 돌아보면 안 됐다',
+      '소리를 내면 안 됐다',
+      '혼자 남겨졌다',
+      '빛이 꺼졌다',
+    ],
+  },
+  드라마: {
+    innerThoughts: [
+      '마음 한구석이 아려왔다',
+      '그때 그 선택을 후회했다',
+      '진심을 전하고 싶었다',
+      '용서받을 자격이 있을까',
+      '함께했던 시간이 떠올랐다',
+      '이별이 두려웠다',
+      '사랑한다는 말이 목에 걸렸다',
+      '다시 기회가 있을까',
+    ],
+    physicalExpressions: [
+      '눈물이 볼을 타고 흘렀다',
+      '목이 메었다',
+      '손을 꽉 잡았다',
+      '가슴이 먹먹해졌다',
+      '쓴웃음이 나왔다',
+      '고개를 숙였다',
+      '깊은 한숨을 내쉬었다',
+      '떨리는 목소리로 말했다',
+    ],
+    atmosphereWords: ['눈물', '미소', '포옹', '이별', '재회', '기억', '약속'],
+    tensionPhrases: [
+      '말해야 할 때였다',
+      '더 이상 미룰 수 없었다',
+      '마지막 기회였다',
+      '진실을 마주할 시간이었다',
+    ],
+  },
+  SF: {
+    innerThoughts: [
+      '인간이란 무엇인가 생각했다',
+      '이 선택이 미래를 바꿀 것이다',
+      '기술의 대가를 깨달았다',
+      '경계가 무너지고 있었다',
+      '존재의 의미를 물었다',
+      '진보의 끝은 어디인가',
+      '기계와 다른 점이 무엇일까',
+      '새로운 세계가 열리고 있었다',
+    ],
+    physicalExpressions: [
+      '차가운 금속의 감촉이 느껴졌다',
+      '홀로그램 빛이 눈을 스쳤다',
+      '데이터가 시야를 가득 채웠다',
+      '중력의 부재를 느꼈다',
+      '신경 접속의 이질감이 왔다',
+      '기계음이 귓가에 맴돌았다',
+      '공기 정화 시스템이 멈췄다',
+      '비상등이 깜빡였다',
+    ],
+    atmosphereWords: ['홀로그램', '네온', '우주', '데이터', '사이버', '진공', '회로'],
+    tensionPhrases: [
+      '시스템이 경고했다',
+      '산소가 부족했다',
+      '카운트다운이 시작됐다',
+      '연결이 끊겼다',
+    ],
+  },
+  판타지: {
+    innerThoughts: [
+      '운명이 부르는 소리가 들렸다',
+      '예언의 무게가 어깨를 짓눌렀다',
+      '어둠의 유혹이 속삭였다',
+      '힘의 대가를 알고 있었다',
+      '영웅의 길은 외로웠다',
+      '마법의 흐름을 느꼈다',
+      '신들의 뜻을 헤아렸다',
+      '고대의 지혜가 필요했다',
+    ],
+    physicalExpressions: [
+      '마력이 손끝에서 출렁였다',
+      '검을 움켜쥔 손에 힘이 들어갔다',
+      '고대의 기운이 몸을 감쌌다',
+      '예언의 문양이 빛났다',
+      '심장이 용기로 불타올랐다',
+      '신성한 빛이 눈을 가렸다',
+      '저주의 고통이 엄습했다',
+      '변신의 고통이 찾아왔다',
+    ],
+    atmosphereWords: ['마법', '용', '왕국', '검', '예언', '고대', '신전', '숲'],
+    tensionPhrases: [
+      '때가 왔다',
+      '운명을 거스를 수 없었다',
+      '선택의 순간이었다',
+      '어둠이 밀려오고 있었다',
+    ],
+  },
+  '포스트 아포칼립스': {
+    innerThoughts: [
+      '살아남아야 했다',
+      '인간성을 지킬 수 있을까',
+      '희망이 보이지 않았다',
+      '과거의 세계가 그리웠다',
+      '나눌 것인가 독점할 것인가',
+      '신뢰할 수 있는 사람이 있을까',
+      '내일이 올까 두려웠다',
+      '이것이 정의인가',
+    ],
+    physicalExpressions: [
+      '굶주림이 정신을 흐리게 했다',
+      '먼지가 폐를 찔렀다',
+      '총을 겨누는 손이 떨렸다',
+      '상처가 욱신거렸다',
+      '지친 몸을 이끌었다',
+      '배급품을 움켜쥐었다',
+      '방호복 안에서 땀이 흘렀다',
+      '갈증에 목이 탔다',
+    ],
+    atmosphereWords: ['폐허', '먼지', '생존', '배급', '방벽', '황무지', '잔해'],
+    tensionPhrases: [
+      '자원이 바닥났다',
+      '그들이 오고 있었다',
+      '숨을 곳이 없었다',
+      '결정해야 했다',
+    ],
+  },
+  default: {
+    innerThoughts: [
+      '복잡한 감정이 밀려왔다',
+      '선택의 무게가 느껴졌다',
+      '마음이 흔들렸다',
+      '진실이 알고 싶었다',
+      '후회하지 않을 수 있을까',
+      '믿어도 될까 망설였다',
+      '결단의 시간이었다',
+      '돌아갈 수 없었다',
+    ],
+    physicalExpressions: [
+      '깊은 숨을 들이쉬었다',
+      '주먹을 불끈 쥐었다',
+      '시선을 피했다',
+      '입술을 깨물었다',
+      '어깨가 축 처졌다',
+      '고개를 끄덕였다',
+      '눈을 질끈 감았다',
+      '손이 떨렸다',
+    ],
+    atmosphereWords: ['변화', '선택', '관계', '성장', '갈등', '화해', '운명'],
+    tensionPhrases: [
+      '때가 왔다',
+      '더 이상 미룰 수 없었다',
+      '결정해야 했다',
+      '돌이킬 수 없었다',
+    ],
+  },
+};
+
+/**
+ * 장르별 딜레마 확장 풀
+ */
+export const GENRE_DILEMMA_POOLS: Record<string, DilemmaType[]> = {
+  스릴러: [
+    { name: '진실 vs 안전', description: '진실을 파헤치면 위험해지는 상황', emotionalWeight: 8, examples: ['증거를 공개하면 표적이 된다'] },
+    { name: '동맹 vs 독립', description: '의심스러운 동맹을 받아들일 것인가', emotionalWeight: 7, examples: ['그의 도움이 필요하지만 믿을 수 없다'] },
+    { name: '시간 vs 안전', description: '빠른 행동과 신중한 접근 사이', emotionalWeight: 6, examples: ['지금 움직이면 위험하지만 기다리면 늦는다'] },
+  ],
+  호러: [
+    { name: '도주 vs 대면', description: '공포를 피할 것인가 맞설 것인가', emotionalWeight: 9, examples: ['도망치면 다른 사람이 위험해진다'] },
+    { name: '정신 vs 생존', description: '진실을 알면 미쳐버릴 수 있는 상황', emotionalWeight: 10, examples: ['알면 안 되는 것을 알아버렸다'] },
+    { name: '희생 vs 저주', description: '누군가를 희생시켜 저주를 피할 것인가', emotionalWeight: 10, examples: ['한 명을 바치면 모두 살 수 있다'] },
+  ],
+  드라마: [
+    { name: '꿈 vs 현실', description: '이상과 현실 사이의 선택', emotionalWeight: 7, examples: ['꿈을 따르면 가족을 떠나야 한다'] },
+    { name: '진심 vs 체면', description: '진심을 말하면 관계가 변할 수 있는 상황', emotionalWeight: 6, examples: ['고백하면 우정이 끝날 수도 있다'] },
+    { name: '과거 vs 미래', description: '과거를 붙잡을 것인가 놓을 것인가', emotionalWeight: 8, examples: ['그때 그 사람을 잊어야 새 출발이 가능하다'] },
+  ],
+  default: [],
+};
+
+/**
+ * 플레이어 행동 패턴 타입
+ */
+export interface PlayerBehaviorPattern {
+  dominant: 'aggressive' | 'cautious' | 'diplomatic' | 'exploratory' | 'balanced';
+  recentEmotions: string[];
+  conflictTendency: number; // 0-1
+  relationshipFocus: number; // 0-1
+}
+
+/**
+ * 누적 텐션 상태
+ */
+export interface CumulativeTensionState {
+  currentLevel: number; // 1-10
+  peakReached: boolean;
+  valleysCount: number;
+  lastPeakDay: number;
+  emotionalDebt: number; // 해소되지 않은 긴장
+}
+
+/**
+ * 동적 페르소나 컨텍스트
+ */
+export interface DynamicPersonaContext {
+  genres: string[];
+  currentDay: number;
+  totalDays: number;
+  playerPattern: PlayerBehaviorPattern;
+  tensionState: CumulativeTensionState;
+  recentNarrativeKeywords: string[];
+}
+
+/**
+ * 플레이어 행동 패턴 분석
+ */
+export function analyzePlayerBehavior(
+  actionHistory: Array<{ type: string; description: string }>,
+): PlayerBehaviorPattern {
+  if (!actionHistory || actionHistory.length === 0) {
+    return {
+      dominant: 'balanced',
+      recentEmotions: [],
+      conflictTendency: 0.5,
+      relationshipFocus: 0.5,
+    };
+  }
+
+  const patterns = {
+    aggressive: 0,
+    cautious: 0,
+    diplomatic: 0,
+    exploratory: 0,
+  };
+
+  const aggressiveKeywords = ['공격', '싸우', '저항', '방어', '무기', '강제', '위협'];
+  const cautiousKeywords = ['기다', '관찰', '숨', '조심', '경계', '확인', '대기'];
+  const diplomaticKeywords = ['협상', '대화', '설득', '동맹', '협력', '화해', '타협'];
+  const exploratoryKeywords = ['탐색', '조사', '발견', '찾', '수색', '정보', '확인'];
+
+  actionHistory.forEach((action) => {
+    const desc = action.description.toLowerCase();
+    if (aggressiveKeywords.some((kw) => desc.includes(kw))) patterns.aggressive++;
+    if (cautiousKeywords.some((kw) => desc.includes(kw))) patterns.cautious++;
+    if (diplomaticKeywords.some((kw) => desc.includes(kw))) patterns.diplomatic++;
+    if (exploratoryKeywords.some((kw) => desc.includes(kw))) patterns.exploratory++;
+  });
+
+  const total = Object.values(patterns).reduce((a, b) => a + b, 1);
+  const dominant = Object.entries(patterns).reduce((a, b) => (b[1] > a[1] ? b : a))[0] as PlayerBehaviorPattern['dominant'];
+
+  return {
+    dominant: total <= 1 ? 'balanced' : dominant,
+    recentEmotions: [],
+    conflictTendency: (patterns.aggressive) / total,
+    relationshipFocus: (patterns.diplomatic) / total,
+  };
+}
+
+/**
+ * 장르에 맞는 감정 표현 선택 (동적)
+ */
+export function selectEmotionExpression(
+  context: DynamicPersonaContext,
+  expressionType: 'inner' | 'physical' | 'atmosphere' | 'tension',
+): string {
+  const primaryGenre = context.genres[0] || 'default';
+  const pool = GENRE_EMOTION_POOLS[primaryGenre] || GENRE_EMOTION_POOLS.default;
+
+  let candidates: string[];
+  switch (expressionType) {
+    case 'inner':
+      candidates = pool.innerThoughts;
+      break;
+    case 'physical':
+      candidates = pool.physicalExpressions;
+      break;
+    case 'atmosphere':
+      candidates = pool.atmosphereWords;
+      break;
+    case 'tension':
+      candidates = pool.tensionPhrases;
+      break;
+  }
+
+  // 최근 사용된 키워드 제외 (반복 방지)
+  const filteredCandidates = candidates.filter(
+    (c) => !context.recentNarrativeKeywords.some((kw) => c.includes(kw)),
+  );
+
+  const finalCandidates = filteredCandidates.length > 0 ? filteredCandidates : candidates;
+
+  // 텐션 레벨에 따른 선택 조정
+  const tensionBias = context.tensionState.currentLevel / 10;
+  const index = Math.floor(tensionBias * (finalCandidates.length - 1));
+
+  return finalCandidates[Math.min(index, finalCandidates.length - 1)];
+}
+
+/**
+ * 동적 딜레마 생성
+ */
+export function generateDynamicDilemma(
+  context: DynamicPersonaContext,
+): DilemmaType {
+  const primaryGenre = context.genres[0] || 'default';
+  const genreDilemmas = GENRE_DILEMMA_POOLS[primaryGenre] || [];
+  const baseDilemmas = DOKYUNG_PERSONA.dilemmaDesignPrinciples.types;
+
+  // 장르 + 기본 딜레마 풀 합치기
+  const allDilemmas = [...genreDilemmas, ...baseDilemmas];
+
+  // 플레이어 패턴에 따른 딜레마 선택
+  let selectedDilemma: DilemmaType;
+
+  if (context.playerPattern.conflictTendency > 0.6) {
+    // 공격적 플레이어에게는 신중함을 요구하는 딜레마
+    selectedDilemma = allDilemmas.find((d) => d.name.includes('신뢰') || d.name.includes('용서'))
+      || allDilemmas[0];
+  } else if (context.playerPattern.relationshipFocus > 0.6) {
+    // 관계 중심 플레이어에게는 희생을 요구하는 딜레마
+    selectedDilemma = allDilemmas.find((d) => d.name.includes('희생') || d.name.includes('집단'))
+      || allDilemmas[0];
+  } else {
+    // Day 진행도에 따른 딜레마 무게 조정
+    const dayRatio = context.currentDay / context.totalDays;
+    const targetWeight = Math.ceil(dayRatio * 10);
+    selectedDilemma = allDilemmas.reduce((closest, current) =>
+      Math.abs(current.emotionalWeight - targetWeight) < Math.abs(closest.emotionalWeight - targetWeight)
+        ? current : closest,
+    );
+  }
+
+  return selectedDilemma;
+}
+
+/**
+ * 누적 텐션 업데이트
+ */
+export function updateCumulativeTension(
+  currentState: CumulativeTensionState,
+  narrativeEvent: 'conflict' | 'resolution' | 'revelation' | 'quiet' | 'climax',
+  currentDay: number,
+): CumulativeTensionState {
+  const newState = { ...currentState };
+
+  switch (narrativeEvent) {
+    case 'conflict':
+      newState.currentLevel = Math.min(10, newState.currentLevel + 2);
+      newState.emotionalDebt += 1;
+      break;
+    case 'resolution':
+      newState.currentLevel = Math.max(1, newState.currentLevel - 1);
+      newState.emotionalDebt = Math.max(0, newState.emotionalDebt - 1);
+      newState.valleysCount++;
+      break;
+    case 'revelation':
+      newState.currentLevel = Math.min(10, newState.currentLevel + 3);
+      newState.emotionalDebt += 2;
+      break;
+    case 'quiet':
+      newState.currentLevel = Math.max(1, newState.currentLevel - 2);
+      newState.valleysCount++;
+      break;
+    case 'climax':
+      newState.currentLevel = 10;
+      newState.peakReached = true;
+      newState.lastPeakDay = currentDay;
+      break;
+  }
+
+  return newState;
+}
+
+/**
+ * 동적 페르소나 프롬프트 생성
+ */
+export function buildDynamicPersonaPrompt(context: DynamicPersonaContext): string {
+  const innerExpression = selectEmotionExpression(context, 'inner');
+  const physicalExpression = selectEmotionExpression(context, 'physical');
+  const atmosphereWord = selectEmotionExpression(context, 'atmosphere');
+  const tensionPhrase = selectEmotionExpression(context, 'tension');
+  const recommendedDilemma = generateDynamicDilemma(context);
+
+  // Peak-Valley 권장사항
+  let pacingRecommendation = '';
+  if (context.tensionState.emotionalDebt > 3) {
+    pacingRecommendation = '⚠️ 긴장이 과도하게 누적됨. 이번 장면에서 숨 쉴 틈(Breathing Room)을 배치하세요.';
+  } else if (context.tensionState.valleysCount > context.currentDay) {
+    pacingRecommendation = '⚠️ 이완 장면이 많음. 긴장감을 높이는 이벤트를 배치하세요.';
+  } else {
+    pacingRecommendation = '✓ 텐션 밸런스 양호';
+  }
+
+  return `
+### 동적 페르소나 가이드 (Day ${context.currentDay}) ###
+
+**이번 장면 권장 감정 표현**:
+- 내면: "${innerExpression}"
+- 신체: "${physicalExpression}"
+- 분위기: ${atmosphereWord}
+- 긴장: "${tensionPhrase}"
+
+**권장 딜레마 유형**: ${recommendedDilemma.name} (무게: ${recommendedDilemma.emotionalWeight}/10)
+- ${recommendedDilemma.description}
+
+**플레이어 패턴 분석**:
+- 주요 성향: ${context.playerPattern.dominant}
+- 갈등 선호: ${Math.round(context.playerPattern.conflictTendency * 100)}%
+- 관계 중심: ${Math.round(context.playerPattern.relationshipFocus * 100)}%
+
+**텐션 상태**:
+- 현재 레벨: ${context.tensionState.currentLevel}/10
+- 감정 부채: ${context.tensionState.emotionalDebt}
+- ${pacingRecommendation}
+`;
+}
+
+/**
+ * 초기 텐션 상태 생성
+ */
+export function createInitialTensionState(): CumulativeTensionState {
+  return {
+    currentLevel: 3,
+    peakReached: false,
+    valleysCount: 0,
+    lastPeakDay: 0,
+    emotionalDebt: 0,
+  };
 }
 
 export default DOKYUNG_PERSONA;

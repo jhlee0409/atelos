@@ -15,6 +15,12 @@ import {
   getCompactPersona,
   calculateRecommendedTension,
   DOKYUNG_PERSONA,
+  // v2.1: 동적 페르소나 시스템
+  buildDynamicPersonaPrompt,
+  analyzePlayerBehavior,
+  createInitialTensionState,
+  type DynamicPersonaContext,
+  type CumulativeTensionState,
 } from './story-writer-persona';
 
 // ===========================================
@@ -297,7 +303,32 @@ const buildLitePrompt = (
     includeWritingTechniques: false, // 토큰 절약
   });
 
-  // 2025 Enhanced: 압축된 페르소나 가이드
+  // v2.1: 동적 페르소나 시스템 (정적 한계 극복)
+  const actionHistory = options.actionContext?.todayActions?.map((a: { type: string; description: string }) => ({
+    type: a.type,
+    description: a.description,
+  })) || [];
+  const playerPattern = analyzePlayerBehavior(actionHistory);
+  const tensionState: CumulativeTensionState = options.tensionState || createInitialTensionState();
+
+  // 최근 내러티브 키워드 추출 (반복 방지용)
+  const recentNarrativeKeywords = recentEvents
+    .flatMap((e: string) => e.split(/[\s,."'"'"!?]+/).filter((w: string) => w.length > 2))
+    .slice(-10);
+
+  const dynamicContext: DynamicPersonaContext = {
+    genres: scenario.genre || [],
+    currentDay,
+    totalDays,
+    playerPattern,
+    tensionState,
+    recentNarrativeKeywords,
+  };
+
+  // 동적 페르소나 가이드 생성 (컨텍스트 기반)
+  const dynamicPersonaGuide = buildDynamicPersonaPrompt(dynamicContext);
+
+  // 2025 Enhanced: 압축된 페르소나 가이드 (기본)
   const personaGuide = getCompactPersona();
 
   // 회상 시스템 - 주요 결정 포맷팅
@@ -419,10 +450,7 @@ Focus: Character-driven narrative, emotional engagement, Korean immersion, consi
 
 ${personaGuide}
 
-### TENSION RECOMMENDATION (Drama Manager) ###
-- 현재 긴장도: ${tensionRecommendation.tensionLevel}/10
-- 감정 포커스: ${tensionRecommendation.emotionalFocus.join(', ')}
-- 권장사항: ${tensionRecommendation.recommendation}
+${dynamicPersonaGuide}
 
 ${genreGuide}
 
