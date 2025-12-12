@@ -1,8 +1,12 @@
 import { cn } from '@/lib/utils';
 import { CharacterDialogueOption, DialogueTopic, CharacterArc, ScenarioData, SaveState } from '@/types';
 import { getKoreanRoleName } from '@/constants/korean-english-mapping';
-import { MessageCircle, ArrowLeft, User, Info, Lightbulb, Heart, HelpCircle, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { MessageCircle, ArrowLeft, User, Info, Lightbulb, Heart, HelpCircle, Loader2, Lock, Sparkles, Eye } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  generateDynamicDialogueTopics,
+  type DynamicDialogueTopic,
+} from '@/lib/action-engagement-system';
 
 interface CharacterDialoguePanelProps {
   scenario: ScenarioData;
@@ -61,6 +65,17 @@ const getTrustBorderColor = (trustLevel: number): string => {
   if (trustLevel >= -20) return 'border-zinc-700';
   if (trustLevel >= -50) return 'border-red-700/50';
   return 'border-red-600';
+};
+
+// 신뢰도를 모호한 표현으로 변환 (숫자 노출 방지)
+const getTrustDescription = (trustLevel: number): { text: string; color: string } => {
+  if (trustLevel >= 60) return { text: '깊이 신뢰함', color: 'text-green-400' };
+  if (trustLevel >= 40) return { text: '신뢰함', color: 'text-green-400' };
+  if (trustLevel >= 20) return { text: '호감', color: 'text-green-500/70' };
+  if (trustLevel >= 0) return { text: '보통', color: 'text-zinc-500' };
+  if (trustLevel >= -20) return { text: '경계 중', color: 'text-zinc-400' };
+  if (trustLevel >= -40) return { text: '불신', color: 'text-red-400/70' };
+  return { text: '적대적', color: 'text-red-400' };
 };
 
 // 분위기에 따른 표시
@@ -144,7 +159,7 @@ const CharacterCard = ({
   );
 };
 
-// 대화 주제 선택
+// 대화 주제 선택 (동적 주제 지원 - 몰입형 UI)
 const TopicSelection = ({
   character,
   topics,
@@ -153,43 +168,80 @@ const TopicSelection = ({
   isLoading,
 }: {
   character: CharacterDialogueOption;
-  topics: DialogueTopic[];
+  topics: DynamicDialogueTopic[];
   onSelect: (topic: DialogueTopic) => void;
   onBack: () => void;
   isLoading?: boolean;
 }) => {
   const moodDisplay = getMoodDisplay(character.currentMood || 'anxious');
+  const trustLevel = character.trustLevel || 0;
+  const trustDesc = getTrustDescription(trustLevel);
 
   return (
     <div className="space-y-2">
-      {/* 캐릭터 정보 */}
-      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-800">
-        <span className="font-medium text-zinc-200">{character.characterName}</span>
-        <span className={cn("text-sm", moodDisplay.color)}>
-          {moodDisplay.emoji}
+      {/* 캐릭터 정보 - 숫자 제거, 모호한 표현 사용 */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-zinc-200">{character.characterName}</span>
+          <span className={cn("text-sm", moodDisplay.color)}>
+            {moodDisplay.emoji}
+          </span>
+        </div>
+        {/* 신뢰도: 숫자 대신 모호한 표현 */}
+        <span className={cn("text-[10px]", trustDesc.color)}>
+          {trustDesc.text}
         </span>
       </div>
 
       {/* 대화 주제 목록 */}
       {topics.map((topic) => {
         const TopicIcon = getTopicIcon(topic.category);
+        const isLocked = topic.trustRequired && trustLevel < topic.trustRequired;
+        const isSecret = topic.isSecret;
+
         return (
           <button
             key={topic.topicId}
-            onClick={() => onSelect(topic)}
-            disabled={isLoading}
+            onClick={() => !isLocked && onSelect(topic)}
+            disabled={isLoading || isLocked}
             className={cn(
-              "w-full flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-left transition-all",
-              isLoading
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-zinc-700/50 hover:border-zinc-600"
+              "w-full rounded-lg border p-3 text-left transition-all",
+              isLocked
+                ? "border-zinc-800 bg-zinc-900/30 opacity-60 cursor-not-allowed"
+                : isSecret
+                  ? "border-amber-800/50 bg-amber-950/20 hover:bg-amber-900/30 hover:border-amber-700/50"
+                  : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-700/50 hover:border-zinc-600"
             )}
           >
-            <TopicIcon className="h-4 w-4 text-zinc-500" />
-            <span className="text-sm text-zinc-200">{topic.label}</span>
-            {isLoading && (
-              <Loader2 className="ml-auto h-4 w-4 animate-spin text-zinc-500" />
-            )}
+            <div className="flex items-start gap-2">
+              {isLocked ? (
+                <Lock className="h-4 w-4 text-zinc-600 mt-0.5" />
+              ) : isSecret ? (
+                <Eye className="h-4 w-4 text-amber-400 mt-0.5" />
+              ) : (
+                <TopicIcon className="h-4 w-4 text-zinc-500 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0">
+                <span className={cn(
+                  "text-sm",
+                  isLocked ? "text-zinc-500" :
+                  isSecret ? "text-amber-200" :
+                  "text-zinc-200"
+                )}>
+                  {topic.label}
+                </span>
+
+                {/* 잠긴 경우: 모호한 힌트만 표시 (숫자 제거) */}
+                {isLocked && (
+                  <p className="text-[10px] text-zinc-600 mt-1 italic">
+                    아직 이 이야기를 나눌 만큼 가깝지 않다
+                  </p>
+                )}
+              </div>
+              {isLoading && !isLocked && (
+                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+              )}
+            </div>
           </button>
         );
       })}
@@ -207,6 +259,11 @@ const TopicSelection = ({
   );
 };
 
+// 확장된 캐릭터 대화 옵션 (동적 주제 포함)
+interface ExtendedCharacterDialogueOption extends Omit<CharacterDialogueOption, 'availableTopics'> {
+  availableTopics: DynamicDialogueTopic[];
+}
+
 export const CharacterDialoguePanel = ({
   scenario,
   saveState,
@@ -214,27 +271,48 @@ export const CharacterDialoguePanel = ({
   onClose,
   isLoading = false,
 }: CharacterDialoguePanelProps) => {
-  const [selectedCharacter, setSelectedCharacter] = useState<CharacterDialogueOption | null>(null);
+  const [selectedCharacter, setSelectedCharacter] = useState<ExtendedCharacterDialogueOption | null>(null);
 
-  // 대화 가능한 캐릭터 목록 생성
-  const availableCharacters: CharacterDialogueOption[] = saveState.community.survivors
-    .filter((survivor) => survivor.name !== '(플레이어)' && survivor.status !== 'dead')
-    .map((survivor) => {
-      // 캐릭터 아크에서 mood와 trustLevel 가져오기
-      const arc = saveState.characterArcs?.find(
-        (a) => a.characterName === survivor.name
-      );
+  // 대화 가능한 캐릭터 목록 생성 (동적 주제 시스템 사용)
+  const availableCharacters: ExtendedCharacterDialogueOption[] = useMemo(() => {
+    return saveState.community.survivors
+      .filter((survivor) => survivor.name !== '(플레이어)' && survivor.status !== 'dead')
+      .map((survivor) => {
+        // 캐릭터 아크에서 mood와 trustLevel 가져오기
+        const arc = saveState.characterArcs?.find(
+          (a) => a.characterName === survivor.name
+        );
 
-      return {
-        characterName: survivor.name,
-        role: survivor.role,
-        availableTopics: generateTopicsForRole(survivor.role, survivor.name),
-        currentMood: arc?.currentMood || 'anxious',
-        trustLevel: arc?.trustLevel || 0,
-      };
-    });
+        // 동적 대화 주제 생성 (신뢰도, 발견물, 맥락 기반)
+        const dynamicTopics = generateDynamicDialogueTopics(
+          survivor.name,
+          survivor.role,
+          saveState,
+          scenario
+        );
 
-  const handleCharacterSelect = (character: CharacterDialogueOption) => {
+        // 정적 주제도 폴백으로 포함 (없는 경우)
+        const staticTopics = generateTopicsForRole(survivor.role, survivor.name);
+        const mergedTopics = [...dynamicTopics];
+
+        // 정적 주제 중 동적에 없는 것 추가
+        for (const staticTopic of staticTopics) {
+          if (!mergedTopics.find(t => t.topicId === staticTopic.topicId)) {
+            mergedTopics.push(staticTopic);
+          }
+        }
+
+        return {
+          characterName: survivor.name,
+          role: survivor.role,
+          availableTopics: mergedTopics,
+          currentMood: arc?.currentMood || 'anxious',
+          trustLevel: arc?.trustLevel || 0,
+        };
+      });
+  }, [saveState, scenario]);
+
+  const handleCharacterSelect = (character: ExtendedCharacterDialogueOption) => {
     setSelectedCharacter(character);
   };
 

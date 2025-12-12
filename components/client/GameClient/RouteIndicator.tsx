@@ -1,9 +1,9 @@
 import { SaveState, ScenarioData, ActionHistoryEntry } from '@/types';
 import { Compass, Shield, Users, DoorOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   isBeforeRouteActivation,
   getTotalDays,
-  getEndingCheckDay,
   calculateRouteScores,
   getDominantRoute,
 } from '@/lib/gameplay-config';
@@ -107,36 +107,39 @@ const determineRoute = (saveState: SaveState, actionHistory: ActionHistoryEntry[
   };
 };
 
-// Day 진행 바 컴포넌트
+// Day 진행 바 컴포넌트 (몰입형 - 시스템 정보 숨김)
 const DayProgressBar = ({
   currentDay,
   maxDays,
-  endingCheckDay,
 }: {
   currentDay: number;
   maxDays: number;
-  endingCheckDay: number;
 }) => {
   const progress = (currentDay / maxDays) * 100;
+  // 시간이 얼마 남지 않았을 때 분위기 표현
+  const isLate = currentDay >= maxDays - 2;
+  const isFinal = currentDay >= maxDays - 1;
 
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="text-zinc-500">진행도</span>
+        <span className="text-zinc-500">
+          {isFinal ? '마지막 순간' : isLate ? '시간이 얼마 남지 않았다' : '진행 중'}
+        </span>
         <span className="text-zinc-400">
-          {currentDay}일차 / {maxDays}일
+          {currentDay}일차
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-red-900 to-red-600 transition-all duration-500"
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            isFinal ? "bg-gradient-to-r from-red-600 to-red-500" :
+            isLate ? "bg-gradient-to-r from-red-800 to-red-600" :
+            "bg-gradient-to-r from-zinc-700 to-zinc-600"
+          )}
           style={{ width: `${progress}%` }}
         />
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-zinc-600">
-        <span>시작</span>
-        <span className="text-yellow-600">Day {endingCheckDay} 엔딩 체크</span>
-        <span>종료</span>
       </div>
     </div>
   );
@@ -156,7 +159,6 @@ export const RouteIndicator = ({
   const routeInfo = determineRoute(saveState, actionHistory, scenario);
   const currentDay = saveState.context.currentDay ?? 1;
   const totalDays = getTotalDays(scenario);
-  const endingCheckDay = getEndingCheckDay(scenario);
 
   if (isCompact) {
     // 컴팩트 모드: 기존 레이아웃 + 간단한 진행 바
@@ -194,7 +196,7 @@ export const RouteIndicator = ({
         </span>
       </div>
       {/* 진행 바 추가 */}
-      <DayProgressBar currentDay={currentDay} maxDays={totalDays} endingCheckDay={endingCheckDay} />
+      <DayProgressBar currentDay={currentDay} maxDays={totalDays} />
     </div>
   );
 };

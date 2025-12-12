@@ -1,7 +1,12 @@
 import { cn } from '@/lib/utils';
-import { SaveState, GameMode, ActionType } from '@/types';
-import { AlertTriangle, MessageCircle, Pencil, MapPin, Zap, ArrowLeft } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { SaveState, GameMode, ActionType, ScenarioData } from '@/types';
+import { AlertTriangle, MessageCircle, Pencil, MapPin, Zap, ArrowLeft, Sparkles, TrendingUp } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import {
+  analyzeActionSequence,
+  getRecommendedActions,
+  type ActionSequence,
+} from '@/lib/action-engagement-system';
 
 type ExpandedPanel = 'none' | 'choice' | 'freeText';
 
@@ -20,6 +25,7 @@ export const ChoiceButtons = ({
   isLoading,
   error,
   saveState,
+  scenario,
   isUrgent,
   handlePlayerChoice,
   isInitialLoading = false,
@@ -34,6 +40,7 @@ export const ChoiceButtons = ({
   isLoading: boolean;
   error: string | null;
   saveState: SaveState;
+  scenario?: ScenarioData;
   isUrgent: boolean;
   handlePlayerChoice: (choice: string) => void;
   isInitialLoading?: boolean;
@@ -61,6 +68,20 @@ export const ChoiceButtons = ({
   // AP 부족 상태
   const isAPDepleted = currentAP === 0;
   const isLowAP = currentAP === 1;
+
+  // 행동 시퀀스 분석 (시너지/콤보 체크)
+  const actionSequence = useMemo<ActionSequence | null>(() => {
+    if (!scenario) return null;
+    const recentActions = saveState.context.actionsThisDay || [];
+    const currentDay = saveState.context.currentDay || 1;
+    return analyzeActionSequence(recentActions, currentDay);
+  }, [saveState.context.actionsThisDay, saveState.context.currentDay, scenario]);
+
+  // 추천 행동 (시나리오가 있을 때만)
+  const recommendations = useMemo(() => {
+    if (!scenario) return [];
+    return getRecommendedActions(saveState, scenario).slice(0, 2);
+  }, [saveState, scenario]);
 
   // 자유 입력 필드 포커스
   useEffect(() => {
@@ -162,6 +183,14 @@ export const ChoiceButtons = ({
         {isLowAP && !isAPDepleted && (
           <div className="mb-3 flex items-center justify-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-900/30 px-4 py-2 text-zinc-500">
             <span className="text-sm">오늘 마지막으로 할 수 있는 일이다.</span>
+          </div>
+        )}
+
+        {/* 행동 효과 표시 (몰입형 - 메카닉 이름 숨김) */}
+        {actionSequence?.comboBonus && !isAPDepleted && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-700/30 bg-zinc-900/50 px-3 py-2">
+            <Sparkles className="h-4 w-4 text-zinc-400" />
+            <p className="text-xs text-zinc-400 italic">{actionSequence.comboBonus}</p>
           </div>
         )}
 

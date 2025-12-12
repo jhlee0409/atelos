@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { SaveState, ScenarioData } from '@/types';
-import { Sun, Sunset, Moon, Sunrise, Clock, Calendar, AlertTriangle, Zap } from 'lucide-react';
+import { Sun, Sunset, Moon, Sunrise, Clock, Calendar, AlertTriangle, Zap, Heart, Flame, Snowflake, Activity } from 'lucide-react';
+import { calculateRecommendedTension } from '@/lib/story-writer-persona';
 
 /** 기본 일일 행동 포인트 (GameClient.tsx와 동기화) */
 const DEFAULT_ACTION_POINTS = 3;
@@ -67,6 +68,42 @@ const calculateProgress = (currentDay: number, totalDays: number): number => {
   return Math.min(100, Math.max(0, ((currentDay - 1) / (totalDays - 1)) * 100));
 };
 
+// 감정 온도 설정 (2025 Enhanced)
+const emotionTempConfig: Record<string, { icon: typeof Heart; label: string; color: string; bgColor: string }> = {
+  low: {
+    icon: Snowflake,
+    label: '차분',
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-900/20',
+  },
+  medium: {
+    icon: Activity,
+    label: '고조',
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-900/20',
+  },
+  high: {
+    icon: Flame,
+    label: '긴장',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-900/20',
+  },
+  critical: {
+    icon: Heart,
+    label: '클라이맥스',
+    color: 'text-red-400',
+    bgColor: 'bg-red-900/20',
+  },
+};
+
+// 긴장도에 따른 감정 레벨 결정
+const getEmotionLevel = (tensionLevel: number): 'low' | 'medium' | 'high' | 'critical' => {
+  if (tensionLevel <= 3) return 'low';
+  if (tensionLevel <= 6) return 'medium';
+  if (tensionLevel <= 8) return 'high';
+  return 'critical';
+};
+
 export const TimelineProgress = ({
   saveState,
   scenario,
@@ -87,6 +124,13 @@ export const TimelineProgress = ({
   const isEndingSoon = remainingDays <= 2;
   const isLastDay = remainingDays === 0;
 
+  // 2025 Enhanced: 감정 온도 계산 (Drama Manager)
+  const recentEvents = saveState.keyDecisions?.slice(-3)?.map(d => d.consequence) || [];
+  const tensionData = calculateRecommendedTension(currentDay, totalDays, recentEvents);
+  const emotionLevel = getEmotionLevel(tensionData.tensionLevel);
+  const emotionConfig = emotionTempConfig[emotionLevel];
+  const EmotionIcon = emotionConfig.icon;
+
   return (
     <div className={cn("rounded-lg border border-zinc-800 bg-zinc-900/80 p-3", className)}>
       {/* 상단: Day 및 시간대 */}
@@ -98,9 +142,20 @@ export const TimelineProgress = ({
             <span className="text-zinc-500"> / {totalDays}</span>
           </span>
         </div>
-        <div className={cn("flex items-center gap-1 rounded px-2 py-0.5", config.bgColor)}>
-          <TimeIcon className={cn("h-3 w-3", config.color)} />
-          <span className={cn("text-xs", config.color)}>{config.label}</span>
+        <div className="flex items-center gap-1">
+          {/* 시간대 표시 */}
+          <div className={cn("flex items-center gap-1 rounded px-2 py-0.5", config.bgColor)}>
+            <TimeIcon className={cn("h-3 w-3", config.color)} />
+            <span className={cn("text-xs", config.color)}>{config.label}</span>
+          </div>
+          {/* 감정 온도 표시 (2025 Enhanced) */}
+          <div
+            className={cn("flex items-center gap-1 rounded px-2 py-0.5", emotionConfig.bgColor)}
+            title={`긴장도: ${tensionData.tensionLevel}/10\n감정 포커스: ${tensionData.emotionalFocus.join(', ')}`}
+          >
+            <EmotionIcon className={cn("h-3 w-3", emotionConfig.color)} />
+            <span className={cn("text-xs", emotionConfig.color)}>{emotionConfig.label}</span>
+          </div>
         </div>
       </div>
 
