@@ -641,7 +641,8 @@ Output JSON:
     "scenarioStats": {"statId": change_amount},
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"]
+    "flags_acquired": ["FLAG_NAME"],
+    "locations_discovered": [{"name": "장소명", "description": "장소 설명"}]
   }
 }
 
@@ -653,6 +654,13 @@ STAT CHANGE GUIDELINES (CRITICAL):
 - Stats: cityChaos (↓ is good), communityCohesion (↑ is good), survivalFoundation (↑ is good)
 - Example: Successful negotiation → {"cityChaos": -10, "communityCohesion": 15}
 - Example: Internal conflict → {"communityCohesion": -15, "cityChaos": 5}
+
+LOCATIONS_DISCOVERED GUIDELINES (동적 장소 발견):
+- 서사에서 새로운 장소가 언급되거나 이동 가능해지면 locations_discovered에 추가
+- 예: 대화 중 "창고가 있다던데..." → {"name": "창고", "description": "물자가 보관된 곳"}
+- 예: 탐색 중 새 통로 발견 → {"name": "지하 통로", "description": "어둡고 습한 지하 통로"}
+- 이미 알려진 장소는 중복 추가하지 말 것
+- 플레이어가 실제로 방문 가능해진 장소만 추가
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 

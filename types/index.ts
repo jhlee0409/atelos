@@ -734,6 +734,11 @@ export interface AIResponse {
     hiddenRelationships_change: any[]; // Type can be refined if needed
     /** @deprecated Flags system removed. */
     flags_acquired?: string[];
+    /** v1.2: 동적 위치 시스템 - 서사에서 발견/언급된 새 장소 */
+    locations_discovered?: Array<{
+      name: string;
+      description?: string;
+    }>;
   };
 }
 

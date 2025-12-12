@@ -55,358 +55,71 @@ const createLocationsFromScenario = (
 };
 
 /**
- * 시나리오에 맞는 기본 위치 생성 (폴백용)
+ * v1.2: 동적 위치 시스템 - 시작 위치만 생성
+ * 나머지 위치는 AI 서사를 통해 동적으로 발견됨
  */
-const createDefaultLocations = (scenario: ScenarioData): WorldLocation[] => {
-  // 시나리오에 커스텀 위치가 정의되어 있으면 사용
+const createInitialLocations = (scenario: ScenarioData): WorldLocation[] => {
+  // 시나리오에 커스텀 위치가 정의되어 있으면 사용 (레거시 호환)
   if (scenario.locations && scenario.locations.length > 0) {
     console.log(`🗺️ 시나리오 정의 위치 ${scenario.locations.length}개 사용`);
     return createLocationsFromScenario(scenario.locations);
   }
 
-  // 폴백: 장르 기반 기본 위치 생성
-  console.log('🗺️ 장르 기반 기본 위치 생성');
-  const genre = scenario.genre || [];
-  const isSpaceScenario = genre.includes('SF') || genre.includes('우주');
-  const isMilitaryScenario = genre.includes('밀리터리') || genre.includes('군사');
-  const isHorrorScenario = genre.includes('호러') || genre.includes('공포');
+  // v1.2: 동적 시스템 - 시작 위치만 생성
+  const openingLocation = scenario.storyOpening?.openingLocation || '본부';
+  console.log(`🗺️ 동적 위치 시스템: 시작 위치 "${openingLocation}"만 생성`);
 
-  const baseLocations: WorldLocation[] = [
+  return [
     {
-      locationId: 'storage',
-      name: '창고',
-      baseDescription: '물자가 보관된 창고.',
-      currentDescription: '물자가 보관된 창고. 유용한 자원을 찾을 수 있을지도.',
-      icon: 'warehouse',
-      status: 'available',
-      explorationCooldown: 1,
-      dangerLevel: 0,
-      possibleDiscoveries: ['disc_storage_supplies', 'disc_storage_map'],
-    },
-    {
-      locationId: 'entrance',
-      name: '입구',
-      baseDescription: '외부 상황을 살펴볼 수 있는 곳.',
-      currentDescription: '외부 상황을 살펴볼 수 있는 곳.',
-      icon: 'entrance',
+      locationId: 'starting_location',
+      name: openingLocation,
+      baseDescription: `이야기가 시작되는 장소입니다.`,
+      currentDescription: `이야기가 시작되는 장소입니다.`,
+      icon: 'home',
       status: 'available',
       explorationCooldown: 0,
-      dangerLevel: 1,
-      possibleDiscoveries: ['disc_entrance_intel'],
-    },
-    {
-      locationId: 'medical',
-      name: '의무실',
-      baseDescription: '부상자와 의료 물자가 있는 곳.',
-      currentDescription: '부상자와 의료 물자가 있는 곳.',
-      icon: 'medical',
-      status: 'available',
-      explorationCooldown: 1,
       dangerLevel: 0,
-      possibleDiscoveries: ['disc_medical_kit', 'disc_medical_records'],
-    },
-    {
-      locationId: 'roof',
-      name: '옥상',
-      baseDescription: '전체 상황을 조망할 수 있지만 위험할 수 있다.',
-      currentDescription: '전체 상황을 조망할 수 있지만 위험할 수 있다.',
-      icon: 'roof',
-      status: 'locked',
-      unlockCondition: { requiredDay: 3 },
-      explorationCooldown: 1,
-      dangerLevel: 2,
-      possibleDiscoveries: ['disc_roof_signal', 'disc_roof_threat'],
-    },
-    {
-      locationId: 'basement',
-      name: '지하',
-      baseDescription: '아직 탐색하지 않은 지하 공간.',
-      currentDescription: '아직 탐색하지 않은 어두운 지하 공간. 뭔가 숨겨져 있을지도.',
-      icon: 'basement',
-      status: 'hidden',
-      unlockCondition: { requiredDay: 5 },
-      explorationCooldown: 2,
-      dangerLevel: 3,
-      possibleDiscoveries: ['disc_basement_cache', 'disc_basement_secret'],
+      possibleDiscoveries: [],
     },
   ];
-
-  // 장르별 추가 위치
-  if (isSpaceScenario) {
-    baseLocations.push({
-      locationId: 'quarters',
-      name: '승무원 숙소',
-      baseDescription: '개인 물품이나 단서를 찾을 수 있는 숙소 구역.',
-      currentDescription: '개인 물품이나 단서를 찾을 수 있는 숙소 구역.',
-      icon: 'quarters',
-      status: 'locked',
-      unlockCondition: { requiredDay: 2 },
-      explorationCooldown: 1,
-      dangerLevel: 0,
-      possibleDiscoveries: ['disc_quarters_diary', 'disc_quarters_keycard'],
-    });
-  }
-
-  if (isMilitaryScenario) {
-    baseLocations.push({
-      locationId: 'armory',
-      name: '무기고',
-      baseDescription: '무기와 장비가 보관된 곳.',
-      currentDescription: '무기와 장비가 보관된 곳. 접근이 제한되어 있다.',
-      icon: 'hidden',
-      status: 'locked',
-      unlockCondition: { requiredFlag: 'FLAG_ARMORY_ACCESS' },
-      explorationCooldown: 2,
-      dangerLevel: 1,
-      possibleDiscoveries: ['disc_armory_weapon', 'disc_armory_intel'],
-    });
-  }
-
-  if (isHorrorScenario) {
-    baseLocations.push({
-      locationId: 'dark_corridor',
-      name: '어두운 복도',
-      baseDescription: '불길한 기운이 감도는 복도.',
-      currentDescription: '불길한 기운이 감도는 복도. 무언가가 숨어있는 것 같다.',
-      icon: 'corridor',
-      status: 'available',
-      explorationCooldown: 0,
-      dangerLevel: 3,
-      possibleDiscoveries: ['disc_corridor_clue', 'disc_corridor_danger'],
-    });
-  }
-
-  return baseLocations;
 };
 
 /**
- * 시나리오에 맞는 기본 발견물 생성
+ * v1.2: 동적 발견물 시스템 - 빈 배열로 시작
+ * 발견물은 AI 서사를 통해 동적으로 생성됨
  */
-const createDefaultDiscoveries = (scenario: ScenarioData): ConcreteDiscovery[] => {
-  const discoveries: ConcreteDiscovery[] = [
-    // 창고 발견물
-    {
-      discoveryId: 'disc_storage_supplies',
-      type: 'resource',
-      name: '비상 보급품 상자',
-      description: '통조림, 물, 기본 의료품이 담긴 상자',
-      locationId: 'storage',
-      effects: {
-        statChanges: { survivalFoundation: 5 },
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'minor',
-    },
-    {
-      discoveryId: 'disc_storage_map',
-      type: 'document',
-      name: '건물 도면',
-      description: '이 건물의 구조가 표시된 도면. 지하로 가는 통로가 표시되어 있다.',
-      locationId: 'storage',
-      effects: {
-        newLocationsUnlocked: ['basement'],
-        flagsAcquired: ['FLAG_BASEMENT_DISCOVERED'],
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'major',
-    },
-    // 입구 발견물
-    {
-      discoveryId: 'disc_entrance_intel',
-      type: 'clue',
-      name: '외부 상황 정보',
-      description: '멀리서 연기가 피어오르고 간헐적으로 폭발음이 들린다.',
-      locationId: 'entrance',
-      effects: {},
-      discovered: false,
-      oneTimeOnly: false,
-      importance: 'trivial',
-    },
-    // 의무실 발견물
-    {
-      discoveryId: 'disc_medical_kit',
-      type: 'item',
-      name: '의료 키트',
-      description: '붕대, 소독약, 진통제가 들어있는 응급 처치 키트',
-      locationId: 'medical',
-      effects: {
-        statChanges: { survivalFoundation: 3 },
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'minor',
-    },
-    {
-      discoveryId: 'disc_medical_records',
-      type: 'document',
-      name: '환자 기록',
-      description: '최근 입원 환자들의 기록. 특이한 증상들이 기록되어 있다.',
-      locationId: 'medical',
-      effects: {
-        flagsAcquired: ['FLAG_MEDICAL_INFO'],
-      },
-      discoveryCondition: {
-        requiredFlag: 'FLAG_TRUST_MEDICAL_STAFF',
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'major',
-    },
-    // 옥상 발견물
-    {
-      discoveryId: 'disc_roof_signal',
-      type: 'clue',
-      name: '구조 신호 발견',
-      description: '멀리서 빛 신호가 깜빡인다. 누군가 살아있다.',
-      locationId: 'roof',
-      effects: {
-        newLocationsUnlocked: ['signal_source'],
-        flagsAcquired: ['FLAG_SURVIVOR_SIGNAL'],
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'major',
-    },
-    {
-      discoveryId: 'disc_roof_threat',
-      type: 'clue',
-      name: '위협 세력 발견',
-      description: '동쪽에서 무장 집단이 이동 중인 것이 보인다.',
-      locationId: 'roof',
-      effects: {
-        statChanges: { cityChaos: 5 },
-        flagsAcquired: ['FLAG_THREAT_DETECTED'],
-      },
-      discoveryCondition: {
-        requiredStat: { statId: 'cityChaos', minValue: 50 },
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'major',
-    },
-    // 지하 발견물
-    {
-      discoveryId: 'disc_basement_cache',
-      type: 'resource',
-      name: '비밀 물자 저장고',
-      description: '누군가 숨겨둔 대량의 물자가 발견되었다.',
-      locationId: 'basement',
-      effects: {
-        statChanges: { survivalFoundation: 10 },
-        flagsAcquired: ['FLAG_SECRET_CACHE'],
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'critical',
-    },
-    {
-      discoveryId: 'disc_basement_secret',
-      type: 'document',
-      name: '비밀 문서',
-      description: '이 사태의 원인에 대한 단서가 담긴 문서.',
-      locationId: 'basement',
-      effects: {
-        flagsAcquired: ['FLAG_TRUTH_REVEALED'],
-      },
-      discoveryCondition: {
-        requiredItem: 'disc_storage_map',
-      },
-      discovered: false,
-      oneTimeOnly: true,
-      importance: 'critical',
-    },
-  ];
-
-  return discoveries;
+const createInitialDiscoveries = (): ConcreteDiscovery[] => {
+  // 동적 시스템에서는 발견물을 미리 정의하지 않음
+  // AI가 탐색/대화 결과로 발견물을 생성
+  return [];
 };
 
 /**
  * 초기 월드 상태 생성
+ * v1.2: 동적 시스템 - 시작 위치만 생성, 나머지는 AI 서사로 발견
  */
 export const createInitialWorldState = (
   scenario: ScenarioData,
   currentDay: number = 1
 ): WorldState => {
-  const locations = createDefaultLocations(scenario);
-  const discoveries = createDefaultDiscoveries(scenario);
+  const locations = createInitialLocations(scenario);
+  const discoveries = createInitialDiscoveries();
+  const openingLocation = scenario.storyOpening?.openingLocation || '본부';
 
-  // 기본 관계 생성 (캐릭터-위치)
+  // 기본 관계 생성 (캐릭터-위치) - 시작 위치 기준
   const relations: ObjectRelation[] = scenario.characters.map((char, index) => ({
     relationId: `rel_char_loc_${index}`,
     type: 'character-location' as const,
     subject: { type: 'character' as const, id: char.characterName },
-    object: { type: 'location' as const, id: 'entrance' }, // 기본 위치
-    description: `${char.characterName}이(가) 입구 근처에 있음`,
+    object: { type: 'location' as const, id: 'starting_location' },
+    description: `${char.characterName}이(가) ${openingLocation} 근처에 있음`,
     strength: 50,
     active: true,
   }));
 
-  // 기본 이벤트 생성
-  const pendingEvents: WorldEvent[] = [
-    {
-      eventId: 'event_medical_collapse',
-      type: 'location_destroyed',
-      description: '의무실이 폭발로 인해 무너졌다',
-      trigger: {
-        stat: { statId: 'cityChaos', comparison: 'gte', value: 80 },
-      },
-      effects: {
-        locationChanges: [
-          { locationId: 'medical', newStatus: 'destroyed', reason: '폭발로 무너짐' },
-        ],
-      },
-      triggered: false,
-      oneTime: true,
-    },
-    {
-      eventId: 'event_entrance_blocked',
-      type: 'location_blocked',
-      description: '입구가 적대 세력에 의해 봉쇄되었다',
-      trigger: {
-        flag: 'FLAG_THREAT_DETECTED',
-        day: 4,
-      },
-      effects: {
-        locationChanges: [
-          { locationId: 'entrance', newStatus: 'blocked', reason: '적대 세력이 감시 중' },
-        ],
-      },
-      triggered: false,
-      oneTime: true,
-    },
-    {
-      eventId: 'event_roof_unlock',
-      type: 'location_unlocked',
-      description: '옥상으로 가는 길이 열렸다',
-      trigger: {
-        day: 3,
-      },
-      effects: {
-        locationChanges: [
-          { locationId: 'roof', newStatus: 'available' },
-        ],
-      },
-      triggered: false,
-      oneTime: true,
-    },
-    {
-      eventId: 'event_basement_reveal',
-      type: 'location_unlocked',
-      description: '지하로 가는 통로가 발견되었다',
-      trigger: {
-        flag: 'FLAG_BASEMENT_DISCOVERED',
-      },
-      effects: {
-        locationChanges: [
-          { locationId: 'basement', newStatus: 'available' },
-        ],
-      },
-      triggered: false,
-      oneTime: true,
-    },
-  ];
+  // v1.2: 동적 시스템에서는 하드코딩된 이벤트 없음
+  // 이벤트는 AI 서사를 통해 동적으로 발생
+  const pendingEvents: WorldEvent[] = [];
 
   return {
     locations,
@@ -527,6 +240,65 @@ export const updateLocationStatus = (
         : loc
     ),
   };
+};
+
+/**
+ * v1.2: 동적으로 새로운 위치 추가
+ * AI 서사에서 발견된 장소를 WorldState에 추가
+ */
+export const addDiscoveredLocation = (
+  worldState: WorldState,
+  locationName: string,
+  description?: string,
+  icon?: WorldLocation['icon']
+): WorldState => {
+  // 이미 존재하는 위치인지 확인 (이름 기준)
+  const existingLocation = worldState.locations.find(
+    (loc) => loc.name === locationName || loc.locationId === locationName.toLowerCase().replace(/\s+/g, '_')
+  );
+
+  if (existingLocation) {
+    console.log(`🗺️ 위치 "${locationName}"은(는) 이미 존재함`);
+    return worldState;
+  }
+
+  // 고유 locationId 생성
+  const locationId = `loc_${locationName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+
+  const newLocation: WorldLocation = {
+    locationId,
+    name: locationName,
+    baseDescription: description || `${locationName}. 새로 발견된 장소입니다.`,
+    currentDescription: description || `${locationName}. 새로 발견된 장소입니다.`,
+    icon: icon || 'default',
+    status: 'available',
+    explorationCooldown: 1,
+    dangerLevel: 0,
+    possibleDiscoveries: [],
+  };
+
+  console.log(`🗺️ 새 위치 발견: "${locationName}" (${locationId})`);
+
+  return {
+    ...worldState,
+    locations: [...worldState.locations, newLocation],
+  };
+};
+
+/**
+ * v1.2: 여러 위치를 한 번에 추가
+ */
+export const addDiscoveredLocations = (
+  worldState: WorldState,
+  locations: Array<{ name: string; description?: string; icon?: WorldLocation['icon'] }>
+): WorldState => {
+  let newWorldState = worldState;
+
+  for (const loc of locations) {
+    newWorldState = addDiscoveredLocation(newWorldState, loc.name, loc.description, loc.icon);
+  }
+
+  return newWorldState;
 };
 
 // =============================================================================
@@ -985,8 +757,15 @@ export const getLocationsForUI = (
 
 /**
  * 월드 상태 요약 (프롬프트용)
+ * v1.2: 알려진 장소 목록 추가 (중복 방지용)
  */
 export const summarizeWorldState = (worldState: WorldState): string => {
+  // v1.2: 이미 알려진 장소 목록 (중복 생성 방지)
+  const knownLocations = worldState.locations
+    .filter((l) => l.status === 'available' || l.status === 'explored')
+    .map((l) => l.name)
+    .join(', ');
+
   const destroyedLocations = worldState.locations
     .filter((l) => l.status === 'destroyed')
     .map((l) => `${l.name} (${l.statusReason || '파괴됨'})`)
@@ -1004,6 +783,10 @@ export const summarizeWorldState = (worldState: WorldState): string => {
 
   const parts: string[] = [];
 
+  // v1.2: 알려진 장소 먼저 추가 (AI가 중복 생성하지 않도록)
+  if (knownLocations) {
+    parts.push(`알려진 장소: ${knownLocations}`);
+  }
   if (destroyedLocations) {
     parts.push(`파괴된 장소: ${destroyedLocations}`);
   }

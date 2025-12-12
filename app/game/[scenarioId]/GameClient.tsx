@@ -55,6 +55,7 @@ import {
   advanceWorldStateToNewDay,
   getLocationsForUI,
   updateLocationStatus,
+  addDiscoveredLocations,
 } from '@/lib/world-state-manager';
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
 import { calculateDynamicAPCost, getActionSynergy, type DynamicAPCost } from '@/lib/action-engagement-system';
@@ -455,6 +456,7 @@ const updateSaveState = (
     survivorStatus,
     flags_acquired,
     hiddenRelationships_change,
+    locations_discovered,
   } = aiResponse.statChanges;
 
   // 시나리오에서 알려진 캐릭터 이름 목록 생성 (관계 파싱에 사용)
@@ -1051,6 +1053,15 @@ const updateSaveState = (
     });
 
     console.log('👤 새로 만난 캐릭터:', newlyIntroducedCharacters.join(', '));
+  }
+
+  // v1.2: 동적 위치 시스템 - AI가 반환한 locations_discovered 처리
+  if (locations_discovered && locations_discovered.length > 0) {
+    newSaveState.worldState = addDiscoveredLocations(
+      newSaveState.worldState,
+      locations_discovered
+    );
+    console.log('🗺️ 새로 발견된 장소:', locations_discovered.map((l) => l.name).join(', '));
   }
 
   return newSaveState;
