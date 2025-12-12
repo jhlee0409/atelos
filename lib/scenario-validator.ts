@@ -26,9 +26,15 @@ export interface ValidationResult {
 
 /**
  * 엔딩 조건에서 참조하는 스탯 ID가 실제 존재하는지 검증
+ * @deprecated Legacy ending system validation - use DynamicEndingConfig instead
  */
 function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // 동적 엔딩 시스템을 사용하거나 endingArchetypes가 없으면 검증 스킵
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+    return issues;
+  }
+
   const validStatIds = new Set(scenario.scenarioStats.map((s) => s.id));
 
   scenario.endingArchetypes.forEach((ending) => {
@@ -53,9 +59,15 @@ function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[]
 
 /**
  * 엔딩 조건에서 참조하는 플래그가 실제 존재하는지 검증
+ * @deprecated Legacy ending system validation - use DynamicEndingConfig instead
  */
 function validateEndingFlagReferences(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // 동적 엔딩 시스템을 사용하거나 endingArchetypes가 없으면 검증 스킵
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+    return issues;
+  }
+
   const validFlagNames = new Set(scenario.flagDictionary.map((f) => f.flagName));
 
   scenario.endingArchetypes.forEach((ending) => {
@@ -220,9 +232,14 @@ function validateStatRanges(scenario: ScenarioData): ValidationIssue[] {
 
 /**
  * 엔딩 조건의 논리적 충돌 검증 (동일 스탯에 상충 조건)
+ * @deprecated Legacy ending system validation - use DynamicEndingConfig instead
  */
 function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // 동적 엔딩 시스템을 사용하거나 endingArchetypes가 없으면 검증 스킵
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+    return issues;
+  }
 
   scenario.endingArchetypes.forEach((ending) => {
     const statConditions = ending.systemConditions.filter(
@@ -271,9 +288,15 @@ function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIss
 
 /**
  * 미사용 플래그 감지 (경고)
+ * @deprecated Legacy ending system validation - Dynamic Ending System doesn't use flag conditions
  */
 function detectUnusedFlags(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // 동적 엔딩 시스템을 사용하면 플래그는 루트/스토리용으로만 사용되므로 검증 스킵
+  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length) {
+    return issues;
+  }
+
   const usedFlags = new Set<string>();
 
   // 엔딩 조건에서 사용된 플래그
@@ -336,19 +359,21 @@ function validateDuplicateIds(scenario: ScenarioData): ValidationIssue[] {
     });
   });
 
-  // 엔딩 ID 중복 체크
-  const endingIds = scenario.endingArchetypes.map((e) => e.endingId);
-  const duplicateEndingIds = endingIds.filter((id, index) => endingIds.indexOf(id) !== index);
-  duplicateEndingIds.forEach((id) => {
-    issues.push({
-      type: 'error',
-      category: 'duplicate',
-      field: `ending.${id}`,
-      message: `엔딩 ID "${id}"이(가) 중복됩니다.`,
-      suggestion: '각 엔딩은 고유한 ID를 가져야 합니다.',
-      targetTab: 'system',
+  // 엔딩 ID 중복 체크 (레거시 - 동적 엔딩 시스템에서는 불필요)
+  if (scenario.endingArchetypes?.length) {
+    const endingIds = scenario.endingArchetypes.map((e) => e.endingId);
+    const duplicateEndingIds = endingIds.filter((id, index) => endingIds.indexOf(id) !== index);
+    duplicateEndingIds.forEach((id) => {
+      issues.push({
+        type: 'error',
+        category: 'duplicate',
+        field: `ending.${id}`,
+        message: `엔딩 ID "${id}"이(가) 중복됩니다.`,
+        suggestion: '각 엔딩은 고유한 ID를 가져야 합니다.',
+        targetTab: 'system',
+      });
     });
-  });
+  }
 
   // 캐릭터 이름 중복 체크
   const characterNames = scenario.characters.map((c) => c.characterName);

@@ -1,3 +1,10 @@
+/**
+ * @deprecated This module is deprecated and will be removed in a future version.
+ * Use Dynamic Ending System (DynamicEndingConfig) instead.
+ *
+ * 이 모듈은 레거시 엔딩 시스템을 위한 것입니다.
+ * 새 시나리오에서는 dynamicEndingConfig를 사용하세요.
+ */
 import { PlayerState, SystemCondition, EndingArchetype } from '@/types';
 import { compareValues } from '@/constants/comparison-operators';
 

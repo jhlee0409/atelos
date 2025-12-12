@@ -30,7 +30,6 @@ import {
   Users,
   BarChart3,
   Flag,
-  Trophy,
   Sparkles,
   RotateCcw,
   BookOpen,
@@ -48,7 +47,6 @@ import {
   type CharacterResult,
   type StatResult,
   type FlagResult,
-  type EndingResult,
   type RelationshipResult,
   type TraitsResult,
   type TraitResult,
@@ -61,64 +59,7 @@ import {
   type GameplayConfigResult,
   type EmergentNarrativeResult,
 } from '@/lib/ai-scenario-generator';
-import type { ScenarioData, SystemCondition, Trait, DynamicEndingConfig } from '@/types';
-
-// 비교 연산자 타입
-type ComparisonOperator =
-  | 'greater_equal'
-  | 'less_equal'
-  | 'equal'
-  | 'greater_than'
-  | 'less_than'
-  | 'not_equal';
-
-// 비교 연산자 변환 (AI 형식 → 게임 형식)
-const COMPARISON_MAP: Record<string, ComparisonOperator | undefined> = {
-  '>=': 'greater_equal',
-  '<=': 'less_equal',
-  '==': 'equal',
-  '>': 'greater_than',
-  '<': 'less_than',
-  '!=': 'not_equal',
-};
-
-// suggestedConditions를 SystemCondition[]으로 변환
-const convertToSystemConditions = (
-  suggestedConditions: EndingResult['suggestedConditions'] | undefined,
-): SystemCondition[] => {
-  if (!suggestedConditions) return [];
-
-  const conditions: SystemCondition[] = [];
-
-  // 스탯 조건 변환
-  if (suggestedConditions.stats && Array.isArray(suggestedConditions.stats)) {
-    for (const stat of suggestedConditions.stats) {
-      const comparison = COMPARISON_MAP[stat.comparison];
-      if (comparison && stat.statId && typeof stat.value === 'number') {
-        conditions.push({
-          type: 'required_stat',
-          statId: stat.statId,
-          comparison,
-          value: stat.value,
-        });
-      }
-    }
-  }
-
-  // 플래그 조건 변환
-  if (suggestedConditions.flags && Array.isArray(suggestedConditions.flags)) {
-    for (const flagName of suggestedConditions.flags) {
-      if (flagName && typeof flagName === 'string') {
-        conditions.push({
-          type: 'required_flag',
-          flagName: flagName.startsWith('FLAG_') ? flagName : `FLAG_${flagName}`,
-        });
-      }
-    }
-  }
-
-  return conditions;
-};
+import type { ScenarioData, Trait, DynamicEndingConfig } from '@/types';
 
 // TraitResult를 Trait 타입으로 변환
 const convertTraitResult = (
@@ -135,15 +76,14 @@ const convertTraitResult = (
   iconUrl: '', // 기본값 - 에디터에서 설정 가능
 });
 
-// 단계 정의
-type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'endings' | 'story_opening' | 'complete';
+// 단계 정의 (엔딩은 Dynamic Ending System으로 자동 생성)
+type WizardStep = 'idea' | 'synopsis' | 'characters' | 'system' | 'story_opening' | 'complete';
 
 const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
   { key: 'idea', label: '아이디어', icon: Lightbulb },
   { key: 'synopsis', label: '시놉시스', icon: Sparkles },
   { key: 'characters', label: '캐릭터', icon: Users },
   { key: 'system', label: '시스템', icon: BarChart3 },
-  { key: 'endings', label: '엔딩', icon: Trophy },
   { key: 'story_opening', label: '오프닝', icon: BookOpen },
   { key: 'complete', label: '완료', icon: Check },
 ];
@@ -170,7 +110,6 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
   const [flags, setFlags] = useState<FlagResult[]>([]);
-  const [endings, setEndings] = useState<EndingResult[]>([]);
 
   // 스토리 오프닝 시스템 (Phase 7)
   const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
@@ -371,61 +310,6 @@ ${characterDetails}`,
     }
   }, [synopsisResult, characters]);
 
-  // 엔딩 생성
-  const handleGenerateEndings = useCallback(async () => {
-    if (!synopsisResult) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // 스탯 상세정보
-      const statDetails = stats
-        .map((s) => `- ${s.name} (${s.id}): ${s.description || '설명 없음'}, 범위 ${s.min}-${s.max}`)
-        .join('\n');
-
-      // 플래그 상세정보 (루트별 분류)
-      const flagDetails = flags
-        .map((f) => `- ${f.flagName}: ${f.description}`)
-        .join('\n');
-
-      // 캐릭터 정보
-      const characterNames = characters.map((c) => c.characterName).join(', ');
-
-      const response = await generateWithAI<{ endings: EndingResult[] }>(
-        'endings',
-        `시나리오: ${synopsisResult.title}
-시놉시스: ${synopsisResult.synopsis}
-플레이어 목표: ${synopsisResult.playerGoal}
-핵심 갈등: ${synopsisResult.conflictType}
-
-등장 캐릭터: ${characterNames}
-
-게임 스탯:
-${statDetails}
-
-이벤트 플래그:
-${flagDetails}
-
-엔딩은 스탯과 플래그 조건을 조합하여 다양한 결말을 만들어주세요.
-탈출/항전/협상 각 루트별로 최소 1개씩의 엔딩을 포함해주세요.`,
-        {
-          genre: synopsisResult.genre,
-          title: synopsisResult.title,
-          synopsis: synopsisResult.synopsis,
-          existingStats: stats.map((s) => `${s.name} (${s.id})`),
-          existingFlags: flags.map((f) => f.flagName),
-        },
-      );
-      setEndings(response.data.endings || []);
-      setCurrentStep('endings');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '엔딩 생성에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [synopsisResult, characters, stats, flags]);
-
   // 스토리 오프닝 생성 (Phase 7)
   const handleGenerateStoryOpening = useCallback(async () => {
     if (!synopsisResult) return;
@@ -555,14 +439,6 @@ ${characterDetails}`;
         initial: flag.type === 'count' ? 0 : false,
         triggerCondition: flag.triggerCondition || '',
       })),
-      endingArchetypes: endings.map((ending) => ({
-        endingId: ending.endingId,
-        title: ending.title,
-        description: ending.description || '',
-        isGoalSuccess: ending.isGoalSuccess || false,
-        systemConditions: convertToSystemConditions(ending.suggestedConditions),
-      })),
-      endCondition: { type: 'time_limit', value: 7, unit: 'days' }, // 기본값 - 7일 제한
       status: 'in_progress',
       // 스토리 오프닝 시스템 (Phase 7)
       storyOpening: storyOpening ? {
@@ -662,7 +538,7 @@ ${characterDetails}`;
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, flags, endings, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -1050,60 +926,6 @@ ${characterDetails}`;
                 다시 생성
               </Button>
               <Button
-                onClick={handleGenerateEndings}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 mr-2" />
-                )}
-                엔딩 생성
-              </Button>
-            </div>
-          </div>
-        );
-
-      case 'endings':
-        return (
-          <div className="space-y-6">
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {endings.map((ending, idx) => (
-                <Card key={idx} className={cn(
-                  "bg-zinc-800/30",
-                  ending.isGoalSuccess ? "border-green-900/50" : "border-red-900/50"
-                )}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-medium">{ending.title}</h4>
-                      <Badge variant={ending.isGoalSuccess ? "default" : "destructive"}>
-                        {ending.isGoalSuccess ? '성공' : '실패'}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-400">{ending.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => goToStep('system')}
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                이전
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleGenerateEndings}
-                disabled={isLoading}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                다시 생성
-              </Button>
-              <Button
                 onClick={handleGenerateStoryOpening}
                 disabled={isLoading}
                 className="flex-1"
@@ -1245,7 +1067,7 @@ ${characterDetails}`;
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => goToStep('endings')}
+                onClick={() => goToStep('system')}
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 이전
@@ -1305,8 +1127,8 @@ ${characterDetails}`;
                 <div className="text-xs text-zinc-500">플래그</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">{endings.length}</div>
-                <div className="text-xs text-zinc-500">엔딩</div>
+                <div className="text-lg font-bold">✓</div>
+                <div className="text-xs text-zinc-500">동적 엔딩</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{storyOpening ? '1' : '0'}</div>

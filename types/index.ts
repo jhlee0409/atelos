@@ -60,6 +60,12 @@ export type ScenarioFlag = {
   isEditing?: boolean;
 };
 
+// =============================================================================
+// [DEPRECATED] Legacy Ending System Types - Kept for backwards compatibility
+// Use DynamicEndingConfig instead for new scenarios
+// =============================================================================
+
+/** @deprecated Use DynamicEndingConfig instead */
 export type SystemCondition =
   | {
       type: 'required_stat';
@@ -92,6 +98,7 @@ export type SystemCondition =
       isEditing?: boolean;
     };
 
+/** @deprecated Use DynamicEndingConfig instead */
 export type GoalCluster = {
   id: string;
   title: string;
@@ -99,6 +106,7 @@ export type GoalCluster = {
   connectedEndings: string[];
 };
 
+/** @deprecated Use DynamicEndingConfig instead */
 export type EndingArchetype = {
   endingId: string;
   title: string;
@@ -108,6 +116,7 @@ export type EndingArchetype = {
   isEditing?: boolean;
 };
 
+/** @deprecated Use DynamicEndingConfig.endingDay instead */
 export type EndCondition = {
   type: 'time_limit' | 'goal_achievement' | 'condition_met';
   value?: number;
@@ -568,19 +577,26 @@ export type ScenarioData = {
   playerGoal: string;
   characters: Character[];
   initialRelationships: Relationship[];
-  endCondition: EndCondition;
   scenarioStats: ScenarioStat[];
   traitPool: TraitPool;
   flagDictionary: ScenarioFlag[];
-  goalCluster?: GoalCluster;
-  endingArchetypes: EndingArchetype[];
   status: 'in_progress' | 'testing' | 'active';
   /** 스토리 오프닝 설정 (Phase 7) */
   storyOpening?: StoryOpening;
   /** 게임플레이 설정 (Phase 8: 하드코딩 동적화) */
   gameplayConfig?: GameplayConfig;
-  /** 동적 결말 설정 (Dynamic Ending System) */
+  /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
+
+  // =============================================================================
+  // [DEPRECATED] Legacy fields - kept for backwards compatibility only
+  // =============================================================================
+  /** @deprecated Use dynamicEndingConfig.endingDay instead */
+  endCondition?: EndCondition;
+  /** @deprecated Use dynamicEndingConfig instead */
+  goalCluster?: GoalCluster;
+  /** @deprecated Use dynamicEndingConfig instead */
+  endingArchetypes?: EndingArchetype[];
 };
 
 // --- Game-specific state types, not part of scenario definition ---

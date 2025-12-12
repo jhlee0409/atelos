@@ -11,7 +11,6 @@ import BaseContent from '@/components/admin/ScenarioEditor/BaseContent';
 import StoryOpeningContent from '@/components/admin/ScenarioEditor/StoryOpeningContent';
 import CharacterContent from '@/components/admin/ScenarioEditor/CharacterContent';
 import SystemRulesContent from '@/components/admin/ScenarioEditor/SystemRulesContent';
-import CoreStoryElementsContent from '@/components/admin/ScenarioEditor/CoreStoryElementsContent';
 import GameplayConfigContent from '@/components/admin/ScenarioEditor/GameplayConfigContent';
 import { DynamicEndingConfigContent } from '@/components/admin/ScenarioEditor/DynamicEndingConfigContent';
 import StickySidebar from '@/components/admin/ScenarioEditor/StickySidebar';
@@ -197,13 +196,6 @@ function ScenarioDetailContent() {
           </div>
           <div id="section-system">
             <SystemRulesContent
-              scenario={scenario}
-              setScenario={setScenario}
-              errors={validationErrors}
-            />
-          </div>
-          <div id="section-core">
-            <CoreStoryElementsContent
               scenario={scenario}
               setScenario={setScenario}
               errors={validationErrors}
