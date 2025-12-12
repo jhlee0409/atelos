@@ -229,6 +229,7 @@ export const buildOptimizedGamePrompt = (
     actionContext?: ActionContext; // 맥락 연결 시스템
     actionsThisDay?: import('@/types').ActionRecord[]; // v1.2: 시너지 분석용
     actionType?: import('@/types').ActionType; // v1.2: 현재 행동 타입
+    characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태
   } = {},
 ): GamePromptData => {
   const {
@@ -526,6 +527,20 @@ ${dialogueClues.length > 0 ? `
     })
     .join(' | ');
 
+  // v1.2: 캐릭터 발전 상태 (신뢰도, 기분)
+  let characterArcSection = '';
+  if (options.characterArcs && options.characterArcs.length > 0) {
+    const arcSummaries = options.characterArcs.map(arc => {
+      const trustDesc = arc.trustLevel >= 50 ? '신뢰' : arc.trustLevel >= 0 ? '중립' : '경계';
+      const moodKorean: Record<string, string> = {
+        'hopeful': '희망적', 'anxious': '불안', 'angry': '분노',
+        'resigned': '체념', 'determined': '결의'
+      };
+      return `${arc.characterName}: ${trustDesc}(${arc.trustLevel}), ${moodKorean[arc.currentMood] || arc.currentMood}`;
+    }).join(' | ');
+    characterArcSection = `\n캐릭터 상태: ${arcSummaries}`;
+  }
+
   // 관계 정보 간략화
   const relationships = scenario.initialRelationships
     .map(
@@ -538,7 +553,7 @@ ${dialogueClues.length > 0 ? `
 
 Background: ${scenario.synopsis.substring(0, 300)}...
 
-Characters: ${characterInfo}
+Characters: ${characterInfo}${characterArcSection}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
 Active Flags: ${activeFlags || 'None'}

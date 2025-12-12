@@ -712,8 +712,23 @@ const updateSaveState = (
     });
   }
 
-  // @deprecated - flags system removed, using ActionHistory instead
-  // flags_acquired is logged as significantEvents in ActionHistory
+  // v1.2: flags_acquired를 context.flags에 적용 (ending/route 조건에 필요)
+  if (flags_acquired && flags_acquired.length > 0) {
+    flags_acquired.forEach((flagName: string) => {
+      if (flagName && typeof flagName === 'string') {
+        const normalizedFlag = flagName.startsWith('FLAG_') ? flagName : `FLAG_${flagName}`;
+        // boolean 플래그는 true로, count 플래그는 +1
+        const currentValue = newSaveState.context.flags[normalizedFlag];
+        if (typeof currentValue === 'number') {
+          newSaveState.context.flags[normalizedFlag] = currentValue + 1;
+        } else {
+          newSaveState.context.flags[normalizedFlag] = true;
+        }
+        trackedFlagsAcquired.push(normalizedFlag);
+        console.log(`🏴 플래그 획득: ${normalizedFlag}`);
+      }
+    });
+  }
 
   // =============================================================================
   // 기존 Day 전환 로직 제거됨 (Phase 4: 행동 게이지 시스템으로 대체)

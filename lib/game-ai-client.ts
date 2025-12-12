@@ -646,6 +646,7 @@ export const generateGameResponse = async (
           // v1.2: 시너지 분석용 데이터 전달
           actionsThisDay: saveState.context.actionsThisDay || [],
           actionType: 'choice',
+          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
         },
       );
     } else {
@@ -677,6 +678,7 @@ export const generateGameResponse = async (
           // v1.2: 시너지 분석용 데이터 전달
           actionsThisDay: saveState.context.actionsThisDay || [],
           actionType: 'choice', // choice 핸들러에서 호출되므로 choice
+          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
         },
       );
     }
