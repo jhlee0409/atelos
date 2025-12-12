@@ -197,6 +197,50 @@ const hasInsufficientAP = (
   return currentAP < cost;
 };
 
+/**
+ * 초기 만난 캐릭터 목록 생성 (storyOpening.firstCharacterToMeet 기반)
+ */
+const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
+  const firstCharacter = scenario.storyOpening?.firstCharacterToMeet;
+
+  // 캐릭터 소개 시퀀스가 있으면 첫 번째 캐릭터 사용
+  const introSequence = scenario.storyOpening?.characterIntroductionSequence;
+  if (introSequence && introSequence.length > 0) {
+    const firstInSequence = introSequence.find((s) => s.order === 1);
+    if (firstInSequence) {
+      return [firstInSequence.characterName];
+    }
+  }
+
+  // firstCharacterToMeet이 설정되어 있으면 사용
+  if (firstCharacter) {
+    return [firstCharacter];
+  }
+
+  // 둘 다 없으면 첫 번째 NPC 캐릭터 사용
+  const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+  return npcs.length > 0 ? [npcs[0].characterName] : [];
+};
+
+/**
+ * 초기 survivors 목록 생성 (만난 캐릭터만 포함)
+ */
+const getInitialSurvivors = (
+  scenario: ScenarioData,
+  charactersWithTraits: typeof scenario.characters
+): { name: string; role: string; traits: string[]; status: string }[] => {
+  const metCharacters = getInitialMetCharacters(scenario);
+
+  return charactersWithTraits
+    .filter((c) => metCharacters.includes(c.characterName))
+    .map((c) => ({
+      name: c.characterName,
+      role: c.roleName,
+      traits: c.currentTrait ? [c.currentTrait.displayName || c.currentTrait.traitName] : [],
+      status: 'normal',
+    }));
+};
+
 // =============================================================================
 
 interface GameClientProps {
@@ -303,18 +347,17 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
-      // TODO: [2025 Enhanced] 미래 구현 예정
-      // - protagonistKnowledge: 주인공 지식 시스템
-      // - npcRelationshipStates: 숨겨진 NPC 관계 상태
-      // - triggeredStoryEvents: 발동된 스토리 트리거
+      // [2025 Enhanced] 주인공 지식 시스템 - 만난 캐릭터만 추적
+      protagonistKnowledge: {
+        metCharacters: getInitialMetCharacters(scenario),
+        discoveredRelationships: [],
+        hintedRelationships: [],
+        informationPieces: [],
+      },
     },
     community: {
-      survivors: charactersWithTraits.map((c) => ({
-        name: c.characterName,
-        role: c.roleName,
-        traits: c.currentTrait ? [c.currentTrait.displayName || c.currentTrait.traitName] : [],
-        status: 'normal',
-      })),
+      // 처음에는 만난 캐릭터만 survivors에 포함 (나머지는 스토리 진행 중 추가)
+      survivors: getInitialSurvivors(scenario, charactersWithTraits),
       hiddenRelationships,
     },
     log: scenario.synopsis
@@ -961,6 +1004,53 @@ const updateSaveState = (
       relationships: trackedRelationshipChanges.length,
       flags: trackedFlagsAcquired.length,
     });
+  }
+
+  // v1.2: AI 서사에서 새로 등장한 캐릭터 자동 감지 및 metCharacters 업데이트
+  const allNpcNames = scenario.characters
+    .filter((c) => c.characterName !== '(플레이어)')
+    .map((c) => c.characterName);
+  const currentMetCharacters = newSaveState.context.protagonistKnowledge?.metCharacters || [];
+  const narrative = aiResponse.log || '';
+
+  const newlyIntroducedCharacters: string[] = [];
+  allNpcNames.forEach((charName) => {
+    // 아직 만나지 않은 캐릭터가 서사에 이름으로 언급되면 metCharacters에 추가
+    if (!currentMetCharacters.includes(charName) && narrative.includes(charName)) {
+      newlyIntroducedCharacters.push(charName);
+    }
+  });
+
+  if (newlyIntroducedCharacters.length > 0) {
+    // metCharacters 업데이트
+    if (newSaveState.context.protagonistKnowledge) {
+      newSaveState.context.protagonistKnowledge.metCharacters = [
+        ...currentMetCharacters,
+        ...newlyIntroducedCharacters,
+      ];
+    }
+
+    // community.survivors에도 추가 (아직 없는 경우)
+    newlyIntroducedCharacters.forEach((charName) => {
+      const alreadyInSurvivors = newSaveState.community.survivors.some(
+        (s: { name: string }) => s.name === charName
+      );
+      if (!alreadyInSurvivors) {
+        const charData = scenario.characters.find((c) => c.characterName === charName);
+        if (charData) {
+          newSaveState.community.survivors.push({
+            name: charData.characterName,
+            role: charData.roleName,
+            traits: charData.currentTrait
+              ? [charData.currentTrait.displayName || charData.currentTrait.traitName]
+              : [],
+            status: 'normal',
+          });
+        }
+      }
+    });
+
+    console.log('👤 새로 만난 캐릭터:', newlyIntroducedCharacters.join(', '));
   }
 
   return newSaveState;

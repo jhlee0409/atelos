@@ -188,6 +188,7 @@ export const buildOptimizedGamePromptV2 = (
     actionType?: import('@/types').ActionType; // v1.2: 행동 타입 (미사용, 타입 호환성)
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태 (미사용, 타입 호환성)
     worldState?: import('@/types').WorldState; // v1.2: 월드 상태 (미사용, 타입 호환성)
+    metCharacters?: string[]; // v1.2: 만난 캐릭터 (미사용, 타입 호환성)
   } = {},
 ): GamePromptData => {
   const {

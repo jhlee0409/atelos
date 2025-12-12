@@ -274,9 +274,23 @@ export const CharacterDialoguePanel = ({
   const [selectedCharacter, setSelectedCharacter] = useState<ExtendedCharacterDialogueOption | null>(null);
 
   // 대화 가능한 캐릭터 목록 생성 (동적 주제 시스템 사용)
+  // [v1.2] metCharacters 필터 추가 - 만난 캐릭터만 대화 가능
+  const metCharacters = saveState.context.protagonistKnowledge?.metCharacters || [];
+
   const availableCharacters: ExtendedCharacterDialogueOption[] = useMemo(() => {
     return saveState.community.survivors
-      .filter((survivor) => survivor.name !== '(플레이어)' && survivor.status !== 'dead')
+      .filter((survivor) => {
+        // 플레이어/사망자 제외
+        if (survivor.name === '(플레이어)' || survivor.status === 'dead') {
+          return false;
+        }
+        // metCharacters가 비어있으면 모든 캐릭터 허용 (레거시 호환)
+        if (metCharacters.length === 0) {
+          return true;
+        }
+        // 만난 캐릭터만 대화 가능
+        return metCharacters.includes(survivor.name);
+      })
       .map((survivor) => {
         // 캐릭터 아크에서 mood와 trustLevel 가져오기
         const arc = saveState.characterArcs?.find(
@@ -310,7 +324,7 @@ export const CharacterDialoguePanel = ({
           trustLevel: arc?.trustLevel || 0,
         };
       });
-  }, [saveState, scenario]);
+  }, [saveState, scenario, metCharacters]);
 
   const handleCharacterSelect = (character: ExtendedCharacterDialogueOption) => {
     setSelectedCharacter(character);

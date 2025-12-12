@@ -462,6 +462,10 @@ export const isLocationAccessible = (
       return { accessible: false, reason: location.statusReason || '차단됨' };
 
     case 'hidden':
+      // v1.2: hidden 상태도 requiredDay 조건으로 자동 해금 가능
+      if (location.unlockCondition?.requiredDay && currentDay >= location.unlockCondition.requiredDay) {
+        return { accessible: true };
+      }
       return { accessible: false, reason: '아직 발견되지 않음' };
 
     case 'locked':

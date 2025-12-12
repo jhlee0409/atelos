@@ -232,6 +232,7 @@ export const buildOptimizedGamePrompt = (
     actionType?: import('@/types').ActionType; // v1.2: 현재 행동 타입
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태
     worldState?: WorldState; // v1.2: 월드 상태 (위치, 발견물)
+    metCharacters?: string[]; // v1.2: 만난 캐릭터 (프롬프트 필터링용)
   } = {},
 ): GamePromptData => {
   const {
@@ -519,20 +520,39 @@ ${dialogueClues.length > 0 ? `
   // flags deprecated - using ActionHistory for tracking
   const activeFlags = '';
 
-  // 핵심 캐릭터 정보 포함 (품질 보장을 위해 모든 캐릭터 포함)
+  // v1.2: 만난 캐릭터만 필터링 (빈 배열이면 모두 허용 - 레거시 호환)
+  const metCharacters = options.metCharacters || [];
+  const hasMetFilter = metCharacters.length > 0;
+
+  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시
   const characterInfo = scenario.characters
+    .filter((char) => char.characterName !== '(플레이어)')
     .map((char) => {
       const mainTrait =
         char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
-      const backstory = char.backstory.substring(0, 30) + '...'; // 간략화
-      return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
+      const backstory = char.backstory.substring(0, 30) + '...';
+      const isMet = !hasMetFilter || metCharacters.includes(char.characterName);
+      // 만난 캐릭터는 이름 표시, 아닌 캐릭터는 역할만 표시
+      if (isMet) {
+        return `${char.characterName}(${char.roleName}): ${mainTrait}, ${backstory}`;
+      } else {
+        return `[미등장](${char.roleName}): ${mainTrait}`;
+      }
     })
     .join(' | ');
 
-  // v1.2: 캐릭터 발전 상태 (신뢰도, 기분)
+  // 만난 캐릭터 목록을 AI에 명시적으로 전달
+  const metCharactersSection = hasMetFilter
+    ? `\n**만난 캐릭터**: ${metCharacters.join(', ')} (이 캐릭터만 이름으로 언급. 나머지는 "낯선 사람", "누군가" 등으로 표현)`
+    : '';
+
+  // v1.2: 캐릭터 발전 상태 (만난 캐릭터만)
   let characterArcSection = '';
   if (options.characterArcs && options.characterArcs.length > 0) {
-    const arcSummaries = options.characterArcs.map(arc => {
+    const filteredArcs = hasMetFilter
+      ? options.characterArcs.filter((arc) => metCharacters.includes(arc.characterName))
+      : options.characterArcs;
+    const arcSummaries = filteredArcs.map(arc => {
       const trustDesc = arc.trustLevel >= 50 ? '신뢰' : arc.trustLevel >= 0 ? '중립' : '경계';
       const moodKorean: Record<string, string> = {
         'hopeful': '희망적', 'anxious': '불안', 'angry': '분노',
@@ -540,7 +560,9 @@ ${dialogueClues.length > 0 ? `
       };
       return `${arc.characterName}: ${trustDesc}(${arc.trustLevel}), ${moodKorean[arc.currentMood] || arc.currentMood}`;
     }).join(' | ');
-    characterArcSection = `\n캐릭터 상태: ${arcSummaries}`;
+    if (arcSummaries) {
+      characterArcSection = `\n캐릭터 상태: ${arcSummaries}`;
+    }
   }
 
   // 관계 정보 간략화
@@ -564,7 +586,7 @@ ${dialogueClues.length > 0 ? `
 
 Background: ${scenario.synopsis.substring(0, 300)}...
 
-Characters: ${characterInfo}${characterArcSection}
+Characters: ${characterInfo}${characterArcSection}${metCharactersSection}
 Relationships: ${relationships || 'None'}
 Current Stats: ${currentStats}
 Active Flags: ${activeFlags || 'None'}${worldStateSection}

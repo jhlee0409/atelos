@@ -43,10 +43,13 @@ export const createInitialContext = (
 ): ActionContext => {
   const currentDay = saveState.context.currentDay || 1;
 
+  // v1.2: 시나리오 설정에서 초기 위치 가져오기
+  const initialLocation = scenario.storyOpening?.openingLocation || '본부';
+
   // 캐릭터 초기 위치/상태 설정
   const characterPresences: CharacterPresence[] = scenario.characters.map((char) => ({
     characterName: char.characterName,
-    currentLocation: '본부', // 기본 위치
+    currentLocation: initialLocation,
     availableForDialogue: true,
     currentActivity: '대기 중',
   }));
@@ -55,7 +58,7 @@ export const createInitialContext = (
   const availableLocations: DynamicLocation[] = [
     {
       locationId: 'main_area',
-      name: '본부',
+      name: initialLocation,
       description: '현재 머물고 있는 주요 거점입니다.',
       available: true,
       type: 'interior',
@@ -63,14 +66,14 @@ export const createInitialContext = (
     {
       locationId: 'surroundings',
       name: '주변 구역',
-      description: '본부 근처를 둘러볼 수 있습니다.',
+      description: `${initialLocation} 근처를 둘러볼 수 있습니다.`,
       available: true,
       type: 'exterior',
     },
   ];
 
   return {
-    currentLocation: '본부',
+    currentLocation: initialLocation,
     currentSituation: scenario.synopsis.substring(0, 200),
     todayActions: {
       explorations: [],
@@ -157,6 +160,7 @@ export const updateContextAfterExploration = (
 
   return {
     ...context,
+    currentLocation: locationName, // v1.2: 탐색 시 현재 위치 업데이트
     todayActions: newTodayActions,
     discoveredClues: newClues,
     lastUpdated: { day: currentDay, actionIndex },
@@ -564,6 +568,9 @@ export const buildCluesSummary = (context: ActionContext): string => {
  */
 export const formatContextForPrompt = (context: ActionContext): string => {
   return `
+## 현재 위치
+${context.currentLocation}
+
 ## 오늘의 맥락
 ${buildContextSummary(context)}
 
