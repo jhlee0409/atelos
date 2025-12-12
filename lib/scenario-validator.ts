@@ -1,13 +1,13 @@
 /**
  * 시나리오 데이터 일관성 검증 유틸리티
- * AI 생성 후 스탯/플래그/엔딩 조건 간 불일치를 감지합니다.
+ * Dynamic Ending System 기반 검증
  */
 
-import type { ScenarioData, EndingArchetype, SystemCondition } from '@/types';
+import type { ScenarioData, SystemCondition } from '@/types';
 
 export interface ValidationIssue {
   type: 'error' | 'warning';
-  category: 'ending' | 'stat' | 'flag' | 'character' | 'relationship' | 'trait' | 'duplicate';
+  category: 'ending' | 'stat' | 'character' | 'relationship' | 'trait' | 'duplicate';
   field: string;
   message: string;
   suggestion?: string;
@@ -38,7 +38,8 @@ function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[]
   const validStatIds = new Set(scenario.scenarioStats.map((s) => s.id));
 
   scenario.endingArchetypes.forEach((ending) => {
-    ending.systemConditions.forEach((condition) => {
+    // systemConditions가 optional이므로 안전하게 처리
+    (ending.systemConditions || []).forEach((condition) => {
       if (condition.type === 'required_stat') {
         if (!validStatIds.has(condition.statId)) {
           issues.push({
@@ -47,46 +48,6 @@ function validateEndingStatReferences(scenario: ScenarioData): ValidationIssue[]
             field: `${ending.endingId}.systemConditions`,
             message: `엔딩 "${ending.title}"의 스탯 조건 "${condition.statId}"이(가) 존재하지 않습니다.`,
             suggestion: `사용 가능한 스탯: ${Array.from(validStatIds).join(', ')}`,
-            targetTab: 'system',
-          });
-        }
-      }
-    });
-  });
-
-  return issues;
-}
-
-/**
- * 엔딩 조건에서 참조하는 플래그가 실제 존재하는지 검증
- * @deprecated Legacy ending system validation - use DynamicEndingConfig instead
- * @deprecated Flags system removed - use ActionHistory for tracking player actions
- */
-function validateEndingFlagReferences(scenario: ScenarioData): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  // 동적 엔딩 시스템을 사용하거나 endingArchetypes가 없으면 검증 스킵
-  // 또한 flagDictionary가 없으면 스킵 (flags 시스템 제거됨)
-  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length || !scenario.flagDictionary?.length) {
-    return issues;
-  }
-
-  const validFlagNames = new Set(scenario.flagDictionary.map((f) => f.flagName));
-
-  scenario.endingArchetypes.forEach((ending) => {
-    ending.systemConditions.forEach((condition) => {
-      if (condition.type === 'required_flag') {
-        // FLAG_ 접두사 정규화
-        const normalizedFlag = condition.flagName.startsWith('FLAG_')
-          ? condition.flagName
-          : `FLAG_${condition.flagName}`;
-
-        if (!validFlagNames.has(condition.flagName) && !validFlagNames.has(normalizedFlag)) {
-          issues.push({
-            type: 'error',
-            category: 'ending',
-            field: `${ending.endingId}.systemConditions`,
-            message: `엔딩 "${ending.title}"의 플래그 조건 "${condition.flagName}"이(가) 존재하지 않습니다.`,
-            suggestion: `사용 가능한 플래그: ${Array.from(validFlagNames).slice(0, 5).join(', ')}...`,
             targetTab: 'system',
           });
         }
@@ -244,7 +205,8 @@ function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIss
   }
 
   scenario.endingArchetypes.forEach((ending) => {
-    const statConditions = ending.systemConditions.filter(
+    // systemConditions가 optional이므로 안전하게 처리
+    const statConditions = (ending.systemConditions || []).filter(
       (c): c is Extract<SystemCondition, { type: 'required_stat' }> => c.type === 'required_stat'
     );
 
@@ -289,47 +251,7 @@ function validateEndingConditionConflicts(scenario: ScenarioData): ValidationIss
 }
 
 /**
- * 미사용 플래그 감지 (경고)
- * @deprecated Legacy ending system validation - Dynamic Ending System doesn't use flag conditions
- * @deprecated Flags system removed - use ActionHistory for tracking player actions
- */
-function detectUnusedFlags(scenario: ScenarioData): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  // 동적 엔딩 시스템을 사용하거나 flagDictionary가 없으면 검증 스킵 (flags 시스템 제거됨)
-  if (scenario.dynamicEndingConfig?.enabled || !scenario.endingArchetypes?.length || !scenario.flagDictionary?.length) {
-    return issues;
-  }
-
-  const usedFlags = new Set<string>();
-
-  // 엔딩 조건에서 사용된 플래그
-  scenario.endingArchetypes.forEach((ending) => {
-    ending.systemConditions.forEach((condition) => {
-      if (condition.type === 'required_flag') {
-        usedFlags.add(condition.flagName);
-      }
-    });
-  });
-
-  // 사용되지 않은 플래그 감지
-  scenario.flagDictionary.forEach((flag) => {
-    if (!usedFlags.has(flag.flagName)) {
-      issues.push({
-        type: 'warning',
-        category: 'flag',
-        field: `flag.${flag.flagName}`,
-        message: `플래그 "${flag.flagName}"이(가) 어떤 엔딩 조건에서도 사용되지 않습니다.`,
-        suggestion: '이 플래그를 엔딩 조건에 추가하거나 삭제를 고려하세요.',
-        targetTab: 'system',
-      });
-    }
-  });
-
-  return issues;
-}
-
-/**
- * 중복 ID 검증 (스탯, 플래그, 엔딩)
+ * 중복 ID 검증 (스탯, 엔딩, 캐릭터)
  */
 function validateDuplicateIds(scenario: ScenarioData): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -347,22 +269,6 @@ function validateDuplicateIds(scenario: ScenarioData): ValidationIssue[] {
       targetTab: 'system',
     });
   });
-
-  // 플래그 이름 중복 체크 (레거시 - flags 시스템 제거됨)
-  if (scenario.flagDictionary?.length) {
-    const flagNames = scenario.flagDictionary.map((f) => f.flagName);
-    const duplicateFlagNames = flagNames.filter((name, index) => flagNames.indexOf(name) !== index);
-    duplicateFlagNames.forEach((name) => {
-      issues.push({
-        type: 'error',
-        category: 'duplicate',
-        field: `flag.${name}`,
-        message: `플래그 "${name}"이(가) 중복됩니다.`,
-        suggestion: '각 플래그는 고유한 이름을 가져야 합니다.',
-        targetTab: 'system',
-      });
-    });
-  }
 
   // 엔딩 ID 중복 체크 (레거시 - 동적 엔딩 시스템에서는 불필요)
   if (scenario.endingArchetypes?.length) {
@@ -449,12 +355,10 @@ export function validateScenario(scenario: ScenarioData): ValidationResult {
   const issues: ValidationIssue[] = [
     ...validateDuplicateIds(scenario),
     ...validateEndingStatReferences(scenario),
-    ...validateEndingFlagReferences(scenario),
     ...validateRelationshipCharacters(scenario),
     ...validateStoryOpeningCharacters(scenario),
     ...validateStatRanges(scenario),
     ...validateEndingConditionConflicts(scenario),
-    ...detectUnusedFlags(scenario),
     ...validateTraitPoolReferences(scenario),
   ];
 

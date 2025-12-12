@@ -6,7 +6,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   checkStatCondition,
-  checkFlagCondition,
   checkSurvivorCountCondition,
   checkEndingConditions,
 } from '@/lib/ending-checker';
@@ -176,66 +175,6 @@ describe('checkStatCondition', () => {
 // =============================================================================
 // 플래그 조건 체크 테스트 (DEPRECATED - ActionHistory로 대체)
 // =============================================================================
-
-describe('checkFlagCondition (deprecated)', () => {
-  // 플래그 시스템은 ActionHistory로 대체됨
-  // 이 테스트는 하위 호환성을 위해 유지되지만, 새로운 시나리오에서는 사용하지 않음
-  const flags = {
-    FLAG_FIRST_CONTACT: true,
-    FLAG_RESOURCE_CACHE_FOUND: false,
-    FLAG_ALLIANCE_FORMED: 3,
-    FLAG_EMPTY_COUNT: 0,
-  };
-
-  it('boolean true 플래그는 true 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_FIRST_CONTACT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(true);
-  });
-
-  it('boolean false 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_RESOURCE_CACHE_FOUND',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-
-  it('count > 0인 플래그는 true 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_ALLIANCE_FORMED',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(true);
-  });
-
-  it('count가 0인 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_EMPTY_COUNT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-
-  it('존재하지 않는 플래그는 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_NON_EXISTENT',
-    };
-    expect(checkFlagCondition(condition, flags)).toBe(false);
-  });
-
-  it('빈 flags 객체면 false 반환', () => {
-    const condition = {
-      type: 'required_flag' as const,
-      flagName: 'FLAG_ANY',
-    };
-    expect(checkFlagCondition(condition, {})).toBe(false);
-    expect(checkFlagCondition(condition, undefined as any)).toBe(false);
-  });
-});
 
 // =============================================================================
 // 생존자 수 조건 체크 테스트

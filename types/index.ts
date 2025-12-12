@@ -85,11 +85,6 @@ export type SystemCondition =
       isEditing?: boolean;
     }
   | {
-      type: 'required_flag';
-      flagName: string;
-      isEditing?: boolean;
-    }
-  | {
       type: 'survivor_count';
       comparison:
         | 'greater_equal'
@@ -318,8 +313,6 @@ export interface StorySiftingTrigger {
     dayRange?: { min?: number; max?: number };
     /** 이전 트리거 발동 필요 */
     requiredTriggers?: string[];
-    /** @deprecated Use actionPatternKeywords instead */
-    flagCombination?: string[];
   };
   /** 생성될 스토리 이벤트 */
   generatedEvent: {
@@ -503,11 +496,6 @@ export type RouteScoreConfig = {
     /** 임계값 */
     threshold: number;
     /** 조건 만족 시 점수 */
-    score: number;
-  }[];
-  /** @deprecated Use actionPatterns instead */
-  flagScores?: {
-    flagName: string;
     score: number;
   }[];
 };

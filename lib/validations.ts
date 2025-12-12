@@ -154,24 +154,10 @@ const validateRelationships = (scenario: ScenarioData): string[] => {
   return errors;
 };
 
-// 플래그 검증
-const validateFlags = (scenario: ScenarioData): string[] => {
-  const errors: string[] = [];
-  const flagNames = new Set<string>();
-
-  scenario.flagDictionary.forEach((flag, index) => {
-    if (!flag.flagName) {
-      errors.push(`${VALIDATION_IDS.FLAG_NAME}_${index}`);
-    } else {
-      // 중복 플래그 이름 검증
-      if (flagNames.has(flag.flagName)) {
-        errors.push(`${VALIDATION_IDS.FLAG_NAME}_duplicate_${index}`);
-      }
-      flagNames.add(flag.flagName);
-    }
-  });
-
-  return errors;
+// 플래그 검증 - @deprecated Flags system removed
+// Kept for backwards compatibility but returns empty array
+const validateFlags = (_scenario: ScenarioData): string[] => {
+  return [];
 };
 
 // 기본 검증 (하위 호환성 유지)

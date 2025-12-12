@@ -77,42 +77,35 @@ export const buildStatIdToNameMap = (
 
 // ===== 플래그 매핑 관련 =====
 
+/** @deprecated Flags system removed - kept for backwards compatibility */
 export interface FlagMapping {
-  id: string;          // 영어 ID (예: "FLAG_ESCAPE_SECURED")
-  name: string;        // 한글 이름 (예: "탈출 수단 확보")
+  id: string;
+  name: string;
   description?: string;
 }
 
 /**
- * 시나리오 데이터에서 플래그 매핑 추출
+ * @deprecated Flags system removed - returns empty array
  */
-export const extractFlagMappings = (scenario: ScenarioData): FlagMapping[] => {
-  return scenario.flagDictionary.map((flag) => ({
-    id: flag.flagName,
-    name: flag.description.split('.')[0] || flag.flagName, // 첫 문장을 이름으로 사용
-    description: flag.description,
-  }));
+export const extractFlagMappings = (_scenario: ScenarioData): FlagMapping[] => {
+  return [];
 };
 
 /**
- * 시나리오에서 플래그 ID → 한글 설명 변환
+ * @deprecated Flags system removed - returns placeholder
  */
 export const getFlagNameFromScenario = (
   flagId: string,
-  scenario: ScenarioData
+  _scenario: ScenarioData
 ): string => {
-  const cleanId = flagId.replace(/^FLAG_/, '');
-  const flag = scenario.flagDictionary.find(
-    (f) => f.flagName === flagId || f.flagName === cleanId || f.flagName === `FLAG_${cleanId}`
-  );
-  return flag?.description.split('.')[0] || `[${flagId}]`;
+  return `[${flagId}]`;
 };
 
 /**
- * 시나리오에서 모든 플래그 ID 목록 추출
+ * @deprecated Flags system removed - returns empty array
  */
-export const getAllFlagIdsFromScenario = (scenario: ScenarioData): string[] => {
-  return scenario.flagDictionary.map((f) => f.flagName);
+export const getAllFlagIdsFromScenario = (_scenario: ScenarioData): string[] => {
+  return [];
 };
 
 // ===== 캐릭터 매핑 관련 =====
@@ -222,10 +215,8 @@ export const initScenarioMappingCache = (scenario: ScenarioData): ScenarioMappin
     statIdToName[stat.id] = stat.name;
   }
 
+  // Flags system deprecated - use empty object
   const flagIdToName: Record<string, string> = {};
-  for (const flag of scenario.flagDictionary) {
-    flagIdToName[flag.flagName] = flag.description.split('.')[0];
-  }
 
   mappingCache = {
     scenarioId: scenario.scenarioId,

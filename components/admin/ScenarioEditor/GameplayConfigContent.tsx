@@ -49,7 +49,7 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
     updateConfig({
       routeScores: [
         ...currentRouteScores,
-        { routeName: '새 루트', flagScores: [] },
+        { routeName: '새 루트' },
       ],
     });
   };
@@ -59,38 +59,6 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
     const currentRouteScores = config.routeScores || DEFAULT_ROUTE_SCORES;
     updateConfig({
       routeScores: currentRouteScores.filter((_, i) => i !== index),
-    });
-  };
-
-  // Add flag score to route
-  const addFlagScore = (routeIndex: number) => {
-    const currentRouteScores = config.routeScores || DEFAULT_ROUTE_SCORES;
-    const route = currentRouteScores[routeIndex];
-    updateRouteScore(routeIndex, {
-      flagScores: [...route.flagScores, { flagName: '', score: 30 }],
-    });
-  };
-
-  // Update flag score
-  const updateFlagScore = (
-    routeIndex: number,
-    flagIndex: number,
-    updates: Partial<{ flagName: string; score: number }>
-  ) => {
-    const currentRouteScores = config.routeScores || DEFAULT_ROUTE_SCORES;
-    const route = currentRouteScores[routeIndex];
-    const newFlagScores = route.flagScores.map((fs, i) =>
-      i === flagIndex ? { ...fs, ...updates } : fs
-    );
-    updateRouteScore(routeIndex, { flagScores: newFlagScores });
-  };
-
-  // Remove flag score
-  const removeFlagScore = (routeIndex: number, flagIndex: number) => {
-    const currentRouteScores = config.routeScores || DEFAULT_ROUTE_SCORES;
-    const route = currentRouteScores[routeIndex];
-    updateRouteScore(routeIndex, {
-      flagScores: route.flagScores.filter((_, i) => i !== flagIndex),
     });
   };
 
@@ -105,11 +73,6 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
 
   // AI Generate
   const handleAIGenerate = async () => {
-    if (!scenario.flagDictionary?.length) {
-      toast.error('플래그를 먼저 정의해주세요.');
-      return;
-    }
-
     setIsGenerating(true);
     try {
       const response = await generateWithAI<GameplayConfigResult>(
@@ -119,7 +82,6 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
           genre: scenario.genre,
           title: scenario.title,
           synopsis: scenario.synopsis,
-          existingFlags: scenario.flagDictionary?.map((f) => f.flagName) || [],
           existingStats: scenario.scenarioStats?.map((s) => s.id) || [],
         }
       );
@@ -151,9 +113,6 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
       setIsGenerating(false);
     }
   };
-
-  // Get available flags for dropdown
-  const availableFlags = scenario.flagDictionary?.map((f) => f.flagName) || [];
 
   // Current values with defaults
   const routeActivationRatio = config.routeActivationRatio ?? DEFAULT_GAMEPLAY_CONFIG.routeActivationRatio;
@@ -448,55 +407,9 @@ export default function GameplayConfigContent({ scenario, setScenario }: Props) 
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm">플래그별 점수</Label>
-                      {route.flagScores.map((flagScore, flagIndex) => (
-                        <div key={flagIndex} className="flex items-center gap-2">
-                          <select
-                            value={flagScore.flagName}
-                            onChange={(e) =>
-                              updateFlagScore(routeIndex, flagIndex, {
-                                flagName: e.target.value,
-                              })
-                            }
-                            className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-                          >
-                            <option value="">플래그 선택...</option>
-                            {availableFlags.map((flag) => (
-                              <option key={flag} value={flag}>
-                                {flag}
-                              </option>
-                            ))}
-                          </select>
-                          <Input
-                            type="number"
-                            value={flagScore.score}
-                            onChange={(e) =>
-                              updateFlagScore(routeIndex, flagIndex, {
-                                score: parseInt(e.target.value) || 0,
-                              })
-                            }
-                            className="w-20"
-                            placeholder="점수"
-                          />
-                          <Button
-                            onClick={() => removeFlagScore(routeIndex, flagIndex)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        onClick={() => addFlagScore(routeIndex)}
-                        variant="outline"
-                        size="sm"
-                        className="w-full border-dashed"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        플래그 추가
-                      </Button>
+                      <p className="text-xs text-socratic-grey">
+                        루트 분기는 ActionHistory 기반으로 자동 계산됩니다.
+                      </p>
                     </div>
                   </CardContent>
                 </Card>

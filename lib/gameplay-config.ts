@@ -280,12 +280,6 @@ export function calculateRouteScores(
       }
     }
 
-    // 레거시 flagScores 지원 (하위 호환성)
-    if (route.flagScores && scenario?.flagDictionary) {
-      // 레거시 시나리오에서만 작동 - 새 시나리오에서는 무시됨
-      console.warn('⚠️ Legacy flagScores detected. Please migrate to actionPatterns.');
-    }
-
     scores[route.routeName] = score;
   }
 

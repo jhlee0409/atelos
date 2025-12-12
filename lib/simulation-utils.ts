@@ -219,24 +219,6 @@ export class SimulationUtils {
     }
   }
 
-  /**
-   * @deprecated Flags system removed - use ActionHistory for tracking player actions
-   */
-  private static checkFlagCondition(
-    condition: Extract<SystemCondition, { type: 'required_flag' }>,
-    flags: PlayerState['flags'],
-  ): boolean {
-    if (!flags) return false;
-    const flagValue = flags[condition.flagName];
-    // boolean 플래그는 true 여부 체크, count 플래그는 > 0 체크
-    if (typeof flagValue === 'boolean') {
-      return flagValue === true;
-    } else if (typeof flagValue === 'number') {
-      return flagValue > 0;
-    }
-    return false;
-  }
-
   private static checkSurvivorCountCondition(
     condition: Extract<SystemCondition, { type: 'survivor_count' }>,
     survivorCount: number,
@@ -272,13 +254,12 @@ export class SimulationUtils {
     survivorCount?: number,
   ): EndingArchetype | null {
     for (const ending of endingArchetypes) {
-      const conditionsMet = ending.systemConditions.every((condition) => {
+      // systemConditions가 optional이므로 안전하게 처리
+      const conditions = ending.systemConditions || [];
+      const conditionsMet = conditions.every((condition) => {
         switch (condition.type) {
           case 'required_stat':
             return this.checkStatCondition(condition, playerState.stats);
-          case 'required_flag':
-            // @deprecated - flag conditions are no longer actively used
-            return this.checkFlagCondition(condition, playerState.flags || {});
           case 'survivor_count':
             // survivorCount가 전달되지 않으면 조건 미충족
             if (survivorCount === undefined) return false;

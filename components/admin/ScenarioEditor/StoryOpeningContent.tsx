@@ -167,7 +167,6 @@ ${characterDetails}`;
       synopsis: scenario.synopsis,
       existingCharacters: scenario.characters.map((c) => `${c.characterName} (${c.roleName})`),
       existingStats: scenario.scenarioStats?.map((s) => s.id) || [],
-      existingFlags: scenario.flagDictionary?.map((f) => f.flagName) || [],
     };
 
     return { scenarioInput, context };
@@ -310,14 +309,10 @@ ${characterDetails}`;
     }
   }, [buildScenarioContext, scenario.characters.length]);
 
-  // 이머전트 내러티브 AI 생성
+  // 이머전트 내러티브 AI 생성 (ActionHistory 기반)
   const handleGenerateEmergentNarrative = useCallback(async () => {
     if (scenario.characters.length < 2) {
       toast.error('캐릭터가 2명 이상 필요합니다');
-      return;
-    }
-    if (!scenario.flagDictionary || scenario.flagDictionary.length === 0) {
-      toast.error('플래그가 1개 이상 필요합니다');
       return;
     }
     setIsGeneratingEmergent(true);
@@ -347,7 +342,7 @@ ${characterDetails}`;
     } finally {
       setIsGeneratingEmergent(false);
     }
-  }, [buildScenarioContext, scenario.characters.length, scenario.flagDictionary]);
+  }, [buildScenarioContext, scenario.characters.length]);
 
   // 모든 2025 Enhanced 기능 일괄 생성
   const handleGenerateAllEnhanced = useCallback(async () => {
@@ -1276,7 +1271,7 @@ ${characterDetails}`;
             variant="outline"
             size="sm"
             onClick={handleGenerateEmergentNarrative}
-            disabled={isAnyGenerating || scenario.characters.length < 2 || !scenario.flagDictionary?.length}
+            disabled={isAnyGenerating || scenario.characters.length < 2}
             className="shrink-0 border-kairos-gold text-kairos-gold hover:bg-kairos-gold/10"
           >
             {isGeneratingEmergent ? (
@@ -1371,9 +1366,9 @@ ${characterDetails}`;
                               👤 {char}
                             </Badge>
                           ))}
-                          {trigger.conditions.flagCombination?.map((flag) => (
-                            <Badge key={flag} variant="outline" className="text-xs bg-green-50">
-                              🏴 {flag}
+                          {trigger.conditions.actionPatternKeywords?.map((keyword) => (
+                            <Badge key={keyword} variant="outline" className="text-xs bg-green-50">
+                              📝 {keyword}
                             </Badge>
                           ))}
                         </div>

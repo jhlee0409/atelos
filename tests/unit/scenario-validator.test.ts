@@ -1,5 +1,6 @@
 /**
  * 시나리오 검증 유틸리티 테스트
+ * Dynamic Ending System 기반 검증
  */
 
 import { describe, it, expect } from 'vitest';
@@ -93,72 +94,6 @@ describe('validateScenario', () => {
       );
 
       expect(statErrors.length).toBe(0);
-    });
-  });
-
-  // 플래그 시스템은 ActionHistory로 대체됨 - 이 테스트는 하위 호환성 검증용
-  describe('ending flag reference validation (deprecated)', () => {
-    it('should skip flag validation when no flagDictionary exists', () => {
-      // 플래그 딕셔너리가 없는 시나리오에서는 플래그 검증을 건너뜀
-      const scenario = createTestScenario({
-        flagDictionary: undefined, // 플래그 없음
-        endingArchetypes: [
-          {
-            endingId: 'ENDING_TEST',
-            title: '테스트 엔딩',
-            description: '테스트',
-            isGoalSuccess: true,
-            systemConditions: [
-              {
-                type: 'required_flag',
-                flagName: 'FLAG_ANY', // 플래그 딕셔너리가 없으므로 검증 skip
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = validateScenario(scenario);
-      // flagDictionary가 없으면 플래그 참조 오류를 발생시키지 않음 (deprecated)
-      const flagErrors = result.issues.filter(
-        (i) => i.category === 'ending' && i.type === 'error' && i.message.includes('플래그')
-      );
-      expect(flagErrors.length).toBe(0);
-    });
-
-    it('should validate flag reference only when flagDictionary exists', () => {
-      // 플래그 딕셔너리가 있는 경우에만 참조 검증
-      const scenario = createTestScenario({
-        flagDictionary: [
-          {
-            flagName: 'FLAG_VALID',
-            description: '유효한 플래그',
-            type: 'boolean',
-            initial: false,
-          },
-        ],
-        endingArchetypes: [
-          {
-            endingId: 'ENDING_TEST',
-            title: '테스트 엔딩',
-            description: '테스트',
-            isGoalSuccess: true,
-            systemConditions: [
-              {
-                type: 'required_flag',
-                flagName: 'FLAG_VALID',
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = validateScenario(scenario);
-      const flagErrors = result.issues.filter(
-        (i) => i.category === 'ending' && i.type === 'error' && i.message.includes('플래그')
-      );
-
-      expect(flagErrors.length).toBe(0);
     });
   });
 
@@ -395,58 +330,6 @@ describe('validateScenario', () => {
       expect(conflictWarnings.length).toBe(0);
     });
   });
-
-  // 플래그 시스템은 ActionHistory로 대체됨 - 미사용 플래그 경고 테스트
-  describe('unused flag detection (deprecated)', () => {
-    it('should warn about unused flags when flagDictionary exists', () => {
-      const scenario = createTestScenario({
-        flagDictionary: [
-          {
-            flagName: 'FLAG_USED_IN_ENDING',
-            description: '엔딩에서 사용되는 플래그',
-            type: 'boolean',
-            initial: false,
-          },
-          {
-            flagName: 'FLAG_NEVER_USED',
-            description: '사용되지 않는 플래그',
-            type: 'boolean',
-            initial: false,
-          },
-        ],
-        endingArchetypes: [
-          {
-            endingId: 'ENDING_TEST',
-            title: '테스트 엔딩',
-            description: '테스트',
-            isGoalSuccess: true,
-            systemConditions: [
-              {
-                type: 'required_flag',
-                flagName: 'FLAG_USED_IN_ENDING',
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = validateScenario(scenario);
-      const flagWarnings = filterIssuesByCategory(result, 'flag');
-
-      expect(flagWarnings.some((i) => i.message.includes('FLAG_NEVER_USED'))).toBe(true);
-    });
-
-    it('should not warn when no flagDictionary exists', () => {
-      const scenario = createTestScenario({
-        flagDictionary: undefined, // 플래그 없음
-      });
-
-      const result = validateScenario(scenario);
-      const flagWarnings = filterIssuesByCategory(result, 'flag');
-
-      expect(flagWarnings.length).toBe(0);
-    });
-  });
 });
 
 describe('filterIssuesByCategory', () => {
@@ -555,30 +438,6 @@ describe('duplicate ID validation', () => {
     const duplicateIssues = result.issues.filter((i) => i.category === 'duplicate');
 
     expect(duplicateIssues.some((i) => i.message.includes('duplicateStat'))).toBe(true);
-  });
-
-  it('should detect duplicate flag names', () => {
-    const scenario = createTestScenario({
-      flagDictionary: [
-        {
-          flagName: 'FLAG_DUPLICATE',
-          description: '테스트1',
-          type: 'boolean',
-          initial: false,
-        },
-        {
-          flagName: 'FLAG_DUPLICATE', // 중복
-          description: '테스트2',
-          type: 'boolean',
-          initial: false,
-        },
-      ],
-    });
-
-    const result = validateScenario(scenario);
-    const duplicateIssues = result.issues.filter((i) => i.category === 'duplicate');
-
-    expect(duplicateIssues.some((i) => i.message.includes('FLAG_DUPLICATE'))).toBe(true);
   });
 
   it('should detect duplicate character names', () => {

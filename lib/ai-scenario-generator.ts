@@ -208,7 +208,7 @@ export interface CharacterRevelationsResult {
 
 export interface RouteScoreConfigResult {
   routeName: string;
-  flagScores: { flagName: string; score: number }[];
+  actionPatterns?: { description: string; actionType?: 'choice' | 'dialogue' | 'exploration'; targetKeywords?: string[]; score: number }[];
   statScores?: { statId: string; comparison: '>=' | '<=' | '>' | '<' | '=='; threshold: number; score: number }[];
 }
 
@@ -245,7 +245,7 @@ export interface StorySiftingTriggerResult {
   conditions: {
     charactersMetTogether?: string[];
     relationshipsDiscovered?: string[];
-    flagCombination?: string[];
+    actionPatternKeywords?: string[];
     statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
     dayRange?: { min?: number; max?: number };
     requiredTriggers?: string[];
