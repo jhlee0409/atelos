@@ -154,6 +154,8 @@ atelos/
 │   ├── ai-scenario-generator.ts      # AI scenario generation client
 │   ├── synopsis-generator.ts         # AI synopsis generation
 │   ├── genre-narrative-styles.ts     # Genre-specific narrative guidance
+│   ├── ai-narrative-engine.ts        # AI Narrative Engine (ending prediction, seeds)
+│   ├── action-engagement-system.ts   # Action synergy, combo, dynamic AP system
 │   ├── scenario-api.ts               # Scenario API client functions
 │   └── scenario-mapping-utils.ts     # Scenario data transformations
 ├── constants/
@@ -241,11 +243,14 @@ The game supports multiple message types for rich narrative display:
 
 Key files:
 - `lib/gemini-client.ts`: Gemini API wrapper
+- `lib/prompt-builder.ts`: AI prompt construction with persona system
 - `lib/game-builder.ts`: Initial game state generation
 - `lib/ai-scenario-generator.ts`: Scenario generation client
 - `lib/synopsis-generator.ts`: Synopsis generation
 - `lib/genre-narrative-styles.ts`: Genre-specific narrative guidance
 - `lib/gameplay-config.ts`: Dynamic gameplay configuration utilities (Day calculation, route scores, action points, stat thresholds)
+- `lib/ai-narrative-engine.ts`: AI Narrative Engine (ending prediction, narrative seeds)
+- `lib/action-engagement-system.ts`: Action Engagement System (synergy, combo, dynamic AP)
 
 Language validation features:
 - Detects and removes Arabic, Thai, Hindi, Cyrillic characters
@@ -340,6 +345,66 @@ Per-day action budget management:
 - `ActionRecord`: Records of actions taken
 - Actions consume points: choice (1), dialogue (1), exploration (1), freeText (1)
 
+#### Action Engagement System (`lib/action-engagement-system.ts`)
+
+전략적 깊이와 몰입감을 높이는 행동 시스템:
+
+**핵심 기능:**
+- **동적 AP 비용**: 신뢰도, 상황에 따라 AP 비용 조정
+  - 높은 신뢰도 캐릭터와 대화: 0.5 AP
+  - 낮은 신뢰도 캐릭터와 대화: 1.5 AP
+  - 익숙한 장소 재방문: 0.5 AP
+- **행동 시너지**: 선행 행동이 후속 행동에 보너스
+  - `exploration → dialogue`: 발견한 정보로 대화 유리
+  - `dialogue → choice`: 조언받은 후 더 나은 선택
+- **콤보 시스템**: 연속 행동 패턴 감지 및 보상
+  - 정보수집 콤보: 탐색 + 대화 + 탐색
+  - 신중함 콤보: 탐색 → 대화(조언) → 선택
+  - 결단력 콤보: 연속 3회 선택
+- **동적 대화 주제**: 신뢰도/발견 기반 주제 언락
+
+**주요 함수:**
+```typescript
+calculateDynamicAPCost(actionType, saveState, scenario, target?)
+getActionSynergy(currentAction, previousActions)
+analyzeActionSequence(actions, currentDay)
+generateDynamicDialogueTopics(character, saveState, scenario)
+```
+
+#### AI Narrative Engine (`lib/ai-narrative-engine.ts`)
+
+AI 스토리 생성을 위한 고급 서사 시스템:
+
+**핵심 기능:**
+- **엔딩 예측**: 현재 상태에서 가능한 엔딩 예측
+- **서사 씨앗(Narrative Seeds)**: 복선과 떡밥 시스템
+- **스토리 비트**: 서사 진행에 따른 이벤트 트리거
+- **캐릭터 아크 추적**: 캐릭터별 서사 발전 단계
+
+**주요 함수:**
+```typescript
+predictPossibleEndings(saveState, scenario)
+generateNarrativeSeeds(phase, context)
+checkStoryBeatTriggers(saveState, scenario)
+analyzeCharacterArcProgression(characterArcs)
+```
+
+#### Story Writer Persona System (도경 v2.1)
+
+AI가 일관된 작가 페르소나로 서사를 생성:
+
+**페르소나 특성:**
+- 이름: 도경 (導京) - "서울로 이끄는 자"
+- 역할: 인터랙티브 내러티브 전문 작가
+- 스타일: 장르별 톤 조절, 캐릭터 일관성 유지
+- 원칙: 플레이어 선택 존중, 과도한 개입 자제
+
+**동적 페르소나 기능:**
+- `getNarrativePhase()`: 서사 단계에 따른 톤 조절
+- 장르별 스타일 자동 적용 (GENRE_NARRATIVE_STYLES)
+- 캐릭터 대화 스타일 일관성 유지
+- 플레이어 행동 패턴 인식 및 보상 (콤보/시너지)
+
 #### Context Linking System (Phase 5)
 
 Maintains context across actions:
@@ -390,6 +455,30 @@ Comprehensive genre-specific guidance for AI:
   - `writingTechniques`: Specific techniques
   - `atmosphereKeywords`: Mood keywords
   - `choiceFraming`: How to frame player choices
+
+#### Immersion-First UI Design
+
+게임 메카닉을 숨기고 서사적 표현으로 대체하는 UI 원칙:
+
+**숨겨야 하는 요소:**
+| 메카닉 | 변경 전 | 변경 후 |
+|--------|---------|---------|
+| 신뢰도 숫자 | "+40", "-20" | "신뢰함", "경계 중" |
+| 언락 조건 | "신뢰도 40 필요" | "아직 이 이야기를 나눌 만큼 가깝지 않다" |
+| 엔딩 체크 Day | "Day 5부터 엔딩 체크" | "마지막 순간", "시간이 얼마 남지 않았다" |
+| 콤보 이름 | "🔥 정보수집 콤보!" | 서사적 보너스 텍스트만 |
+| 스탯 변화 예고 | "+10 예상" | 표시 안 함 |
+
+**구현 위치:**
+- `CharacterDialoguePanel.tsx`: `getTrustDescription()` - 신뢰도 모호화
+- `RouteIndicator.tsx`: `DayProgressBar` - 서사적 진행 표현
+- `ChoiceButtons.tsx`: 콤보 보너스 텍스트만 표시
+
+**원칙:**
+1. 플레이어가 "계산"하지 않고 "느끼게" 한다
+2. 숫자보다 감정적 언어 사용
+3. 시스템 용어(콤보, AP, 언락) 노출 금지
+4. 진행 상황은 서사적 긴장감으로 전달
 
 ### Component Architecture
 
@@ -745,6 +834,9 @@ Custom colors defined in `tailwind.config.ts`:
 | WorldState | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | `ExplorationPanel` |
 | Character Arc | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `CharacterArcPanel` |
 | Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |
+| Action Engagement | N/A (런타임) | N/A | `prompt-builder.ts` | `ChoiceButtons` (콤보) |
+| AI Narrative Engine | N/A (런타임) | N/A | `prompt-builder.ts` | N/A |
+| Story Writer Persona | N/A (프롬프트) | N/A | `prompt-builder.ts` | N/A |
 
 ### 3-Way Integration
 
