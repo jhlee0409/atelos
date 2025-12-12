@@ -579,6 +579,8 @@ export type ScenarioData = {
   storyOpening?: StoryOpening;
   /** 게임플레이 설정 (Phase 8: 하드코딩 동적화) */
   gameplayConfig?: GameplayConfig;
+  /** 동적 결말 설정 (Dynamic Ending System) */
+  dynamicEndingConfig?: DynamicEndingConfig;
 };
 
 // --- Game-specific state types, not part of scenario definition ---
@@ -1168,4 +1170,194 @@ export interface WorldStateUpdateResult {
   changedLocations: { locationId: string; previousStatus: LocationStatus; newStatus: LocationStatus; reason?: string }[];
   /** UI에 표시할 알림 메시지 */
   notifications: string[];
+}
+
+// =============================================================================
+// Dynamic Ending System (동적 결말 시스템)
+// SDT(Self-Determination Theory) 기반 플레이어 만족도 최적화
+// =============================================================================
+
+/**
+ * 행동 기록 엔트리 - 플레이어의 모든 행동을 기록
+ * 엔딩 생성 시 AI가 분석하여 결말에 반영
+ */
+export interface ActionHistoryEntry {
+  /** 행동이 발생한 일차 */
+  day: number;
+
+  /** ISO 타임스탬프 */
+  timestamp: string;
+
+  /** 행동 유형 */
+  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText';
+
+  /** 플레이어가 선택/입력한 내용 */
+  content: string;
+
+  /** 대상 (캐릭터명 또는 장소명) */
+  target?: string;
+
+  /** 행동의 결과 */
+  consequence: {
+    /** 변경된 스탯들 */
+    statsChanged: { statId: string; delta: number; newValue: number }[];
+
+    /** 변경된 관계들 */
+    relationshipsChanged: { character: string; delta: number; newValue: number }[];
+
+    /** 발생한 주요 이벤트/발견 */
+    significantEvents: string[];
+  };
+
+  /** AI가 생성한 내러티브 요약 (200자 이내) */
+  narrativeSummary: string;
+
+  /** 행동의 도덕적 성격 (AI 평가) */
+  moralAlignment?: 'selfless' | 'pragmatic' | 'selfish' | 'neutral';
+}
+
+/**
+ * 목표 달성 수준 - SDT 유능감(Competence) 평가용
+ */
+export type GoalAchievementLevel =
+  | 'triumph'      // 완벽한 성공 - 목표 초과 달성
+  | 'success'      // 성공 - 목표 달성
+  | 'partial'      // 부분 성공 - 일부 목표 달성
+  | 'pyrrhic'      // 피로스의 승리 - 큰 대가를 치른 성공
+  | 'failure'      // 실패 - 목표 미달성
+  | 'subverted'    // 전복 - 예상과 다르지만 의미있는 결과
+  | 'tragic';      // 비극 - 피할 수 없는 비극적 결말
+
+/**
+ * 캐릭터 운명 - 각 캐릭터의 결말
+ * SDT 관계성(Relatedness) 반영
+ */
+export interface CharacterFate {
+  /** 캐릭터 이름 */
+  name: string;
+
+  /** 최종 관계 수치 */
+  finalRelationship: number;
+
+  /** 캐릭터의 운명 (100자 이내) */
+  fate: string;
+
+  /** 플레이어와의 마지막 장면 (선택적, 150자 이내) */
+  finalScene?: string;
+
+  /** 관계 변화 요약 */
+  relationshipJourney?: string;
+}
+
+/**
+ * 동적 결말 결과 - AI가 생성하는 최종 결말
+ */
+export interface DynamicEndingResult {
+  /** 결말 제목 */
+  title: string;
+
+  /** 결말 내러티브 (500-1000자) */
+  narrative: string;
+
+  /** 목표 달성도 */
+  goalAchievement: GoalAchievementLevel;
+
+  /** 목표 달성 설명 (플레이어 행동과의 인과관계 명시) */
+  goalExplanation: string;
+
+  /** 각 캐릭터의 운명 */
+  characterFates: CharacterFate[];
+
+  /** 플레이어의 유산/영향 (150자 이내) */
+  playerLegacy: string;
+
+  /** 에필로그 (선택적, 200자 이내) */
+  epilogue?: string;
+
+  /**
+   * SDT 만족도 점수 (AI 내부 평가용)
+   * 각 0-100 점수
+   */
+  sdtScores: {
+    /** 자율성: 플레이어 선택이 결말에 얼마나 반영되었는가 */
+    autonomy: number;
+    /** 유능감: 성취감/달성감을 얼마나 느낄 수 있는가 */
+    competence: number;
+    /** 관계성: 캐릭터와의 관계가 얼마나 의미있게 마무리되었는가 */
+    relatedness: number;
+  };
+
+  /** 결말 생성 근거 (디버깅/분석용) */
+  reasoning: string;
+}
+
+/**
+ * 동적 결말 설정 - 시나리오별 결말 생성 설정
+ */
+export interface DynamicEndingConfig {
+  /** 동적 엔딩 시스템 활성화 여부 */
+  enabled: boolean;
+
+  /** 결말 트리거 일차 (예: 7, 10, 14) */
+  endingDay: number;
+
+  /** 경고 시작 일수 (endingDay - warningDays부터 경고 메시지 표시) */
+  warningDays: number;
+
+  /** 목표 유형: manual(수동 입력) 또는 ai-assisted(AI 보조) */
+  goalType: 'manual' | 'ai-assisted';
+
+  /**
+   * AI 결말 생성 시 평가 기준 가중치
+   * SDT 이론 기반: 자율성, 유능감, 관계성
+   * 모든 가중치 합 = 1.0
+   */
+  evaluationCriteria: {
+    /** 목표 달성도 평가 가중치 (0-1) - 유능감 관련 */
+    goalWeight: number;
+
+    /** 관계 품질 평가 가중치 (0-1) - 관계성 관련 */
+    relationshipWeight: number;
+
+    /** 도덕적 일관성 평가 가중치 (0-1) - 자율성 관련 */
+    moralWeight: number;
+
+    /** 서사적 완결성 평가 가중치 (0-1) */
+    narrativeWeight: number;
+  };
+
+  /** AI 결말 생성 가이드라인 (창작자가 작성) */
+  narrativeGuidelines: string;
+
+  /** 장르별 결말 톤 힌트 (AI 참고용) */
+  endingToneHints: string[];
+}
+
+/**
+ * ScenarioData 확장 - dynamicEndingConfig 추가
+ * (기존 ScenarioData에 dynamicEndingConfig 필드 추가 필요)
+ */
+export interface ScenarioDataWithDynamicEnding extends Omit<ScenarioData, 'endingArchetypes'> {
+  /** 동적 결말 설정 */
+  dynamicEndingConfig?: DynamicEndingConfig;
+
+  /**
+   * [레거시] 기존 엔딩 아키타입 - 마이그레이션 기간 동안 유지
+   * dynamicEndingConfig.enabled가 true면 무시됨
+   */
+  endingArchetypes?: EndingArchetype[];
+}
+
+/**
+ * SaveState 확장 - actionHistory 추가
+ */
+export interface SaveStateWithDynamicEnding extends SaveState {
+  /** 플레이어 행동 기록 */
+  actionHistory?: ActionHistoryEntry[];
+
+  /** 엔딩 트리거 여부 */
+  endingTriggered?: boolean;
+
+  /** 생성된 동적 결말 */
+  dynamicEnding?: DynamicEndingResult;
 }
