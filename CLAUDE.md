@@ -156,6 +156,7 @@ atelos/
 │   ├── genre-narrative-styles.ts     # Genre-specific narrative guidance
 │   ├── ai-narrative-engine.ts        # AI Narrative Engine (ending prediction, seeds)
 │   ├── action-engagement-system.ts   # Action synergy, combo, dynamic AP system
+│   ├── prompt-enhancers.ts           # Prompt Quality Enhancement (Choice Diversity, Character Balancing)
 │   ├── scenario-api.ts               # Scenario API client functions
 │   └── scenario-mapping-utils.ts     # Scenario data transformations
 ├── constants/
@@ -243,7 +244,8 @@ The game supports multiple message types for rich narrative display:
 
 Key files:
 - `lib/gemini-client.ts`: Gemini API wrapper
-- `lib/prompt-builder.ts`: AI prompt construction with persona system
+- `lib/prompt-builder.ts`: AI prompt construction with persona system + 주인공 식별 헬퍼
+- `lib/prompt-enhancers.ts`: Prompt Quality Enhancement System (Choice Diversity, Character Balancing, Theme Rotation, Context Bridge)
 - `lib/game-builder.ts`: Initial game state generation
 - `lib/ai-scenario-generator.ts`: Scenario generation client
 - `lib/synopsis-generator.ts`: Synopsis generation
@@ -372,6 +374,38 @@ analyzeActionSequence(actions, currentDay)
 generateDynamicDialogueTopics(character, saveState, scenario)
 ```
 
+#### Prompt Quality Enhancement System (`lib/prompt-enhancers.ts`)
+
+AI 응답 품질 극대화를 위한 프롬프트 강화 시스템:
+
+**핵심 시스템:**
+- **Choice Diversity System**: 테마별 선택지 분류 및 균형 유지
+  - 테마 카테고리: social, survival, exploration, leadership, moral, information
+  - 연속 동일 테마 방지, 테마 다양성 보장
+- **Character Balancing System**: 캐릭터 등장 빈도 추적 및 조정
+  - 소외 캐릭터 자동 감지
+  - 관계 변화 없는 캐릭터 우선 등장 권유
+- **Theme Rotation System**: 서사 단계별 테마 가중치 조정
+  - setup: exploration, information 강조
+  - rising_action: social, moral 강조
+  - climax: survival, leadership 강조
+- **Context Bridge System**: 이전 씬과의 연결성 유지
+  - 미해결 긴장, 캐릭터 감정 상태 추적
+
+**통합 규칙:**
+- `LANGUAGE_RULES`: 한국어 전용, 스타일 가이드
+- `CHOICE_FORMAT_RULES`: 선택지 형식 규칙
+- `EMOTIONAL_EXPRESSION_RULES`: 감정 표현 가이드
+- `STAT_CHANGE_RULES`: 스탯 변화 가이드
+
+**주요 함수:**
+```typescript
+generateEnhancedPromptGuidelines(saveState, scenario, chatHistory)
+generateChoiceDiversityGuideline(chatHistory)
+generateCharacterBalancingGuideline(saveState, scenario)
+generateContextBridge(chatHistory)
+```
+
 #### AI Narrative Engine (`lib/ai-narrative-engine.ts`)
 
 AI 스토리 생성을 위한 고급 서사 시스템:
@@ -438,6 +472,11 @@ World state that changes based on player actions:
 - `EmergentNarrativeConfig`: Dynamic story events from player action combinations
 - `StorySiftingTrigger`: Conditions that generate emergent story events
 - `ProtagonistKnowledge`: Tracks what the player character knows
+- **Protagonist Identification System** (2025-12-13): Distinguishes protagonist from NPCs
+  - `GameClient.tsx`: `getProtagonistName()`, `isProtagonist()`, `filterNPCs()`, `getProtagonistCharacter()`
+  - `prompt-builder.ts`: `getProtagonistNameForPrompt()`, `isProtagonistForPrompt()`, `filterNPCsForPrompt()`
+  - Identifies protagonist by `(플레이어)` OR `storyOpening.protagonistSetup.name`
+  - Used in: characterArcs initialization, NPC filtering, metCharacters updates
 - **Protagonist-NPC Name Collision Detection**: Prevents protagonist name from matching NPC names
   - `prompt-builder.ts` detects collision at runtime and clears protagonist name
   - AI generation API (`ai-generate/route.ts`) instructs AI to avoid name collision

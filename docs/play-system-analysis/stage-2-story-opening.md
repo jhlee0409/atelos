@@ -7,7 +7,8 @@
 
 **핵심 파일**:
 - `lib/game-ai-client.ts`: generateStoryOpening(), generateInitialDilemma()
-- `lib/prompt-builder.ts`: buildStoryOpeningPrompt()
+- `lib/prompt-builder.ts`: buildStoryOpeningPrompt() + 주인공 식별 헬퍼 (★ 2025-12-13)
+- `lib/prompt-enhancers.ts`: 프롬프트 품질 강화 시스템 (★ 2025-12-13)
 - `app/game/[scenarioId]/GameClient.tsx`: 오프닝 완료 후 상태 업데이트 (lines 1566-1662)
 
 **테스트 파일**: `tests/unit/story-opening.test.ts` (17개 테스트)
@@ -131,6 +132,45 @@ if (options.protagonistKnowledge) {
 **AI 지시**: 주인공이 모르는 정보는 선택지나 서술에 포함하지 마세요.
 `;
 }
+```
+
+### 4.5 [2025-12-13] 주인공 식별 시스템
+
+프롬프트 생성 시 NPC만 필터링하여 전달:
+
+```typescript
+// prompt-builder.ts:66-84 - 주인공 식별 헬퍼 함수
+const getProtagonistNameForPrompt = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+const isProtagonistForPrompt = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistNameForPrompt(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonistForPrompt(c.characterName, scenario));
+};
+```
+
+**적용 위치**:
+- `buildStoryOpeningPrompt()` 내 캐릭터 목록 생성 시
+- `buildLitePrompt()`, `buildDialoguePrompt()`, `buildExplorationPrompt()` 등 모든 프롬프트 함수
+
+### 4.6 [2025-12-13] 프롬프트 품질 강화 시스템
+
+`lib/prompt-enhancers.ts`를 통한 품질 개선:
+
+- **Choice Diversity**: 테마별 선택지 균형
+- **Character Balancing**: 캐릭터 등장 빈도 조정
+- **Theme Rotation**: 서사 단계별 테마 가중치
+- **Context Bridge**: 이전 씬과의 연결성 유지
+
+```typescript
+// prompt-builder.ts에서 통합 사용
+import { generateEnhancedPromptGuidelines } from './prompt-enhancers';
 ```
 
 ---
