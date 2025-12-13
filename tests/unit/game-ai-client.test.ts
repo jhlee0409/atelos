@@ -360,7 +360,7 @@ describe('cleanAndValidateAIResponse', () => {
     expect(result.cleanedResponse.dilemma.choice_a).toBeTruthy();
     expect(result.cleanedResponse.dilemma.choice_b).toBeTruthy();
     expect(result.cleanedResponse.statChanges.survivorStatus).toBeDefined();
-    expect(result.cleanedResponse.statChanges.flags_acquired).toBeDefined();
+    // [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
   });
 });
 
