@@ -8,6 +8,10 @@ export type Character = {
   weightedTraitTypes: string[];
   isEditing?: boolean;
   currentTrait: Trait | null;
+  /** 플레이어가 이 캐릭터로 플레이 가능한지 여부 */
+  isPlayable?: boolean;
+  /** 시나리오의 기본 주인공인지 여부 */
+  isDefaultProtagonist?: boolean;
 };
 
 export type Relationship = {
@@ -593,6 +597,10 @@ export type ScenarioData = {
   gameplayConfig?: GameplayConfig;
   /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
+  /** 플레이 가능한 캐릭터 ID 목록 (동적 주인공 선택용) */
+  playableCharacters?: string[];
+  /** 기본 주인공 캐릭터 ID (시나리오 추천) */
+  defaultProtagonist?: string;
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only

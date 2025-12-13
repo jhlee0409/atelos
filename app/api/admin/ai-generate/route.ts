@@ -79,6 +79,8 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
               items: { type: SchemaType.STRING },
               description: '추천 특성 ID',
             },
+            isPlayable: { type: SchemaType.BOOLEAN, description: '플레이어가 이 캐릭터로 플레이 가능한지 여부', nullable: true },
+            isDefaultProtagonist: { type: SchemaType.BOOLEAN, description: '기본 주인공인지 여부 (하나만 true)', nullable: true },
           },
           required: ['roleId', 'roleName', 'characterName', 'backstory', 'suggestedTraits'],
         },

@@ -6,10 +6,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function GamePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ scenarioId: string }>;
+  searchParams: Promise<{ protagonist?: string }>;
 }) {
   const { scenarioId } = await params;
+  const { protagonist: selectedProtagonistId } = await searchParams;
   const scenario = await getScenario(scenarioId);
 
   if (!scenario) {
@@ -18,7 +21,7 @@ export default async function GamePage({
 
   return (
     <div className="bg-telos-black text-white">
-      <GameClient scenario={scenario} />
+      <GameClient scenario={scenario} selectedProtagonistId={selectedProtagonistId} />
     </div>
   );
 }

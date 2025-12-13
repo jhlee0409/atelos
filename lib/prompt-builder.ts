@@ -58,29 +58,51 @@ import {
 // =============================================================================
 // 주인공 식별 시스템 (Protagonist Identification)
 // 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// 2025-12-13: selectedProtagonistId 지원 추가 (동적 주인공 선택 시스템)
 // =============================================================================
 
 /**
  * 시나리오에서 주인공 이름 가져오기
+ * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 선택된 주인공의 roleId (동적 선택 시스템)
  */
-const getProtagonistName = (scenario: ScenarioData): string | null => {
+const getProtagonistNameForPrompt = (scenario: ScenarioData, selectedProtagonistId?: string): string | null => {
+  // 1. 동적으로 선택된 주인공이 있으면 우선 사용
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar) return selectedChar.characterName;
+  }
+  // 2. storyOpening.protagonistSetup.name 사용
   return scenario.storyOpening?.protagonistSetup?.name || null;
 };
 
 /**
  * 캐릭터가 주인공인지 확인
+ * @param characterName 확인할 캐릭터 이름
+ * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 선택된 주인공의 roleId (동적 선택 시스템)
  */
-const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+const isProtagonistForPrompt = (characterName: string, scenario: ScenarioData, selectedProtagonistId?: string): boolean => {
+  // 1. "(플레이어)" 마커는 항상 주인공
   if (characterName === '(플레이어)') return true;
-  const protagonistName = getProtagonistName(scenario);
+  // 2. 선택된 주인공과 이름이 일치하면 주인공
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar && selectedChar.characterName === characterName) return true;
+  }
+  // 3. protagonistSetup.name과 일치하면 주인공
+  const protagonistName = getProtagonistNameForPrompt(scenario);
   return protagonistName !== null && characterName === protagonistName;
 };
 
 /**
  * NPC 캐릭터만 필터링 (주인공 제외)
+ * @param characters 캐릭터 목록
+ * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 선택된 주인공의 roleId (동적 선택 시스템)
  */
-const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData): Character[] => {
-  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData, selectedProtagonistId?: string): Character[] => {
+  return characters.filter((c) => !isProtagonistForPrompt(c.characterName, scenario, selectedProtagonistId));
 };
 
 // =============================================================================
@@ -280,6 +302,8 @@ export const buildOptimizedGamePrompt = (
     // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
     npcRelationshipStates?: { relationId: string; visibility: string }[]; // 관계 가시성 상태
     protagonistKnowledge?: import('@/types').ProtagonistKnowledge; // 주인공이 아는 정보
+    // 2025-12-13: 동적 주인공 선택 시스템
+    selectedProtagonistId?: string; // 선택된 주인공의 roleId
   } = {},
 ): GamePromptData => {
   const {
@@ -584,7 +608,8 @@ ${dialogueClues.length > 0 ? `
   const hasMetFilter = metCharacters.length > 0;
 
   // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시 (주인공 제외)
-  const characterInfo = filterNPCsForPrompt(scenario.characters, scenario)
+  // 2025-12-13: selectedProtagonistId로 동적 주인공 식별
+  const characterInfo = filterNPCsForPrompt(scenario.characters, scenario, options.selectedProtagonistId)
     .map((char) => {
       const mainTrait =
         char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
@@ -991,14 +1016,17 @@ const buildDetailedPrompt = (
  * AI 기반의 동적 초기 딜레마 생성을 위한 시스템 프롬프트를 빌드합니다.
  * @param scenario - 현재 시나리오 데이터
  * @param characters - 특성이 부여된 캐릭터 목록
+ * @param selectedProtagonistId - 선택된 주인공의 roleId (동적 선택 시스템)
  * @returns 제미나이 API에 전달될 시스템 프롬프트 문자열
  */
 export const buildInitialDilemmaPrompt = (
   scenario: ScenarioData,
   characters: Character[],
+  selectedProtagonistId?: string,
 ): string => {
   // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다. (주인공 식별)
-  const npcs = filterNPCsForPrompt(characters, scenario);
+  // 2025-12-13: selectedProtagonistId로 동적 주인공 식별
+  const npcs = filterNPCsForPrompt(characters, scenario, selectedProtagonistId);
 
   // 장르별 서사 스타일
   const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
@@ -1157,14 +1185,19 @@ const CHARACTER_INTRO_GUIDELINES: Record<CharacterIntroductionStyle, string> = {
  * + 1:1 캐릭터 소개 시퀀스
  * + 숨겨진 NPC 관계 인식 (AI가 숨겨진 관계를 노출하지 않도록)
  * + 점진적 캐릭터 공개 가이드라인
+ * @param scenario - 시나리오 데이터
+ * @param characters - 캐릭터 목록
+ * @param selectedProtagonistId - 선택된 주인공의 roleId (동적 선택 시스템)
  */
 export const buildStoryOpeningPrompt = (
   scenario: ScenarioData,
   characters: Character[],
+  selectedProtagonistId?: string,
 ): string => {
   const storyOpening = scenario.storyOpening || {};
   // [주인공 식별] 주인공 제외 (실제 이름 또는 "(플레이어)")
-  const npcs = filterNPCsForPrompt(characters, scenario);
+  // 2025-12-13: selectedProtagonistId로 동적 주인공 식별
+  const npcs = filterNPCsForPrompt(characters, scenario, selectedProtagonistId);
 
   // 기본값 설정
   const openingTone = storyOpening.openingTone || 'calm';

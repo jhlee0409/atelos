@@ -1,93 +1,146 @@
-# 주인공 선택 시스템 개선 제안
+# 주인공 선택 시스템 개선
 
 ## 작성일: 2025-12-13
-## 상태: 제안 (추후 시나리오 생성 시스템 점검 시 구현 예정)
+## 상태: ✅ 구현 완료 (Phase 1 + Phase 2)
 
 ---
 
-## 1. 현재 시스템의 한계
+## 1. 구현 완료 요약
 
-### 1.1 현재 주인공 식별 방식
+### 1.1 구현된 기능
+
+| 항목 | 파일 | 설명 |
+|------|------|------|
+| **타입 정의** | `types/index.ts` | `Character.isPlayable`, `Character.isDefaultProtagonist`, `ScenarioData.playableCharacters`, `ScenarioData.defaultProtagonist` |
+| **캐릭터 선택 UI** | `ScenarioDetailClient.tsx` | 시나리오 상세 → 게임 시작 사이에 캐릭터 선택 화면 |
+| **쿼리 파라미터 전달** | `game/[scenarioId]/page.tsx` | `?protagonist=ROLE_ID` 쿼리 파라미터 처리 |
+| **주인공 식별** | `GameClient.tsx` | `selectedProtagonistId` 기반 주인공 식별 함수 |
+| **AI 프롬프트** | `prompt-builder.ts` | 선택된 주인공 시점으로 프롬프트 생성 |
+| **AI 생성 지원** | `ai-generate/route.ts` | 캐릭터 생성 시 `isPlayable`, `isDefaultProtagonist` 필드 |
+
+### 1.2 주인공 식별 우선순위
 
 ```typescript
 // 현재 구현 (GameClient.tsx, prompt-builder.ts)
-const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+const isProtagonist = (characterName: string, scenario: ScenarioData, selectedProtagonistId?: string): boolean => {
+  // 1. "(플레이어)" 마커는 항상 주인공
   if (characterName === '(플레이어)') return true;
-  const protagonistName = scenario.storyOpening?.protagonistSetup?.name;
+  // 2. selectedProtagonistId로 선택된 캐릭터와 이름이 일치하면 주인공
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar && selectedChar.characterName === characterName) return true;
+  }
+  // 3. protagonistSetup.name과 일치하면 주인공 (레거시 호환)
+  const protagonistName = scenario.storyOpening?.protagonistSetup?.name || null;
   return protagonistName !== null && characterName === protagonistName;
 };
 ```
 
-### 1.2 문제점
+---
 
-| 문제 | 설명 |
-|------|------|
-| **식별 기준 모호** | 모든 캐릭터가 실제 이름을 가지고 있어, `protagonistSetup.name`만으로 주인공 구분이 불명확 |
-| **시나리오 종속** | 시나리오 생성 시 주인공이 고정되어 플레이어 선택권 없음 |
-| **유연성 부족** | 같은 시나리오를 다른 시점(캐릭터)으로 플레이할 수 없음 |
+## 2. UX 플로우
 
-### 1.3 현재 주인공 판별 우선순위
-
-1. `(플레이어)` 리터럴 체크
-2. `storyOpening.protagonistSetup.name` 일치 체크
-
-→ 다른 NPC와 이름이 겹치면 오동작 가능
+```
+[로비] → [시나리오 상세] → [게임 시작 버튼 클릭]
+                                      │
+                                      ▼
+                          ┌─────────────────────┐
+                          │ 플레이할 캐릭터 선택  │
+                          ├─────────────────────┤
+                          │ ● 강하늘 (형사)      │ ← 기본 선택 (isDefaultProtagonist)
+                          │ ○ 한서아 (의사)      │
+                          │ ○ 박준경 (기자)      │
+                          └─────────────────────┘
+                                      │
+                                      ▼
+                          선택된 캐릭터 = 주인공
+                          ?protagonist=ROLE_DETECTIVE
+```
 
 ---
 
-## 2. 제안: 동적 주인공 선택 시스템
+## 3. 구현 상세
 
-### 2.1 UX 플로우
-
-```
-[로비] → [시나리오 상세] → [캐릭터 선택] → [게임 시작]
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │ 플레이할 캐릭터 선택  │
-                    ├─────────────────────┤
-                    │ ○ 강하늘 (형사)      │ ← 기본 선택 (시나리오 추천)
-                    │ ○ 한서아 (의사)      │
-                    │ ○ 박준경 (기자)      │
-                    │ ○ ...               │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    선택된 캐릭터 = 주인공
-```
-
-### 2.2 데이터 모델 변경
+### 3.1 타입 정의 (`types/index.ts`)
 
 ```typescript
-// types/index.ts 추가
-interface GameSession {
-  scenarioId: string;
-  selectedProtagonistId: string;  // 플레이어가 선택한 주인공
-  startedAt: Date;
-}
-
-// ScenarioData 확장
-interface ScenarioData {
+export type Character = {
   // ... 기존 필드
-  playableCharacters?: string[];  // 플레이 가능한 캐릭터 ID 목록
-  defaultProtagonist?: string;    // 기본 주인공 (시나리오 추천)
-}
+  /** 플레이어가 이 캐릭터로 플레이 가능한지 여부 */
+  isPlayable?: boolean;
+  /** 시나리오의 기본 주인공인지 여부 */
+  isDefaultProtagonist?: boolean;
+};
+
+export type ScenarioData = {
+  // ... 기존 필드
+  /** 플레이 가능한 캐릭터 ID 목록 (동적 주인공 선택용) */
+  playableCharacters?: string[];
+  /** 기본 주인공 캐릭터 ID (시나리오 추천) */
+  defaultProtagonist?: string;
+};
 ```
 
-### 2.3 구현 위치
+### 3.2 캐릭터 선택 UI (`ScenarioDetailClient.tsx`)
 
-| 파일 | 변경 내용 |
-|------|----------|
-| `app/scenarios/[scenarioId]/page.tsx` | 캐릭터 선택 UI 추가 |
-| `app/game/[scenarioId]/page.tsx` | 선택된 주인공 ID를 쿼리 파라미터로 받기 |
-| `GameClient.tsx` | `selectedProtagonistId` 기반 주인공 식별 |
-| `prompt-builder.ts` | 선택된 주인공 시점으로 프롬프트 생성 |
+- `PlayableCharacterCard` 컴포넌트: 선택 가능한 캐릭터 카드
+- `getPlayableCharacters()`: 플레이 가능한 캐릭터 필터링
+- `getDefaultProtagonistId()`: 기본 주인공 ID 가져오기
+- 게임 시작 시 `?protagonist={selectedProtagonistId}` 쿼리 파라미터 전달
+
+### 3.3 주인공 식별 함수 (`GameClient.tsx`)
+
+```typescript
+// 주인공 이름 가져오기
+const getProtagonistName = (scenario: ScenarioData, selectedProtagonistId?: string): string | null
+
+// 캐릭터가 주인공인지 확인
+const isProtagonist = (characterName: string, scenario: ScenarioData, selectedProtagonistId?: string): boolean
+
+// NPC만 필터링 (주인공 제외)
+const filterNPCs = (characters: Character[], scenario: ScenarioData, selectedProtagonistId?: string): Character[]
+
+// 주인공 캐릭터 객체 가져오기
+const getProtagonistCharacter = (scenario: ScenarioData, selectedProtagonistId?: string): Character | undefined
+```
+
+### 3.4 AI 프롬프트 생성 (`prompt-builder.ts`)
+
+```typescript
+// 프롬프트용 주인공 식별 함수
+const getProtagonistNameForPrompt = (scenario: ScenarioData, selectedProtagonistId?: string): string | null
+const isProtagonistForPrompt = (characterName: string, scenario: ScenarioData, selectedProtagonistId?: string): boolean
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData, selectedProtagonistId?: string): Character[]
+
+// 옵션에 selectedProtagonistId 추가
+buildOptimizedGamePrompt(scenario, playerState, playerAction, lastLog, complexity, {
+  // ...
+  selectedProtagonistId?: string;
+})
+
+// 스토리 오프닝 프롬프트
+buildStoryOpeningPrompt(scenario, characters, selectedProtagonistId?)
+
+// 초기 딜레마 프롬프트
+buildInitialDilemmaPrompt(scenario, characters, selectedProtagonistId?)
+```
+
+### 3.5 게임 AI 클라이언트 (`game-ai-client.ts`)
+
+```typescript
+// 스토리 오프닝 생성
+generateStoryOpening(scenario, characters, selectedProtagonistId?)
+
+// 초기 딜레마 생성
+generateInitialDilemma(saveState, scenario, useLiteVersion, selectedProtagonistId?)
+generateInitialDilemmaWithOpening(saveState, scenario, useLiteVersion, selectedProtagonistId?)
+```
 
 ---
 
-## 3. 주요 과제
+## 4. 미구현 항목 (Phase 3 - 추후 검토)
 
-### 3.1 시나리오 생성 시스템 수정 필요
+### 4.1 시나리오 생성 시스템 확장
 
 현재 시나리오 생성 시 특정 주인공 기준으로 생성됨:
 
@@ -96,17 +149,10 @@ interface ScenarioData {
 | `synopsis` | 주인공 시점 고정 | 시점 중립적 또는 다중 시점 |
 | `playerGoal` | 주인공 목표 고정 | 캐릭터별 목표 분리 |
 | `storyOpening` | 주인공 경험 고정 | 캐릭터별 오프닝 또는 동적 생성 |
-| `protagonistSetup` | 단일 주인공 | 다중 플레이어블 캐릭터 |
 
-### 3.2 오프닝 시스템 확장
+### 4.2 캐릭터별 오프닝 시스템
 
 ```typescript
-// 현재: 단일 오프닝
-storyOpening: {
-  protagonistSetup: { name: "강하늘", ... },
-  prologue: "강하늘의 시점에서...",
-}
-
 // 개선 후: 캐릭터별 오프닝
 storyOpenings: {
   "강하늘": {
@@ -120,72 +166,67 @@ storyOpenings: {
 }
 ```
 
-### 3.3 AI 생성 시 고려사항
+### 4.3 Admin UI 확장
 
-시나리오 AI 생성 시 (`/api/admin/ai-generate`) 수정 필요:
-- 각 캐릭터의 동기와 목표 명시
-- 시점 중립적 시놉시스 생성
-- 캐릭터별 오프닝 자동 생성 옵션
+- 캐릭터 편집 시 `isPlayable`, `isDefaultProtagonist` 토글
+- 시나리오 설정에서 플레이 가능 캐릭터 관리
 
 ---
 
-## 4. 구현 우선순위
+## 5. 관련 파일
 
-### Phase 1: 기본 인프라 (낮음)
-- [ ] `GameSession` 타입 추가
-- [ ] 캐릭터 선택 UI 컴포넌트
-- [ ] `selectedProtagonistId` 전달 경로
+### 수정된 파일
 
-### Phase 2: 주인공 식별 리팩토링 (중간)
-- [ ] 세션 기반 주인공 식별로 전환
-- [ ] `isProtagonist()` 함수 시그니처 변경
-- [ ] 관련 컴포넌트 업데이트
-
-### Phase 3: 시나리오 생성 확장 (높음)
-- [ ] 다중 플레이어블 캐릭터 지원
-- [ ] 캐릭터별 오프닝 생성
-- [ ] AI 생성 프롬프트 수정
+| 파일 | 변경 내용 |
+|------|----------|
+| `types/index.ts` | Character, ScenarioData 타입 확장 |
+| `app/scenarios/[scenarioId]/ScenarioDetailClient.tsx` | 캐릭터 선택 UI 추가 |
+| `app/game/[scenarioId]/page.tsx` | 쿼리 파라미터 처리 |
+| `app/game/[scenarioId]/GameClient.tsx` | 주인공 식별 함수 업데이트, selectedProtagonistId 전달 |
+| `lib/prompt-builder.ts` | 프롬프트 생성 함수 업데이트 |
+| `lib/game-ai-client.ts` | AI 생성 함수 업데이트 |
+| `app/api/admin/ai-generate/route.ts` | AI 생성 스키마에 필드 추가 |
 
 ---
 
-## 5. 대안 고려
+## 6. 사용 방법
 
-### 5.1 간단한 대안: 주인공 마커
+### 6.1 시나리오 데이터 설정
 
-```typescript
-// Character 타입에 isPlayable 추가
-interface Character {
-  // ... 기존 필드
-  isPlayable?: boolean;  // true면 플레이어가 선택 가능
-  isDefaultProtagonist?: boolean;  // true면 기본 주인공
+```json
+{
+  "characters": [
+    {
+      "roleId": "ROLE_DETECTIVE",
+      "characterName": "강하늘",
+      "isPlayable": true,
+      "isDefaultProtagonist": true
+    },
+    {
+      "roleId": "ROLE_DOCTOR",
+      "characterName": "한서아",
+      "isPlayable": true,
+      "isDefaultProtagonist": false
+    },
+    {
+      "roleId": "ROLE_VILLAIN",
+      "characterName": "김악당",
+      "isPlayable": false
+    }
+  ],
+  "playableCharacters": ["ROLE_DETECTIVE", "ROLE_DOCTOR"],
+  "defaultProtagonist": "ROLE_DETECTIVE"
 }
 ```
 
-장점: 최소한의 변경으로 구현 가능
-단점: 시나리오/오프닝 문제 해결 안 됨
+### 6.2 레거시 호환성
 
-### 5.2 장기 대안: 멀티 시점 시나리오
-
-완전히 새로운 시나리오 포맷:
-- 각 캐릭터의 시점에서 동일 사건을 다르게 경험
-- 라쇼몽 스타일 서사 구조
-- 구현 복잡도 매우 높음
+- `isPlayable`이 설정되지 않은 시나리오는 기존 방식 (`protagonistSetup.name` 또는 `(플레이어)`) 사용
+- `selectedProtagonistId` 없이 게임 시작 시 기존 로직으로 폴백
 
 ---
 
-## 6. 관련 파일
+## 7. 구현 일자
 
-- `app/scenarios/[scenarioId]/ScenarioDetailClient.tsx` - 캐릭터 선택 UI 추가 위치
-- `app/game/[scenarioId]/GameClient.tsx` - 주인공 식별 로직
-- `lib/prompt-builder.ts` - AI 프롬프트 생성
-- `app/api/admin/ai-generate/route.ts` - 시나리오 AI 생성
-- `types/index.ts` - 타입 정의
-
----
-
-## 7. 참고
-
-이 문서는 **추후 시나리오 생성 시스템 종합 점검 시** 함께 검토할 예정입니다.
-
-현재 구현된 주인공 식별 시스템(`isProtagonist`, `filterNPCs`)은 임시 방편으로,
-`protagonistSetup.name`이 설정된 시나리오에서만 정상 동작합니다.
+- **Phase 1 & 2 구현 완료**: 2025-12-13
+- **Phase 3 (시나리오 생성 확장)**: 추후 검토 예정

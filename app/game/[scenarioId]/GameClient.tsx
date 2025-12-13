@@ -201,28 +201,44 @@ const hasInsufficientAP = (
 // =============================================================================
 // 주인공 식별 시스템 (Protagonist Identification)
 // 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// 동적 주인공 선택 시스템: selectedProtagonistId가 있으면 최우선 사용
 // =============================================================================
 
 /**
  * 시나리오에서 주인공 이름 가져오기
- * storyOpening.protagonistSetup.name이 설정되어 있으면 해당 이름 반환
+ * 우선순위: selectedProtagonistId > storyOpening.protagonistSetup.name
  *
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID (우선순위 최상)
  * @returns 주인공 이름 또는 null
  */
-const getProtagonistName = (scenario: ScenarioData): string | null => {
+const getProtagonistName = (scenario: ScenarioData, selectedProtagonistId?: string): string | null => {
+  // 1. selectedProtagonistId가 있으면 해당 캐릭터 이름 반환
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar) return selectedChar.characterName;
+  }
+  // 2. 기존 로직 (storyOpening.protagonistSetup.name)
   return scenario.storyOpening?.protagonistSetup?.name || null;
 };
 
 /**
  * 캐릭터가 주인공인지 확인
  * "(플레이어)" 또는 protagonistSetup.name과 일치하면 주인공
+ * selectedProtagonistId가 있으면 해당 캐릭터만 주인공으로 판정
  *
  * @param characterName 확인할 캐릭터 이름
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID (우선순위 최상)
  * @returns 주인공이면 true
  */
-const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+const isProtagonist = (characterName: string, scenario: ScenarioData, selectedProtagonistId?: string): boolean => {
+  // 1. selectedProtagonistId가 있으면 해당 캐릭터인지 확인
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar) return characterName === selectedChar.characterName;
+  }
+  // 2. 기존 로직
   if (characterName === '(플레이어)') return true;
   const protagonistName = getProtagonistName(scenario);
   return protagonistName !== null && characterName === protagonistName;
@@ -233,20 +249,28 @@ const isProtagonist = (characterName: string, scenario: ScenarioData): boolean =
  *
  * @param characters 캐릭터 배열
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
  * @returns NPC만 포함된 배열
  */
-const filterNPCs = (characters: Character[], scenario: ScenarioData): Character[] => {
-  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+const filterNPCs = (characters: Character[], scenario: ScenarioData, selectedProtagonistId?: string): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario, selectedProtagonistId));
 };
 
 /**
  * 주인공 캐릭터 가져오기
  *
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
  * @returns 주인공 캐릭터 또는 undefined
  */
-const getProtagonistCharacter = (scenario: ScenarioData): Character | undefined => {
-  return scenario.characters.find((c) => isProtagonist(c.characterName, scenario));
+const getProtagonistCharacter = (scenario: ScenarioData, selectedProtagonistId?: string): Character | undefined => {
+  // 1. selectedProtagonistId가 있으면 해당 캐릭터 반환
+  if (selectedProtagonistId) {
+    const selectedChar = scenario.characters.find((c) => c.roleId === selectedProtagonistId);
+    if (selectedChar) return selectedChar;
+  }
+  // 2. 기존 로직
+  return scenario.characters.find((c) => isProtagonist(c.characterName, scenario, selectedProtagonistId));
 };
 
 /**
@@ -258,9 +282,10 @@ const getProtagonistCharacter = (scenario: ScenarioData): Character | undefined 
  * - 'contextual': firstCharacterToMeet만 (기본값)
  *
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
  * @returns 초기에 만난 캐릭터 이름 배열
  */
-const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
+const getInitialMetCharacters = (scenario: ScenarioData, selectedProtagonistId?: string): string[] => {
   const storyOpening = scenario.storyOpening;
   const introStyle = storyOpening?.characterIntroductionStyle || 'contextual';
   const introSequence = storyOpening?.characterIntroductionSequence;
@@ -274,7 +299,7 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
         .map((s) => s.characterName);
     }
     // introSequence가 없으면 모든 NPC (주인공 제외)
-    const npcs = filterNPCs(scenario.characters, scenario);
+    const npcs = filterNPCs(scenario.characters, scenario, selectedProtagonistId);
     return npcs.map((c) => c.characterName);
   }
 
@@ -298,7 +323,7 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
   }
 
   // 4. 폴백: 첫 번째 NPC 캐릭터 (주인공 제외)
-  const npcs = filterNPCs(scenario.characters, scenario);
+  const npcs = filterNPCs(scenario.characters, scenario, selectedProtagonistId);
   return npcs.length > 0 ? [npcs[0].characterName] : [];
 };
 
@@ -310,18 +335,20 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
  *
  * @param characterName 캐릭터 이름
  * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
  * @returns 초기 trustLevel 값
  */
 const getInitialTrustLevel = (
   characterName: string,
-  scenario: ScenarioData
+  scenario: ScenarioData,
+  selectedProtagonistId?: string
 ): number => {
   // initialRelationships에서 플레이어-캐릭터 관계 찾기
-  // 주인공은 "(플레이어)" 또는 실제 이름(protagonistSetup.name)일 수 있음
+  // 주인공은 "(플레이어)" 또는 실제 이름(protagonistSetup.name) 또는 선택된 캐릭터일 수 있음
   const playerRelation = scenario.initialRelationships?.find(
     (rel) =>
-      (isProtagonist(rel.personA, scenario) && rel.personB === characterName) ||
-      (isProtagonist(rel.personB, scenario) && rel.personA === characterName)
+      (isProtagonist(rel.personA, scenario, selectedProtagonistId) && rel.personB === characterName) ||
+      (isProtagonist(rel.personB, scenario, selectedProtagonistId) && rel.personA === characterName)
   );
 
   return playerRelation?.value ?? 0;
@@ -434,9 +461,11 @@ const updateNPCRelationshipVisibility = (
 
 interface GameClientProps {
   scenario: ScenarioData;
+  /** 플레이어가 선택한 주인공 캐릭터 ID (없으면 기존 로직 사용) */
+  selectedProtagonistId?: string;
 }
 
-const createInitialSaveState = (scenario: ScenarioData): SaveState => {
+const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: string): SaveState => {
   const scenarioStats = scenario.scenarioStats.reduce(
     (acc, stat) => {
       acc[stat.id] = stat.initialValue ?? stat.current;
@@ -543,7 +572,7 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       // [Stage 1 개선 #2] 배열 깊은 병합 (스프레드 대신 concat + 중복 제거)
       // =======================================================================
       protagonistKnowledge: (() => {
-        const baseMetCharacters = getInitialMetCharacters(scenario);
+        const baseMetCharacters = getInitialMetCharacters(scenario, selectedProtagonistId);
         const initialKnowledge = scenario.storyOpening?.initialProtagonistKnowledge;
 
         return {
@@ -594,13 +623,13 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
     },
     // 캐릭터 아크 초기화 (NPC만 - 주인공 제외)
     // [Stage 1 개선 #1] trustLevel을 initialRelationships에서 가져옴
-    // [주인공 식별] filterNPCs로 주인공 이름 또는 (플레이어) 모두 제외
-    characterArcs: filterNPCs(charactersWithTraits, scenario)
+    // [주인공 식별] filterNPCs로 주인공 이름 또는 (플레이어) 또는 선택된 캐릭터 모두 제외
+    characterArcs: filterNPCs(charactersWithTraits, scenario, selectedProtagonistId)
       .map((c) => ({
         characterName: c.characterName,
         moments: [],
         currentMood: 'anxious' as const,
-        trustLevel: getInitialTrustLevel(c.characterName, scenario),
+        trustLevel: getInitialTrustLevel(c.characterName, scenario, selectedProtagonistId),
       })),
     // 회상 시스템 - 주요 결정 기록 초기화
     keyDecisions: [],
@@ -671,6 +700,7 @@ const updateSaveState = (
   currentSaveState: SaveState,
   aiResponse: AIResponse,
   scenario: ScenarioData,
+  selectedProtagonistId?: string,
 ): SaveState => {
   const newSaveState = JSON.parse(JSON.stringify(currentSaveState));
 
@@ -1231,7 +1261,7 @@ const updateSaveState = (
 
   // v1.2: AI 서사에서 새로 등장한 캐릭터 자동 감지 및 metCharacters 업데이트
   // [주인공 식별] filterNPCs로 주인공 제외
-  const allNpcNames = filterNPCs(scenario.characters, scenario)
+  const allNpcNames = filterNPCs(scenario.characters, scenario, selectedProtagonistId)
     .map((c) => c.characterName);
   const currentMetCharacters = newSaveState.context.protagonistKnowledge?.metCharacters || [];
   const narrative = aiResponse.log || '';
@@ -1411,9 +1441,9 @@ const updateSaveState = (
   return newSaveState;
 };
 
-export default function GameClient({ scenario }: GameClientProps) {
+export default function GameClient({ scenario, selectedProtagonistId }: GameClientProps) {
   const [saveState, setSaveState] = useState<SaveState>(() =>
-    createInitialSaveState(scenario),
+    createInitialSaveState(scenario, selectedProtagonistId),
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialDilemmaLoading, setIsInitialDilemmaLoading] = useState(true);
@@ -1634,17 +1664,19 @@ export default function GameClient({ scenario }: GameClientProps) {
       setIsInitialDilemmaLoading(true);
       setError(null);
       try {
-        const initialState = createInitialSaveState(scenario);
+        const initialState = createInitialSaveState(scenario, selectedProtagonistId);
         // [PlayTestLogger] Stage 1 로깅
         playTestLogger.logStage1(scenario, initialState);
 
         const aiSettings = getOptimalAISettings(1, 'medium', 0, scenario);
 
         // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
+        // 2025-12-13: selectedProtagonistId 전달 (동적 주인공 선택 시스템)
         const result = await generateInitialDilemmaWithOpening(
           initialState,
           scenario,
           aiSettings.useLiteVersion,
+          selectedProtagonistId,
         );
 
         // 초기 딜레마도 언어 검증 및 정리
@@ -1839,6 +1871,7 @@ export default function GameClient({ scenario }: GameClientProps) {
               initialState,
               cleanedResponse,
               scenario,
+              selectedProtagonistId,
             );
             setSaveState(updatedState);
           }
@@ -1852,7 +1885,7 @@ export default function GameClient({ scenario }: GameClientProps) {
           '초기 딜레마를 생성하는 데 실패했습니다. 폴백 선택지를 사용합니다.',
         );
         // Fallback on error
-        const initialState = createInitialSaveState(scenario);
+        const initialState = createInitialSaveState(scenario, selectedProtagonistId);
         const fallbackCharacters = initialState.community.survivors.map((c) => {
           const originalChar = scenario.characters.find(
             (char) => char.characterName === c.name,
@@ -1988,6 +2021,7 @@ export default function GameClient({ scenario }: GameClientProps) {
         newSaveState,
         cleanedResponse,
         scenario,
+        selectedProtagonistId,
       );
 
       // [PlayTestLogger] Stage 4 로깅 (AI 응답 처리)
@@ -2033,7 +2067,7 @@ export default function GameClient({ scenario }: GameClientProps) {
 
         // AI 응답에서 영향받은 캐릭터 추출 (주인공 제외)
         const extractImpactedCharacters = (): string[] => {
-          const npcNames = filterNPCs(scenario.characters, scenario)
+          const npcNames = filterNPCs(scenario.characters, scenario, selectedProtagonistId)
             .map((c) => c.characterName);
           return npcNames.filter(
             (name) =>
