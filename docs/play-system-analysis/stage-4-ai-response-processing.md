@@ -8,6 +8,10 @@ AI 응답(AIResponse)을 받아 게임 상태(SaveState)에 반영하는 단계�
 **핵심 파일**: `app/game/[scenarioId]/GameClient.tsx`
 **함수 위치**: lines 535-1233
 
+**관련 시스템** (★ 2025-12-13):
+- 주인공 식별 시스템: NPC만 캐릭터 처리 대상으로 필터링
+- 프롬프트 품질 강화: `lib/prompt-enhancers.ts`로 AI 응답 품질 개선
+
 ---
 
 ## 2. Stage 3에서 받는 데이터
@@ -136,8 +140,15 @@ const normalizeName = (name: string) => {
 
 ### 4.3 [v1.2] 새로 만난 캐릭터 자동 감지 (lines 1114-1159)
 
+**[2025-12-13 업데이트]**: 주인공 식별 시스템으로 NPC만 필터링
+
 ```typescript
+// 이전: 하드코딩된 '(플레이어)' 체크
 const allNpcNames = scenario.characters.filter(c => c.characterName !== '(플레이어)')
+  .map(c => c.characterName);
+
+// 현재: 주인공 식별 헬퍼 사용
+const allNpcNames = filterNPCs(scenario.characters, scenario)
   .map(c => c.characterName);
 
 allNpcNames.forEach((charName) => {

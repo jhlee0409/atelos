@@ -4,8 +4,8 @@
 
 이 문서는 ATELOS 게임의 플레이 시스템을 5단계로 분석하고, 각 단계에서 구현된 개선사항과 추가 개선 필요사항을 정리합니다.
 
-**분석 일자**: 2025-12-13
-**관련 커밋**: 3d4669b ~ 76371dd
+**분석 일자**: 2025-12-13 (최종 업데이트)
+**관련 커밋**: 3d4669b ~ 72b524c (최신: 주인공 식별 시스템 + 프롬프트 강화)
 
 ---
 
@@ -29,11 +29,12 @@
 │                                                                             │
 │   ScenarioData ──→ createInitialSaveState() ──→ SaveState                  │
 │                          │                                                  │
+│                          ├─→ 주인공 식별 (isProtagonist, filterNPCs) ★★   │
 │                          ├─→ protagonistKnowledge (metCharacters 초기화)   │
 │                          ├─→ npcRelationshipStates (visibility: hidden)    │
 │                          ├─→ actionContext (초기 맥락)                     │
 │                          ├─→ worldState (초기 월드)                        │
-│                          └─→ characterArcs (초기 상태)                     │
+│                          └─→ characterArcs (NPC만 필터링) ★★              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
@@ -121,6 +122,7 @@
 ```
 
 ★ = Stage 2-5에서 구현된 개선사항
+★★ = 2025-12-13 주인공 식별 시스템 개선사항
 
 ---
 
@@ -207,6 +209,36 @@
 - **#1** character_arcs 프롬프트 섹션: 캐릭터별 발전 기록을 AI 프롬프트에 포함
 - **테스트**: `tests/unit/dynamic-ending.test.ts` 11개 테스트 추가
 
+### 커밋 72b524c (2025-12-13) - 주인공 식별 시스템
+
+플레이 테스트에서 발견된 주인공이 NPC로 처리되는 문제 해결:
+
+- **주인공 식별 헬퍼 함수** (`GameClient.tsx:202-251`):
+  - `getProtagonistName()`: `storyOpening.protagonistSetup.name` 추출
+  - `isProtagonist()`: `(플레이어)` 또는 `protagonistSetup.name` 체크
+  - `filterNPCs()`: 주인공 제외한 NPC 목록 반환
+  - `getProtagonistCharacter()`: 주인공 캐릭터 객체 반환
+- **GameClient.tsx 5개 위치 수정**:
+  - `characterArcs` 초기화 시 주인공 제외
+  - `getInitialTrustLevel()` 주인공 체크
+  - `extractImpactedCharacters()` NPC 필터링
+  - 대화/탐색 시 metCharacters 업데이트
+- **prompt-builder.ts 3개 위치 수정**:
+  - `buildLitePrompt()` 내 NPC 필터링
+  - `buildDialoguePrompt()` 내 NPC 필터링
+  - `buildExplorationPrompt()` 내 NPC 필터링
+
+### 프롬프트 품질 강화 시스템 (prompt-enhancers.ts)
+
+AI 응답 품질 극대화를 위한 새로운 모듈 (`lib/prompt-enhancers.ts`):
+
+- **Choice Diversity System**: 테마별 선택지 분류 및 균형 유지
+- **Character Balancing System**: 캐릭터 등장 빈도 추적 및 조정
+- **Theme Rotation System**: 서사 단계별 테마 가중치 조정
+- **Context Bridge System**: 이전 씬과의 연결성 유지
+- **통합 규칙**: LANGUAGE_RULES, CHOICE_FORMAT_RULES, EMOTIONAL_EXPRESSION_RULES, STAT_CHANGE_RULES
+- **프롬프트 생성**: `generateEnhancedPromptGuidelines()` 함수로 통합 가이드라인 생성
+
 ---
 
 ## 추가 개선 필요사항 (우선순위별)
@@ -247,7 +279,15 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 262개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개, Stage 5: 11개, 남은 이슈: 10개)
+├── pnpm test 262개 테스트 통과
+├── [주인공 식별] isProtagonist() 헬퍼 함수
+├── [주인공 식별] filterNPCs() NPC 필터링
+├── [주인공 식별] characterArcs 주인공 제외
+├── [주인공 식별] prompt-builder.ts NPC 필터링 통합
+├── [프롬프트 강화] prompt-enhancers.ts 모듈
+├── [프롬프트 강화] Choice Diversity System
+├── [프롬프트 강화] Character Balancing System
+├── [프롬프트 강화] generateEnhancedPromptGuidelines() 통합
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -303,3 +343,5 @@
 - [CLAUDE.md](../../CLAUDE.md): 프로젝트 전체 가이드
 - [types/index.ts](../../types/index.ts): 타입 정의
 - [lib/gameplay-config.ts](../../lib/gameplay-config.ts): 게임플레이 설정 유틸리티
+- [lib/prompt-enhancers.ts](../../lib/prompt-enhancers.ts): 프롬프트 품질 강화 시스템 (NEW)
+- [lib/prompt-builder.ts](../../lib/prompt-builder.ts): AI 프롬프트 빌더

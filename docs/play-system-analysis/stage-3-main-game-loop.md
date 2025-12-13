@@ -5,13 +5,43 @@
 플레이어의 행동을 처리하는 3개의 핵심 핸들러입니다.
 모든 핸들러는 동일한 패턴을 따라야 시스템 일관성이 유지됩니다.
 
-**핵심 파일**: `app/game/[scenarioId]/GameClient.tsx`
+**핵심 파일**:
+- `app/game/[scenarioId]/GameClient.tsx` - 핸들러 및 주인공 식별 헬퍼 (★ 2025-12-13)
+- `lib/prompt-builder.ts` - AI 프롬프트 생성
+- `lib/prompt-enhancers.ts` - 프롬프트 품질 강화 시스템 (★ 2025-12-13)
 
 | 핸들러 | 라인 | 역할 |
 |--------|------|------|
 | `handlePlayerChoice` | 1597-1989 | 선택지/자유 입력 처리 |
 | `handleDialogueSelect` | 1992-2232 | 캐릭터 대화 처리 |
 | `handleExplore` | 2235-2595 | 장소 탐색 처리 |
+
+### 1.1 [2025-12-13] 주인공 식별 시스템
+
+핸들러에서 NPC만 처리하기 위한 헬퍼 함수:
+
+```typescript
+// GameClient.tsx:202-251 - 주인공 식별 헬퍼
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+const filterNPCs = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+```
+
+**적용 위치**:
+- `characterArcs` 초기화 시 주인공 제외
+- `getInitialTrustLevel()` 주인공 체크
+- `extractImpactedCharacters()` NPC 필터링
+- `metCharacters` 업데이트 시 NPC만 추가
 
 ---
 

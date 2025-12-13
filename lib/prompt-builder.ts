@@ -39,9 +39,51 @@ import {
   type ActionSynergy,
 } from './action-engagement-system';
 
+// v2.4: Prompt Quality Enhancement System (품질 강화)
+import {
+  generateEnhancedPromptGuidelines,
+  generateChoiceDiversityGuideline,
+  generateCharacterBalancingGuideline,
+  generateContextBridge,
+  LANGUAGE_RULES,
+  CHOICE_FORMAT_RULES,
+  EMOTIONAL_EXPRESSION_RULES,
+  STAT_CHANGE_RULES,
+} from './prompt-enhancers';
+
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
 // ===========================================
+
+// =============================================================================
+// 주인공 식별 시스템 (Protagonist Identification)
+// 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// =============================================================================
+
+/**
+ * 시나리오에서 주인공 이름 가져오기
+ */
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+/**
+ * 캐릭터가 주인공인지 확인
+ */
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+/**
+ * NPC 캐릭터만 필터링 (주인공 제외)
+ */
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+
+// =============================================================================
 
 export interface GamePromptData {
   systemPrompt: string;
@@ -212,6 +254,49 @@ IMPORTANT: Reference these past decisions naturally in the narrative when releva
 - Mention consequences of earlier choices
 - Show how characters remember player's actions
 - Create callbacks to meaningful moments`;
+};
+
+/**
+ * 플래그 딕셔너리를 AI 프롬프트용으로 포맷팅
+ * AI가 어떤 플래그를 언제 부여해야 하는지 명확하게 안내
+ */
+const formatFlagDictionaryForPrompt = (scenario: ScenarioData): string => {
+  if (!scenario.flagDictionary || scenario.flagDictionary.length === 0) {
+    return '';
+  }
+
+  const flagsWithTriggers = scenario.flagDictionary
+    .filter(flag => flag.triggerCondition) // 트리거 조건이 있는 것만
+    .map(flag => {
+      const flagName = flag.flagName.startsWith('FLAG_') ? flag.flagName : `FLAG_${flag.flagName}`;
+      return `- ${flagName}: ${flag.description} (조건: ${flag.triggerCondition})`;
+    })
+    .join('\n');
+
+  const flagsWithoutTriggers = scenario.flagDictionary
+    .filter(flag => !flag.triggerCondition)
+    .map(flag => {
+      const flagName = flag.flagName.startsWith('FLAG_') ? flag.flagName : `FLAG_${flag.flagName}`;
+      return `- ${flagName}: ${flag.description}`;
+    })
+    .join('\n');
+
+  return `FLAGS_ACQUIRED GUIDELINES (이벤트 플래그 부여 - 중요!):
+플레이어의 행동에 따라 아래 플래그를 flags_acquired에 추가하세요.
+플래그는 루트 결정과 엔딩 조건에 영향을 미칩니다.
+
+**조건 기반 플래그 (조건 충족 시 반드시 부여):**
+${flagsWithTriggers || '(없음)'}
+
+**상황 기반 플래그 (관련 행동 시 부여):**
+${flagsWithoutTriggers || '(없음)'}
+
+**플래그 부여 규칙:**
+1. 플레이어가 조건에 해당하는 행동을 하면 즉시 부여
+2. 같은 플래그를 중복 부여해도 됨 (count 타입)
+3. 플래그 부여 시 서사에 해당 행동의 결과를 반영
+4. 매 턴 최소 1개 이상의 플래그 부여를 권장
+예: 협상 시도 → ["FLAG_NEGOTIATE_ATTEMPT"], 방어 강화 → ["FLAG_DEFENSE_ACTION"]`;
 };
 
 // 토큰 최적화된 프롬프트 빌더 (메인 함수)
@@ -516,6 +601,18 @@ ${dialogueClues.length > 0 ? `
     3, // 라이트 모드에서는 최근 3개만
   );
 
+  // v2.4: 프롬프트 품질 강화 시스템 - 선택지 다양성, 캐릭터 균형, 주제 순환
+  const qualityEnhancementSection = generateEnhancedPromptGuidelines({
+    scenario,
+    keyDecisions: options.keyDecisions || [],
+    characterArcs: options.characterArcs || [],
+    metCharacters: options.metCharacters || [],
+    currentDay,
+    totalDays,
+    recentChoiceTexts: options.recentChoiceTexts || [],
+    actionContext: options.actionContext,
+  });
+
   const currentStats = Object.entries(playerState.stats)
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
@@ -527,9 +624,8 @@ ${dialogueClues.length > 0 ? `
   const metCharacters = options.metCharacters || [];
   const hasMetFilter = metCharacters.length > 0;
 
-  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시
-  const characterInfo = scenario.characters
-    .filter((char) => char.characterName !== '(플레이어)')
+  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시 (주인공 제외)
+  const characterInfo = filterNPCsForPrompt(scenario.characters, scenario)
     .map((char) => {
       const mainTrait =
         char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
@@ -706,6 +802,8 @@ LOCATIONS_DISCOVERED GUIDELINES (동적 장소 발견):
 - 이미 알려진 장소는 중복 추가하지 말 것
 - 플레이어가 실제로 방문 가능해진 장소만 추가
 
+${formatFlagDictionaryForPrompt(scenario)}
+
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 
 ${personaGuide}
@@ -720,7 +818,8 @@ ${narrativeSeedsSection}
 ${actionEngagementSection}
 ${discoveredInfoSection}
 ${hiddenRelationshipSection}
-${protagonistKnowledgeSection}`;
+${protagonistKnowledgeSection}
+${qualityEnhancementSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
@@ -942,8 +1041,8 @@ export const buildInitialDilemmaPrompt = (
   scenario: ScenarioData,
   characters: Character[],
 ): string => {
-  // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다.
-  const npcs = characters.filter((char) => char.characterName !== '(플레이어)');
+  // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다. (주인공 식별)
+  const npcs = filterNPCsForPrompt(characters, scenario);
 
   // 장르별 서사 스타일
   const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
@@ -1108,7 +1207,8 @@ export const buildStoryOpeningPrompt = (
   characters: Character[],
 ): string => {
   const storyOpening = scenario.storyOpening || {};
-  const npcs = characters.filter((char) => char.characterName !== '(플레이어)');
+  // [주인공 식별] 주인공 제외 (실제 이름 또는 "(플레이어)")
+  const npcs = filterNPCsForPrompt(characters, scenario);
 
   // 기본값 설정
   const openingTone = storyOpening.openingTone || 'calm';

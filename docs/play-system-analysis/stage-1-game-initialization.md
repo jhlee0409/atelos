@@ -69,10 +69,12 @@ protagonistKnowledge: (() => {
 
 **[구현 완료]** trustLevel이 initialRelationships에서 초기화됨
 
+**[2025-12-13 추가]** 주인공 식별 시스템으로 NPC만 필터링
+
 ```typescript
-// GameClient.tsx:543-552
-characterArcs: charactersWithTraits
-  .filter((c) => c.characterName !== '(플레이어)')
+// GameClient.tsx:596-605
+// [주인공 식별] filterNPCs로 주인공 이름 또는 (플레이어) 모두 제외
+characterArcs: filterNPCs(charactersWithTraits, scenario)
   .map((c) => ({
     characterName: c.characterName,
     moments: [],
@@ -81,14 +83,15 @@ characterArcs: charactersWithTraits
   })),
 ```
 
-**`getInitialTrustLevel()` 헬퍼** (GameClient.tsx:264-276):
+**`getInitialTrustLevel()` 헬퍼** (GameClient.tsx:316-328):
 ```typescript
 const getInitialTrustLevel = (characterName: string, scenario: ScenarioData): number => {
   // initialRelationships에서 플레이어-캐릭터 관계 찾기
-  const playerRelation = scenario.initialRelationships.find(
+  // 주인공은 "(플레이어)" 또는 실제 이름(protagonistSetup.name)일 수 있음
+  const playerRelation = scenario.initialRelationships?.find(
     (rel) =>
-      (rel.pair[0] === '(플레이어)' && rel.pair[1] === characterName) ||
-      (rel.pair[1] === '(플레이어)' && rel.pair[0] === characterName)
+      (isProtagonist(rel.personA, scenario) && rel.personB === characterName) ||
+      (isProtagonist(rel.personB, scenario) && rel.personA === characterName)
   );
   return playerRelation?.value ?? 0;
 };
@@ -112,9 +115,72 @@ const getInitialTrustLevel = (characterName: string, scenario: ScenarioData): nu
 
 ---
 
-## 3. 헬퍼 함수 분석
+## 3. 주인공 식별 시스템 (Protagonist Identification) ★ 신규
 
-### 3.1 getInitialMetCharacters() - GameClient.tsx:212-252
+**[2025-12-13 추가]** 시나리오에서 주인공을 `(플레이어)` 또는 실제 이름으로 설정할 수 있도록 지원
+
+### 3.1 배경
+
+기존 시스템은 주인공을 항상 `(플레이어)`라는 이름으로만 인식했습니다. 하지만 시나리오에서 `storyOpening.protagonistSetup.name = "강하늘"` 처럼 실제 이름을 설정하면, 시스템이 주인공을 NPC로 취급하는 문제가 발생했습니다.
+
+**발생했던 문제:**
+- 주인공이 `characterArcs`에 NPC로 포함됨
+- 주인공이 `metCharacters`에 "자기 자신을 만났다"로 기록됨
+- 주인공과 "대화"했다고 기록되는 비정상 동작
+
+### 3.2 헬퍼 함수 (GameClient.tsx:202-251)
+
+```typescript
+// 시나리오에서 주인공 이름 가져오기
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+// 캐릭터가 주인공인지 확인
+// "(플레이어)" 또는 protagonistSetup.name과 일치하면 주인공
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+// NPC 캐릭터만 필터링 (주인공 제외)
+const filterNPCs = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+
+// 주인공 캐릭터 가져오기
+const getProtagonistCharacter = (scenario: ScenarioData): Character | undefined => {
+  return scenario.characters.find((c) => isProtagonist(c.characterName, scenario));
+};
+```
+
+### 3.3 적용 위치
+
+| 위치 | 기존 코드 | 변경 후 |
+|------|----------|---------|
+| `characterArcs` 초기화 | `.filter((c) => c.characterName !== '(플레이어)')` | `filterNPCs(charactersWithTraits, scenario)` |
+| `getInitialMetCharacters()` | `.filter((c) => c.characterName !== '(플레이어)')` | `filterNPCs(scenario.characters, scenario)` |
+| `getInitialTrustLevel()` | `rel.personA === '(플레이어)'` | `isProtagonist(rel.personA, scenario)` |
+| `extractImpactedCharacters()` | `.filter((name) => name !== '(플레이어)')` | `filterNPCs(scenario.characters, scenario)` |
+| `updateSaveState()` NPC 감지 | `.filter((c) => c.characterName !== '(플레이어)')` | `filterNPCs(scenario.characters, scenario)` |
+
+### 3.4 prompt-builder.ts 동일 적용
+
+AI 프롬프트 생성에서도 동일한 시스템 적용:
+
+```typescript
+// lib/prompt-builder.ts:66-84
+const getProtagonistName = (scenario: ScenarioData): string | null => {...};
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {...};
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData): Character[] => {...};
+```
+
+---
+
+## 4. 헬퍼 함수 분석
+
+### 4.1 getInitialMetCharacters() - GameClient.tsx:264-303
 
 **역할**: 캐릭터 소개 스타일에 따라 초기에 만난 캐릭터 목록 생성
 
@@ -205,7 +271,7 @@ charactersWithTraits
 
 ---
 
-## 4. 데이터 흐름도
+## 5. 데이터 흐름도
 
 ```
 ScenarioData
@@ -238,7 +304,7 @@ ScenarioData
 
 ---
 
-## 5. Stage 2로 전달되는 핵심 데이터
+## 6. Stage 2로 전달되는 핵심 데이터
 
 Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 
@@ -252,9 +318,9 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 
 ---
 
-## 6. 구현된 개선사항
+## 7. 구현된 개선사항
 
-### 6.1 커밋 3d4669b (초기 구현)
+### 7.1 커밋 3d4669b (초기 구현)
 
 | 항목 | 구현 내용 |
 |------|----------|
@@ -264,7 +330,7 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 | 시나리오별 AP 설정 | getActionPointsPerDay() 사용 |
 | triggeredStoryEvents 추적 | 중복 이벤트 발동 방지 준비 |
 
-### 6.2 Stage 1 개선 (현재 커밋)
+### 7.2 Stage 1 개선 (이전 커밋)
 
 | # | 이슈 | 해결 내용 | 영향 Stage |
 |---|------|----------|-----------|
@@ -273,11 +339,20 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 | #3 | 'gradual' 스타일 order=1 누락 시 무응답 | 경고 로그 출력 + 첫 번째 항목 fallback | Stage 2 |
 | #4 | storyOpening undefined 체크 산발적 | `getStoryOpeningWithDefaults()` 통합 헬퍼 | 전체 |
 
+### 7.3 주인공 식별 시스템 추가 (2025-12-13) ★ 신규
+
+| # | 이슈 | 해결 내용 | 영향 Stage |
+|---|------|----------|-----------|
+| #5 | 주인공이 실제 이름일 때 NPC로 취급 | `isProtagonist()`, `filterNPCs()` 헬퍼 추가 | **전체** |
+| #6 | characterArcs에 주인공 포함됨 | `filterNPCs()` 로 초기화 시 주인공 제외 | Stage 3, 4, 5 |
+| #7 | getInitialTrustLevel 주인공 미인식 | `isProtagonist()` 로 관계 확인 | Stage 1, 3 |
+| #8 | prompt-builder에서 주인공 NPC 취급 | `filterNPCsForPrompt()` 추가 | Stage 2, 3 |
+
 ---
 
-## 7. 추가 개선 필요사항 (향후)
+## 8. 추가 개선 필요사항 (향후)
 
-### 7.1 잠재적 이슈
+### 8.1 잠재적 이슈
 
 | 이슈 | 현재 상태 | 우선순위 |
 |------|----------|---------|
@@ -288,7 +363,7 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 **해결된 이슈 상세**:
 - `worldState.locations`: `lib/world-state-manager.ts`의 `createInitialLocations()`에서 `scenario.locations` 배열이 있으면 해당 위치를 사용, 없으면 기본 5개 위치 사용
 
-### 7.2 향후 확장 고려사항
+### 8.2 향후 확장 고려사항
 
 1. ~~**시나리오별 초기 위치 설정**: `gameplayConfig.initialLocations` 추가~~ → 이미 `scenario.locations`로 지원됨
 2. **캐릭터별 초기 mood 설정**: `storyOpening.characterInitialMoods` 추가
@@ -296,7 +371,7 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 
 ---
 
-## 8. 다음 Stage 연계 정보
+## 9. 다음 Stage 연계 정보
 
 ### Stage 2 (스토리 오프닝)에서 사용할 데이터:
 
@@ -318,7 +393,7 @@ const {
 
 ---
 
-## 9. 검증 체크리스트
+## 10. 검증 체크리스트
 
 ### 기존 검증 (완료)
 - [x] protagonistKnowledge 모든 필드 초기화 확인
@@ -332,6 +407,12 @@ const {
 - [x] #3 'gradual' 스타일 order=1 누락 시 경고 로그 + fallback
 - [x] #4 getStoryOpeningWithDefaults() 헬퍼 함수 추가
 
+### 주인공 식별 검증 (2025-12-13 추가) ★ 신규
+- [x] #5 `isProtagonist()` 함수가 `(플레이어)` 및 실제 이름 모두 인식
+- [x] #6 `characterArcs` 초기화 시 주인공 제외 확인
+- [x] #7 `getInitialTrustLevel()` 주인공-NPC 관계 정확히 인식
+- [x] #8 `prompt-builder.ts`에서 주인공 NPC 필터링 동작
+
 ### 테스트 커버리지
 - [x] `tests/unit/game-initialization.test.ts` - 19개 테스트 통과
   - characterArcs.trustLevel 초기값 테스트 (3개)
@@ -339,17 +420,20 @@ const {
   - 'gradual' 스타일 fallback 테스트 (4개)
   - storyOpening undefined 통합 폴백 테스트 (3개)
   - characterIntroductionStyle 전체 분기 테스트 (4개)
+- [x] 빌드 및 262개 전체 테스트 통과 확인
 
 ---
 
-## 10. 코드 참조
+## 11. 코드 참조
 
 | 위치 | 함수/섹션 | 역할 |
 |------|----------|------|
-| GameClient.tsx:212-252 | getInitialMetCharacters() | 초기 만난 캐릭터 목록 생성 |
-| GameClient.tsx:264-276 | getInitialTrustLevel() | [신규] 초기 신뢰도 가져오기 |
-| GameClient.tsx:286-302 | getStoryOpeningWithDefaults() | [신규] storyOpening 기본값 병합 |
-| GameClient.tsx:307-320 | getInitialSurvivors() | 초기 survivors 목록 생성 |
-| GameClient.tsx:387-556 | createInitialSaveState() | 전체 게임 상태 초기화 |
-| GameClient.tsx:493-510 | protagonistKnowledge 초기화 | [개선] 배열 깊은 병합 |
-| GameClient.tsx:543-552 | characterArcs 초기화 | [개선] trustLevel 초기화 |
+| GameClient.tsx:202-251 | 주인공 식별 시스템 | **[2025-12-13 신규]** isProtagonist, filterNPCs 등 |
+| GameClient.tsx:264-303 | getInitialMetCharacters() | 초기 만난 캐릭터 목록 생성 |
+| GameClient.tsx:316-328 | getInitialTrustLevel() | 초기 신뢰도 가져오기 (isProtagonist 사용) |
+| GameClient.tsx:331-354 | getStoryOpeningWithDefaults() | storyOpening 기본값 병합 |
+| GameClient.tsx:356-369 | getInitialSurvivors() | 초기 survivors 목록 생성 |
+| GameClient.tsx:437-608 | createInitialSaveState() | 전체 게임 상태 초기화 |
+| GameClient.tsx:543-558 | protagonistKnowledge 초기화 | 배열 깊은 병합 |
+| GameClient.tsx:596-605 | characterArcs 초기화 | **[개선]** filterNPCs로 주인공 제외 |
+| lib/prompt-builder.ts:66-84 | filterNPCsForPrompt() | **[2025-12-13 신규]** AI 프롬프트용 NPC 필터링 |

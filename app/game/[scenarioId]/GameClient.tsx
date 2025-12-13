@@ -199,6 +199,57 @@ const hasInsufficientAP = (
   return currentAP < cost;
 };
 
+// =============================================================================
+// 주인공 식별 시스템 (Protagonist Identification)
+// 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// =============================================================================
+
+/**
+ * 시나리오에서 주인공 이름 가져오기
+ * storyOpening.protagonistSetup.name이 설정되어 있으면 해당 이름 반환
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 주인공 이름 또는 null
+ */
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+/**
+ * 캐릭터가 주인공인지 확인
+ * "(플레이어)" 또는 protagonistSetup.name과 일치하면 주인공
+ *
+ * @param characterName 확인할 캐릭터 이름
+ * @param scenario 시나리오 데이터
+ * @returns 주인공이면 true
+ */
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+/**
+ * NPC 캐릭터만 필터링 (주인공 제외)
+ *
+ * @param characters 캐릭터 배열
+ * @param scenario 시나리오 데이터
+ * @returns NPC만 포함된 배열
+ */
+const filterNPCs = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+
+/**
+ * 주인공 캐릭터 가져오기
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 주인공 캐릭터 또는 undefined
+ */
+const getProtagonistCharacter = (scenario: ScenarioData): Character | undefined => {
+  return scenario.characters.find((c) => isProtagonist(c.characterName, scenario));
+};
+
 /**
  * 초기 만난 캐릭터 목록 생성 (storyOpening 설정 기반)
  *
@@ -223,8 +274,8 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
         .sort((a, b) => a.order - b.order)
         .map((s) => s.characterName);
     }
-    // introSequence가 없으면 모든 NPC
-    const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+    // introSequence가 없으면 모든 NPC (주인공 제외)
+    const npcs = filterNPCs(scenario.characters, scenario);
     return npcs.map((c) => c.characterName);
   }
 
@@ -247,8 +298,8 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
     return [firstCharacter];
   }
 
-  // 4. 폴백: 첫 번째 NPC 캐릭터
-  const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+  // 4. 폴백: 첫 번째 NPC 캐릭터 (주인공 제외)
+  const npcs = filterNPCs(scenario.characters, scenario);
   return npcs.length > 0 ? [npcs[0].characterName] : [];
 };
 
@@ -267,10 +318,11 @@ const getInitialTrustLevel = (
   scenario: ScenarioData
 ): number => {
   // initialRelationships에서 플레이어-캐릭터 관계 찾기
+  // 주인공은 "(플레이어)" 또는 실제 이름(protagonistSetup.name)일 수 있음
   const playerRelation = scenario.initialRelationships?.find(
     (rel) =>
-      (rel.personA === '(플레이어)' && rel.personB === characterName) ||
-      (rel.personB === '(플레이어)' && rel.personA === characterName)
+      (isProtagonist(rel.personA, scenario) && rel.personB === characterName) ||
+      (isProtagonist(rel.personB, scenario) && rel.personA === characterName)
   );
 
   return playerRelation?.value ?? 0;
@@ -541,10 +593,10 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       choice_a: '... 로딩 중 ...',
       choice_b: '... 로딩 중 ...',
     },
-    // 캐릭터 아크 초기화
+    // 캐릭터 아크 초기화 (NPC만 - 주인공 제외)
     // [Stage 1 개선 #1] trustLevel을 initialRelationships에서 가져옴
-    characterArcs: charactersWithTraits
-      .filter((c) => c.characterName !== '(플레이어)')
+    // [주인공 식별] filterNPCs로 주인공 이름 또는 (플레이어) 모두 제외
+    characterArcs: filterNPCs(charactersWithTraits, scenario)
       .map((c) => ({
         characterName: c.characterName,
         moments: [],
@@ -1196,8 +1248,8 @@ const updateSaveState = (
   }
 
   // v1.2: AI 서사에서 새로 등장한 캐릭터 자동 감지 및 metCharacters 업데이트
-  const allNpcNames = scenario.characters
-    .filter((c) => c.characterName !== '(플레이어)')
+  // [주인공 식별] filterNPCs로 주인공 제외
+  const allNpcNames = filterNPCs(scenario.characters, scenario)
     .map((c) => c.characterName);
   const currentMetCharacters = newSaveState.context.protagonistKnowledge?.metCharacters || [];
   const narrative = aiResponse.log || '';
@@ -1294,8 +1346,10 @@ const updateSaveState = (
 
       if (!relState) return;
 
-      // 관계에 연결된 두 캐릭터 이름을 찾음
-      const relatedChars = rel.relationId.split('-');
+      // [버그 수정] 관계에 연결된 두 캐릭터 이름을 찾음
+      // rel.relationId는 'REL_001' 형식이므로 split('-')으로 캐릭터 이름을 얻을 수 없음
+      // rel.characterA와 rel.characterB를 직접 사용해야 함
+      const relatedChars = [rel.characterA, rel.characterB].filter(Boolean);
       // 서사에서 두 캐릭터가 함께 언급되었는지 확인
       const bothMentioned = relatedChars.length >= 2 &&
         relatedChars.every((charName: string) => narrative.includes(charName));
@@ -1514,12 +1568,49 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       } else {
         console.error('❌ 동적 엔딩 생성 실패:', result.error);
+        // Fallback: 기본 시간 초과 엔딩 트리거
+        triggerFallbackEnding(currentDay);
       }
     } catch (error) {
       console.error('❌ 동적 엔딩 API 오류:', error);
+      // Fallback: 기본 시간 초과 엔딩 트리거
+      triggerFallbackEnding(currentDay);
     } finally {
       setIsGeneratingEnding(false);
     }
+  };
+
+  /**
+   * Dynamic Ending 실패 시 fallback 엔딩 트리거
+   */
+  const triggerFallbackEnding = (currentDay: number) => {
+    console.log('🔄 Fallback 엔딩 트리거 (Dynamic Ending 실패)');
+
+    // 시나리오의 ENDING_TIME_UP 먼저 찾기
+    let fallbackEnding = scenario.endingArchetypes?.find(
+      (e) => e.endingId === 'ENDING_TIME_UP'
+    ) || null;
+
+    // 없으면 기본 엔딩 생성
+    if (!fallbackEnding) {
+      const totalDays = scenario.endCondition?.value || 7;
+      fallbackEnding = {
+        endingId: 'DEFAULT_TIME_UP',
+        title: '결단의 시간',
+        description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다. 당신과 당신의 공동체는 이제 운명의 심판을 기다린다.`,
+        systemConditions: [],
+        isGoalSuccess: false,
+      };
+    }
+
+    // [PlayTestLogger] Fallback 엔딩 로깅
+    playTestLogger.logStage5Ending('fallback', {
+      endingId: fallbackEnding.endingId,
+      title: fallbackEnding.title,
+      reason: 'Dynamic Ending API failure',
+    });
+
+    setTriggeredEnding(fallbackEnding);
   };
 
   // 엔딩 Day 경고 체크
@@ -1958,27 +2049,58 @@ export default function GameClient({ scenario }: GameClientProps) {
           return 'strategic';
         };
 
-        // AI 응답에서 영향받은 캐릭터 추출
+        // AI 응답에서 영향받은 캐릭터 추출 (주인공 제외)
         const extractImpactedCharacters = (): string[] => {
-          const characters = scenario.characters
-            .map((c) => c.characterName)
-            .filter((name) => name !== '(플레이어)');
-          return characters.filter(
+          const npcNames = filterNPCs(scenario.characters, scenario)
+            .map((c) => c.characterName);
+          return npcNames.filter(
             (name) =>
               cleanedResponse.log.includes(name) ||
               choiceDetails.includes(name),
           );
         };
 
-        // 결과 요약 (50자 이내)
+        // 결과 요약 (50자 이내) - 개선: 장면 묘사 스킵, 의미있는 문장 선택
         const summarizeConsequence = (log: string): string => {
           // Day 태그 제거
           const cleanLog = log.replace(/\[Day \d+\]\s*/g, '').trim();
-          // 첫 문장 또는 50자까지
-          const firstSentence = cleanLog.split(/[.!?。]/)[0];
-          return firstSentence.length > 50
-            ? firstSentence.substring(0, 47) + '...'
-            : firstSentence;
+
+          // 문장 분리
+          const sentences = cleanLog.split(/(?<=[.!?。])\s*/).filter(s => s.trim().length > 5);
+
+          if (sentences.length === 0) {
+            return cleanLog.substring(0, 50);
+          }
+
+          // 장면 묘사 패턴 (스킵 대상)
+          const sceneDescPatterns = [
+            /^.{0,10}(대피소|창고|통로|공기|냄새|어둠|빛|바람|소리|침묵)/,
+            /^.{0,10}(차갑|따뜻|습|건조|퀴퀴|먼지|얼어붙)/,
+            /^.{0,10}(안은|속에서|사이로|위로|아래로)/,
+          ];
+
+          // 의미있는 문장 찾기 (캐릭터 언급, 대화, 감정 표현 우선)
+          const meaningfulSentence = sentences.find(sentence => {
+            // 장면 묘사는 스킵
+            if (sceneDescPatterns.some(pattern => pattern.test(sentence))) {
+              return false;
+            }
+            // 캐릭터 이름, 대화, 감정 포함 시 우선
+            const hasMeaning =
+              sentence.includes('라고') || // 대화
+              sentence.includes('느꼈다') || // 감정
+              sentence.includes('생각했다') || // 생각
+              /[가-힣]{2,}(이|가|은|는|을|를)/.test(sentence); // 주어+조사
+            return hasMeaning;
+          });
+
+          // 의미있는 문장이 없으면 마지막 문장 사용 (결론이 보통 마지막에)
+          const selectedSentence = meaningfulSentence || sentences[sentences.length - 1] || sentences[0];
+          const trimmed = selectedSentence.trim();
+
+          return trimmed.length > 50
+            ? trimmed.substring(0, 47) + '...'
+            : trimmed;
         };
 
         const keyDecision = {

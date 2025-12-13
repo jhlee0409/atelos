@@ -15,6 +15,10 @@
 - `app/api/generate-ending/route.ts`: 동적 엔딩 생성 API
 - `app/game/[scenarioId]/GameClient.tsx`: generateDynamicEnding()
 
+**관련 시스템** (★ 2025-12-13):
+- 주인공 식별 시스템: characterArcs에서 NPC만 추출하여 엔딩에 반영
+- 프롬프트 품질 강화: `lib/prompt-enhancers.ts`로 엔딩 서사 품질 개선
+
 ---
 
 ## 2. Stage 4에서 받는 데이터
