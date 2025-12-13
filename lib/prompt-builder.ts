@@ -233,6 +233,9 @@ export const buildOptimizedGamePrompt = (
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태
     worldState?: WorldState; // v1.2: 월드 상태 (위치, 발견물)
     metCharacters?: string[]; // v1.2: 만난 캐릭터 (프롬프트 필터링용)
+    // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
+    npcRelationshipStates?: { relationId: string; visibility: string }[]; // 관계 가시성 상태
+    protagonistKnowledge?: import('@/types').ProtagonistKnowledge; // 주인공이 아는 정보
   } = {},
 ): GamePromptData => {
   const {
@@ -582,6 +585,47 @@ ${dialogueClues.length > 0 ? `
     }
   }
 
+  // [Stage 2] 2025 Enhanced - 숨겨진 NPC 관계 가이드라인
+  let hiddenRelationshipSection = '';
+  if (options.npcRelationshipStates && options.npcRelationshipStates.length > 0) {
+    const hiddenRelations = options.npcRelationshipStates.filter(r => r.visibility === 'hidden');
+    const hintedRelations = options.npcRelationshipStates.filter(r => r.visibility === 'hinted');
+    const revealedRelations = options.npcRelationshipStates.filter(r => r.visibility === 'revealed');
+
+    if (hiddenRelations.length > 0 || hintedRelations.length > 0) {
+      hiddenRelationshipSection = `
+### [Stage 2] NPC 관계 노출 가이드라인 ###
+**숨겨진 관계 (${hiddenRelations.length}개)**: 이 관계들은 절대 언급하지 마세요. NPC들이 서로 아는 것처럼 행동하지 마세요.
+**힌트된 관계 (${hintedRelations.length}개)**: 미묘한 암시만 가능합니다. 직접적인 언급은 금지.
+**공개된 관계 (${revealedRelations.length}개)**: 자유롭게 언급 가능합니다.
+`;
+    }
+  }
+
+  // [Stage 2] 2025 Enhanced - 주인공 지식 시스템
+  let protagonistKnowledgeSection = '';
+  if (options.protagonistKnowledge) {
+    const pk = options.protagonistKnowledge;
+    const metCount = pk.metCharacters?.length || 0;
+    const discoveredRelCount = pk.discoveredRelationships?.length || 0;
+    const hintedRelCount = pk.hintedRelationships?.length || 0;
+    const infoCount = pk.informationPieces?.length || 0;
+
+    // 주인공이 알고 있는 정보 요약
+    if (infoCount > 0) {
+      const recentInfo = pk.informationPieces?.slice(-5).map(i => `- ${i.content}`).join('\n') || '';
+      protagonistKnowledgeSection = `
+### [Stage 2] 주인공이 알고 있는 정보 ###
+만난 캐릭터: ${metCount}명 | 알려진 관계: ${discoveredRelCount}개 | 힌트된 관계: ${hintedRelCount}개 | 정보 조각: ${infoCount}개
+
+최근 알게 된 정보:
+${recentInfo}
+
+**AI 지시**: 주인공이 모르는 정보는 선택지나 서술에 포함하지 마세요. 주인공의 지식 범위 내에서만 서술하세요.
+`;
+    }
+  }
+
   const systemPrompt = `Korean survival simulation AI for "${scenario.title}".
 
 Background: ${scenario.synopsis.substring(0, 300)}...
@@ -674,7 +718,9 @@ ${phaseGuideline}
 ${keyDecisionsSection}
 ${narrativeSeedsSection}
 ${actionEngagementSection}
-${discoveredInfoSection}`;
+${discoveredInfoSection}
+${hiddenRelationshipSection}
+${protagonistKnowledgeSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext

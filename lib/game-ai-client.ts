@@ -649,6 +649,9 @@ export const generateGameResponse = async (
           characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
           worldState: saveState.context.worldState, // v1.2: 월드 상태
           metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
+          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
+          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
+          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
         },
       );
     } else {
@@ -683,6 +686,9 @@ export const generateGameResponse = async (
           characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
           worldState: saveState.context.worldState, // v1.2: 월드 상태
           metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
+          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
+          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
+          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
         },
       );
     }

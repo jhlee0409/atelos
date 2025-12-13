@@ -1410,13 +1410,56 @@ export default function GameClient({ scenario }: GameClientProps) {
               });
             }
 
+            // =================================================================
+            // [Stage 2] 스토리 오프닝 후 상태 업데이트
+            // protagonistKnowledge를 업데이트하여 첫 캐릭터를 만났음을 기록
+            // =================================================================
+            const firstCharacter = scenario.storyOpening?.firstCharacterToMeet;
+            const introSequence = scenario.storyOpening?.characterIntroductionSequence;
+            const firstInSequence = introSequence?.find((s) => s.order === 1);
+            const metCharacterName = firstInSequence?.characterName || firstCharacter;
+
+            // metCharacters 업데이트 (이미 포함되어 있지 않은 경우만)
+            const currentMetCharacters = initialState.context.protagonistKnowledge?.metCharacters || [];
+            const updatedMetCharacters = metCharacterName && !currentMetCharacters.includes(metCharacterName)
+              ? [...currentMetCharacters, metCharacterName]
+              : currentMetCharacters;
+
+            // 첫 만남에서 얻은 기본 정보 기록
+            const initialInformationPieces = initialState.context.protagonistKnowledge?.informationPieces || [];
+            const newInformationPieces = metCharacterName
+              ? [
+                  ...initialInformationPieces,
+                  {
+                    id: `opening_meet_${metCharacterName}`,
+                    content: `${metCharacterName}을(를) 처음 만났다.`,
+                    source: 'story_opening',
+                    discoveredAt: { day: 1, action: 'opening' },
+                  },
+                ]
+              : initialInformationPieces;
+
             // 상태 업데이트 (log 대신 chatHistory 직접 설정)
             const updatedState: SaveState = {
               ...initialState,
               log: storyOpening.fullLog,
               chatHistory,
               dilemma: storyOpening.dilemma,
+              context: {
+                ...initialState.context,
+                // [Stage 2] protagonistKnowledge 업데이트
+                protagonistKnowledge: {
+                  ...initialState.context.protagonistKnowledge,
+                  metCharacters: updatedMetCharacters,
+                  informationPieces: newInformationPieces,
+                },
+              },
             };
+
+            console.log('📖 스토리 오프닝 완료 - 주인공 지식 업데이트:', {
+              metCharacters: updatedMetCharacters,
+              newInfo: newInformationPieces.length - initialInformationPieces.length,
+            });
 
             setSaveState(updatedState);
           } else {
