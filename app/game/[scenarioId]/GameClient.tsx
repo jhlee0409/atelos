@@ -199,6 +199,57 @@ const hasInsufficientAP = (
   return currentAP < cost;
 };
 
+// =============================================================================
+// 주인공 식별 시스템 (Protagonist Identification)
+// 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// =============================================================================
+
+/**
+ * 시나리오에서 주인공 이름 가져오기
+ * storyOpening.protagonistSetup.name이 설정되어 있으면 해당 이름 반환
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 주인공 이름 또는 null
+ */
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+/**
+ * 캐릭터가 주인공인지 확인
+ * "(플레이어)" 또는 protagonistSetup.name과 일치하면 주인공
+ *
+ * @param characterName 확인할 캐릭터 이름
+ * @param scenario 시나리오 데이터
+ * @returns 주인공이면 true
+ */
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+/**
+ * NPC 캐릭터만 필터링 (주인공 제외)
+ *
+ * @param characters 캐릭터 배열
+ * @param scenario 시나리오 데이터
+ * @returns NPC만 포함된 배열
+ */
+const filterNPCs = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+
+/**
+ * 주인공 캐릭터 가져오기
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 주인공 캐릭터 또는 undefined
+ */
+const getProtagonistCharacter = (scenario: ScenarioData): Character | undefined => {
+  return scenario.characters.find((c) => isProtagonist(c.characterName, scenario));
+};
+
 /**
  * 초기 만난 캐릭터 목록 생성 (storyOpening 설정 기반)
  *
@@ -223,8 +274,8 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
         .sort((a, b) => a.order - b.order)
         .map((s) => s.characterName);
     }
-    // introSequence가 없으면 모든 NPC
-    const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+    // introSequence가 없으면 모든 NPC (주인공 제외)
+    const npcs = filterNPCs(scenario.characters, scenario);
     return npcs.map((c) => c.characterName);
   }
 
@@ -247,8 +298,8 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
     return [firstCharacter];
   }
 
-  // 4. 폴백: 첫 번째 NPC 캐릭터
-  const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+  // 4. 폴백: 첫 번째 NPC 캐릭터 (주인공 제외)
+  const npcs = filterNPCs(scenario.characters, scenario);
   return npcs.length > 0 ? [npcs[0].characterName] : [];
 };
 
@@ -267,10 +318,11 @@ const getInitialTrustLevel = (
   scenario: ScenarioData
 ): number => {
   // initialRelationships에서 플레이어-캐릭터 관계 찾기
+  // 주인공은 "(플레이어)" 또는 실제 이름(protagonistSetup.name)일 수 있음
   const playerRelation = scenario.initialRelationships?.find(
     (rel) =>
-      (rel.personA === '(플레이어)' && rel.personB === characterName) ||
-      (rel.personB === '(플레이어)' && rel.personA === characterName)
+      (isProtagonist(rel.personA, scenario) && rel.personB === characterName) ||
+      (isProtagonist(rel.personB, scenario) && rel.personA === characterName)
   );
 
   return playerRelation?.value ?? 0;
@@ -541,10 +593,10 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       choice_a: '... 로딩 중 ...',
       choice_b: '... 로딩 중 ...',
     },
-    // 캐릭터 아크 초기화
+    // 캐릭터 아크 초기화 (NPC만 - 주인공 제외)
     // [Stage 1 개선 #1] trustLevel을 initialRelationships에서 가져옴
-    characterArcs: charactersWithTraits
-      .filter((c) => c.characterName !== '(플레이어)')
+    // [주인공 식별] filterNPCs로 주인공 이름 또는 (플레이어) 모두 제외
+    characterArcs: filterNPCs(charactersWithTraits, scenario)
       .map((c) => ({
         characterName: c.characterName,
         moments: [],
@@ -1196,8 +1248,8 @@ const updateSaveState = (
   }
 
   // v1.2: AI 서사에서 새로 등장한 캐릭터 자동 감지 및 metCharacters 업데이트
-  const allNpcNames = scenario.characters
-    .filter((c) => c.characterName !== '(플레이어)')
+  // [주인공 식별] filterNPCs로 주인공 제외
+  const allNpcNames = filterNPCs(scenario.characters, scenario)
     .map((c) => c.characterName);
   const currentMetCharacters = newSaveState.context.protagonistKnowledge?.metCharacters || [];
   const narrative = aiResponse.log || '';
@@ -1960,12 +2012,11 @@ export default function GameClient({ scenario }: GameClientProps) {
           return 'strategic';
         };
 
-        // AI 응답에서 영향받은 캐릭터 추출
+        // AI 응답에서 영향받은 캐릭터 추출 (주인공 제외)
         const extractImpactedCharacters = (): string[] => {
-          const characters = scenario.characters
-            .map((c) => c.characterName)
-            .filter((name) => name !== '(플레이어)');
-          return characters.filter(
+          const npcNames = filterNPCs(scenario.characters, scenario)
+            .map((c) => c.characterName);
+          return npcNames.filter(
             (name) =>
               cleanedResponse.log.includes(name) ||
               choiceDetails.includes(name),

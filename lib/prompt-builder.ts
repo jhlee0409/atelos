@@ -55,6 +55,36 @@ import {
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
 // ===========================================
 
+// =============================================================================
+// 주인공 식별 시스템 (Protagonist Identification)
+// 시나리오에서 주인공을 "(플레이어)" 또는 실제 이름으로 설정할 수 있음
+// =============================================================================
+
+/**
+ * 시나리오에서 주인공 이름 가져오기
+ */
+const getProtagonistName = (scenario: ScenarioData): string | null => {
+  return scenario.storyOpening?.protagonistSetup?.name || null;
+};
+
+/**
+ * 캐릭터가 주인공인지 확인
+ */
+const isProtagonist = (characterName: string, scenario: ScenarioData): boolean => {
+  if (characterName === '(플레이어)') return true;
+  const protagonistName = getProtagonistName(scenario);
+  return protagonistName !== null && characterName === protagonistName;
+};
+
+/**
+ * NPC 캐릭터만 필터링 (주인공 제외)
+ */
+const filterNPCsForPrompt = (characters: Character[], scenario: ScenarioData): Character[] => {
+  return characters.filter((c) => !isProtagonist(c.characterName, scenario));
+};
+
+// =============================================================================
+
 export interface GamePromptData {
   systemPrompt: string;
   userPrompt: string;
@@ -594,9 +624,8 @@ ${dialogueClues.length > 0 ? `
   const metCharacters = options.metCharacters || [];
   const hasMetFilter = metCharacters.length > 0;
 
-  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시
-  const characterInfo = scenario.characters
-    .filter((char) => char.characterName !== '(플레이어)')
+  // 핵심 캐릭터 정보 - 만난 캐릭터만 이름으로 표시 (주인공 제외)
+  const characterInfo = filterNPCsForPrompt(scenario.characters, scenario)
     .map((char) => {
       const mainTrait =
         char.currentTrait?.displayName || char.currentTrait?.traitName || char.weightedTraitTypes[0] || '일반';
@@ -1012,8 +1041,8 @@ export const buildInitialDilemmaPrompt = (
   scenario: ScenarioData,
   characters: Character[],
 ): string => {
-  // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다.
-  const npcs = characters.filter((char) => char.characterName !== '(플레이어)');
+  // 플레이어는 결정의 주체이므로, 딜레마 구성에서는 제외합니다. (주인공 식별)
+  const npcs = filterNPCsForPrompt(characters, scenario);
 
   // 장르별 서사 스타일
   const genreGuide = formatGenreStyleForPrompt(scenario.genre || [], {
@@ -1178,7 +1207,8 @@ export const buildStoryOpeningPrompt = (
   characters: Character[],
 ): string => {
   const storyOpening = scenario.storyOpening || {};
-  const npcs = characters.filter((char) => char.characterName !== '(플레이어)');
+  // [주인공 식별] 주인공 제외 (실제 이름 또는 "(플레이어)")
+  const npcs = filterNPCsForPrompt(characters, scenario);
 
   // 기본값 설정
   const openingTone = storyOpening.openingTone || 'calm';
