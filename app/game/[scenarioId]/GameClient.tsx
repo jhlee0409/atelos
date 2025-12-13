@@ -1304,6 +1304,23 @@ export default function GameClient({ scenario }: GameClientProps) {
     setIsGeneratingEnding(true);
 
     try {
+      // [Stage 5] 주인공 지식 및 NPC 관계 상태 추출
+      const protagonistKnowledge = currentState.context.protagonistKnowledge;
+      const npcRelationshipStates = currentState.context.npcRelationshipStates;
+
+      // [Stage 5] 발견된 정보 요약
+      const discoveredInfo = {
+        metCharacters: protagonistKnowledge?.metCharacters || [],
+        discoveredRelationships: protagonistKnowledge?.discoveredRelationships || [],
+        hintedRelationships: protagonistKnowledge?.hintedRelationships || [],
+        informationPieces: (protagonistKnowledge?.informationPieces || [])
+          .map(p => p.content)
+          .slice(-20), // 최근 20개 정보만
+        revealedNPCRelations: (npcRelationshipStates || [])
+          .filter((r: { visibility: string }) => r.visibility !== 'hidden')
+          .map((r: { relationId: string; visibility: string }) => `${r.relationId}(${r.visibility})`),
+      };
+
       const response = await fetch('/api/generate-ending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1323,6 +1340,8 @@ export default function GameClient({ scenario }: GameClientProps) {
             relationships: currentState.community.hiddenRelationships,
             day: currentDay,
           },
+          // [Stage 5] 추가 컨텍스트
+          discoveredInfo,
         }),
       });
 

@@ -198,6 +198,14 @@ function buildUserPrompt(
     stats: Record<string, number>;
     relationships: Record<string, number>;
     day: number;
+  },
+  // [Stage 5] 발견된 정보 (optional)
+  discoveredInfo?: {
+    metCharacters: string[];
+    discoveredRelationships: string[];
+    hintedRelationships: string[];
+    informationPieces: string[];
+    revealedNPCRelations: string[];
   }
 ): string {
   // 행동 히스토리를 분석 가능한 형태로 변환
@@ -315,7 +323,24 @@ ${dynamicEndingConfig.endingToneHints.join(', ')}
 5. 모든 주요 스레드가 해결되어야 합니다
 6. 플레이어가 투자한 관계는 결말에서 보상받아야 합니다
 7. 한국어로 작성하세요
-</critical_requirements>`;
+</critical_requirements>
+
+${discoveredInfo ? `<discovered_knowledge>
+## [Stage 5] 플레이어가 발견한 정보
+
+### 만난 캐릭터
+${discoveredInfo.metCharacters.length > 0 ? discoveredInfo.metCharacters.join(', ') : '없음'}
+
+### 알게 된 NPC 관계
+- 직접 발견: ${discoveredInfo.discoveredRelationships.length > 0 ? discoveredInfo.discoveredRelationships.join(', ') : '없음'}
+- 힌트 얻음: ${discoveredInfo.hintedRelationships.length > 0 ? discoveredInfo.hintedRelationships.join(', ') : '없음'}
+- 공개된 관계: ${discoveredInfo.revealedNPCRelations.length > 0 ? discoveredInfo.revealedNPCRelations.join(', ') : '없음'}
+
+### 획득한 정보 조각 (최근 20개)
+${discoveredInfo.informationPieces.length > 0 ? discoveredInfo.informationPieces.map((info, i) => `${i + 1}. ${info}`).join('\n') : '없음'}
+
+**참고**: 위 정보는 플레이어가 직접 발견한 것입니다. 결말에서 이 정보를 활용하여 플레이어의 탐색과 대화 노력을 보상해주세요.
+</discovered_knowledge>` : ''}`;
 }
 
 // =============================================================================
@@ -337,6 +362,14 @@ export interface GenerateEndingRequest {
     stats: Record<string, number>;
     relationships: Record<string, number>;
     day: number;
+  };
+  // [Stage 5] 발견된 정보 (optional for backwards compatibility)
+  discoveredInfo?: {
+    metCharacters: string[];
+    discoveredRelationships: string[];
+    hintedRelationships: string[];
+    informationPieces: string[];
+    revealedNPCRelations: string[];
   };
 }
 
@@ -374,11 +407,13 @@ export async function POST(request: Request) {
     });
 
     // 프롬프트 생성
+    // [Stage 5] discoveredInfo 전달
     const userPrompt = buildUserPrompt(
       body.scenario,
       body.dynamicEndingConfig,
       body.actionHistory,
-      body.finalState
+      body.finalState,
+      body.discoveredInfo
     );
 
     // AI 호출
