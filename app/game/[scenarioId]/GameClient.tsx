@@ -1165,6 +1165,68 @@ const updateSaveState = (
       locations_discovered
     );
     console.log('🗺️ 새로 발견된 장소:', locations_discovered.map((l) => l.name).join(', '));
+
+    // [Stage 4] 발견된 장소를 protagonistKnowledge.informationPieces에도 추가
+    if (newSaveState.context.protagonistKnowledge) {
+      const currentDay = newSaveState.context.currentDay || 1;
+      locations_discovered.forEach((loc) => {
+        const newInfoPiece = {
+          id: `location_${loc.name}_${Date.now()}`,
+          content: `${loc.name} 발견: ${loc.description || '새로운 장소'}`,
+          source: {
+            type: 'exploration' as const,
+            locationId: loc.name,
+          },
+          discoveredAt: {
+            day: currentDay,
+            turn: newSaveState.context.turnsInCurrentDay || 0,
+          },
+        };
+
+        if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+          newSaveState.context.protagonistKnowledge.informationPieces = [];
+        }
+        newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+      });
+      console.log(`📝 주인공 지식 업데이트: ${locations_discovered.length}개 장소 발견 정보 추가`);
+    }
+  }
+
+  // [Stage 4] NPC 관계 힌트 감지 및 npcRelationshipStates 업데이트
+  // AI 서사에서 숨겨진 NPC 관계가 언급되면 visibility를 'hinted' 또는 'revealed'로 변경
+  if (newSaveState.context.npcRelationshipStates && scenario.storyOpening?.hiddenNPCRelationships) {
+    const narrative = aiResponse.log || '';
+    const hiddenRelationships = scenario.storyOpening.hiddenNPCRelationships;
+
+    hiddenRelationships.forEach((rel) => {
+      const relState = newSaveState.context.npcRelationshipStates?.find(
+        (r: { relationId: string }) => r.relationId === rel.relationId
+      );
+
+      if (relState && relState.visibility === 'hidden') {
+        // 관계에 연결된 두 캐릭터 이름을 찾음
+        const relatedChars = rel.relationId.split('-');
+
+        // 서사에서 두 캐릭터가 함께 언급되면 힌트 상태로 변경
+        const bothMentioned = relatedChars.length >= 2 &&
+          relatedChars.every((charName: string) => narrative.includes(charName));
+
+        if (bothMentioned) {
+          relState.visibility = 'hinted';
+          console.log(`💡 NPC 관계 힌트: ${rel.relationId} -> hinted`);
+
+          // protagonistKnowledge에 힌트된 관계 추가
+          if (newSaveState.context.protagonistKnowledge) {
+            if (!newSaveState.context.protagonistKnowledge.hintedRelationships) {
+              newSaveState.context.protagonistKnowledge.hintedRelationships = [];
+            }
+            if (!newSaveState.context.protagonistKnowledge.hintedRelationships.includes(rel.relationId)) {
+              newSaveState.context.protagonistKnowledge.hintedRelationships.push(rel.relationId);
+            }
+          }
+        }
+      }
+    });
   }
 
   return newSaveState;
