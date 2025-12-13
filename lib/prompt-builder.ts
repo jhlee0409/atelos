@@ -39,6 +39,18 @@ import {
   type ActionSynergy,
 } from './action-engagement-system';
 
+// v2.4: Prompt Quality Enhancement System (품질 강화)
+import {
+  generateEnhancedPromptGuidelines,
+  generateChoiceDiversityGuideline,
+  generateCharacterBalancingGuideline,
+  generateContextBridge,
+  LANGUAGE_RULES,
+  CHOICE_FORMAT_RULES,
+  EMOTIONAL_EXPRESSION_RULES,
+  STAT_CHANGE_RULES,
+} from './prompt-enhancers';
+
 // ===========================================
 // 토큰 최적화를 위한 계층화된 프롬프트 시스템
 // ===========================================
@@ -559,6 +571,18 @@ ${dialogueClues.length > 0 ? `
     3, // 라이트 모드에서는 최근 3개만
   );
 
+  // v2.4: 프롬프트 품질 강화 시스템 - 선택지 다양성, 캐릭터 균형, 주제 순환
+  const qualityEnhancementSection = generateEnhancedPromptGuidelines({
+    scenario,
+    keyDecisions: options.keyDecisions || [],
+    characterArcs: options.characterArcs || [],
+    metCharacters: options.metCharacters || [],
+    currentDay,
+    totalDays,
+    recentChoiceTexts: options.recentChoiceTexts || [],
+    actionContext: options.actionContext,
+  });
+
   const currentStats = Object.entries(playerState.stats)
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
@@ -765,7 +789,8 @@ ${narrativeSeedsSection}
 ${actionEngagementSection}
 ${discoveredInfoSection}
 ${hiddenRelationshipSection}
-${protagonistKnowledgeSection}`;
+${protagonistKnowledgeSection}
+${qualityEnhancementSection}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
