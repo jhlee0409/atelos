@@ -1568,12 +1568,49 @@ export default function GameClient({ scenario }: GameClientProps) {
         });
       } else {
         console.error('❌ 동적 엔딩 생성 실패:', result.error);
+        // Fallback: 기본 시간 초과 엔딩 트리거
+        triggerFallbackEnding(currentDay);
       }
     } catch (error) {
       console.error('❌ 동적 엔딩 API 오류:', error);
+      // Fallback: 기본 시간 초과 엔딩 트리거
+      triggerFallbackEnding(currentDay);
     } finally {
       setIsGeneratingEnding(false);
     }
+  };
+
+  /**
+   * Dynamic Ending 실패 시 fallback 엔딩 트리거
+   */
+  const triggerFallbackEnding = (currentDay: number) => {
+    console.log('🔄 Fallback 엔딩 트리거 (Dynamic Ending 실패)');
+
+    // 시나리오의 ENDING_TIME_UP 먼저 찾기
+    let fallbackEnding = scenario.endingArchetypes?.find(
+      (e) => e.endingId === 'ENDING_TIME_UP'
+    ) || null;
+
+    // 없으면 기본 엔딩 생성
+    if (!fallbackEnding) {
+      const totalDays = scenario.endCondition?.value || 7;
+      fallbackEnding = {
+        endingId: 'DEFAULT_TIME_UP',
+        title: '결단의 시간',
+        description: `${totalDays}일의 시간이 흘렀다. 모든 결정과 희생이 이 순간을 위해 존재했다. 당신과 당신의 공동체는 이제 운명의 심판을 기다린다.`,
+        systemConditions: [],
+        isGoalSuccess: false,
+      };
+    }
+
+    // [PlayTestLogger] Fallback 엔딩 로깅
+    playTestLogger.logStage5Ending('fallback', {
+      endingId: fallbackEnding.endingId,
+      title: fallbackEnding.title,
+      reason: 'Dynamic Ending API failure',
+    });
+
+    setTriggeredEnding(fallbackEnding);
   };
 
   // 엔딩 Day 경고 체크
