@@ -10,7 +10,7 @@
 
 기존 ATELOS 엔딩 시스템의 한계:
 - 사전 정의된 `EndingArchetype[]`로 인한 예측 가능성
-- `systemConditions` 조합 폭발 (스탯 × 플래그 × 관계)
+- `systemConditions` 조합 폭발 (스탯 × 관계)
 - 밸런싱 난이도 (특정 루트만 도달 가능/불가능)
 - 창작자의 모든 가능성 예측 부담
 
@@ -67,11 +67,11 @@
 
 ### 2.2 ScenarioData 변경
 
-**제거 대상:**
+**제거/Deprecated 대상:**
 ```typescript
-// ❌ 제거
-endingArchetypes: EndingArchetype[];
-flagDictionary: FlagData[];  // → 단순화 (선택적 유지)
+// ❌ Deprecated (v1.4)
+endingArchetypes: EndingArchetype[];  // → DynamicEndingConfig로 대체
+flagDictionary: FlagData[];           // → ActionHistory.significantEvents로 대체
 emergentNarrative: EmergentNarrativeConfig;  // → 동적 시스템으로 대체
 ```
 

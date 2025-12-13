@@ -30,10 +30,6 @@ import { toast } from 'sonner';
 import {
   generateWithAI,
   type StoryOpeningResult,
-  type CharacterIntroductionsResult,
-  type HiddenRelationshipsResult,
-  type CharacterRevelationsResult,
-  type EmergentNarrativeResult,
 } from '@/lib/ai-scenario-generator';
 
 type Props = {
@@ -105,12 +101,8 @@ const EXPECTED_TIMING_OPTIONS: {
 ];
 
 export default function StoryOpeningContent({ scenario, setScenario }: Props) {
-  // AI 생성 로딩 상태
+  // AI 생성 로딩 상태 (v1.4: story_opening만 AI 생성 지원)
   const [isGeneratingOpening, setIsGeneratingOpening] = useState(false);
-  const [isGeneratingIntroductions, setIsGeneratingIntroductions] = useState(false);
-  const [isGeneratingHiddenRels, setIsGeneratingHiddenRels] = useState(false);
-  const [isGeneratingRevelations, setIsGeneratingRevelations] = useState(false);
-  const [isGeneratingEmergent, setIsGeneratingEmergent] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   // 스토리 오프닝 업데이트 헬퍼
@@ -202,149 +194,15 @@ ${characterDetails}`;
     }
   }, [buildScenarioContext]);
 
-  // 캐릭터 소개 시퀀스 AI 생성
-  const handleGenerateIntroductions = useCallback(async () => {
-    if (scenario.characters.length < 2) {
-      toast.error('캐릭터가 2명 이상 필요합니다');
-      return;
-    }
-    setIsGeneratingIntroductions(true);
-    try {
-      const { scenarioInput, context } = buildScenarioContext();
-      const response = await generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context);
+  // [v1.4 Deprecated] 2025 Enhanced 기능들은 Dynamic Ending System 도입으로 수동 입력만 지원
+  // ActionHistory 기반 동적 엔딩 시스템이 이 기능들을 대체합니다
+  const handleShowDeprecatedMessage = useCallback(() => {
+    toast.info('이 기능의 AI 생성은 지원 종료되었습니다. 수동으로 입력해 주세요.', {
+      description: 'Dynamic Ending System 도입으로 ActionHistory 기반 동적 엔딩이 권장됩니다.',
+    });
+  }, []);
 
-      if (response.data?.characterIntroductionSequence) {
-        const sequence = response.data.characterIntroductionSequence.map((intro) => ({
-          characterName: intro.characterName,
-          order: intro.order,
-          encounterContext: intro.encounterContext,
-          firstImpressionKeywords: intro.firstImpressionKeywords,
-          expectedTiming: intro.expectedTiming,
-        }));
-
-        // 첫 번째 캐릭터 찾기 (order=1)
-        const firstInSequence = sequence.find((s) => s.order === 1);
-
-        // firstCharacterToMeet 자동 동기화
-        updateStoryOpening({
-          characterIntroductionSequence: sequence,
-          // 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
-          ...(firstInSequence && {
-            firstCharacterToMeet: firstInSequence.characterName,
-            firstEncounterContext: firstInSequence.encounterContext,
-          }),
-        });
-        setUseIntroSequence(true);
-        toast.success('캐릭터 소개 시퀀스가 생성되었습니다 (첫 캐릭터 자동 동기화됨)');
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '캐릭터 소개 시퀀스 생성에 실패했습니다');
-    } finally {
-      setIsGeneratingIntroductions(false);
-    }
-  }, [buildScenarioContext, scenario.characters.length]);
-
-  // 숨겨진 NPC 관계 AI 생성
-  const handleGenerateHiddenRelationships = useCallback(async () => {
-    if (scenario.characters.length < 2) {
-      toast.error('캐릭터가 2명 이상 필요합니다');
-      return;
-    }
-    setIsGeneratingHiddenRels(true);
-    try {
-      const { scenarioInput, context } = buildScenarioContext();
-      const response = await generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context);
-
-      if (response.data?.hiddenNPCRelationships) {
-        updateStoryOpening({
-          hiddenNPCRelationships: response.data.hiddenNPCRelationships.map((rel) => ({
-            relationId: rel.relationId,
-            characterA: rel.characterA,
-            characterB: rel.characterB,
-            actualValue: rel.actualValue,
-            relationshipType: rel.relationshipType,
-            backstory: rel.backstory,
-            visibility: rel.visibility as 'hidden' | 'hinted',
-            discoveryMethods: [{
-              method: rel.discoveryMethod,
-              revealsTo: 'revealed' as const,
-              hintText: rel.discoveryHint,
-            }],
-          })),
-        });
-        toast.success('숨겨진 NPC 관계가 생성되었습니다');
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '숨겨진 관계 생성에 실패했습니다');
-    } finally {
-      setIsGeneratingHiddenRels(false);
-    }
-  }, [buildScenarioContext, scenario.characters.length]);
-
-  // 점진적 캐릭터 공개 AI 생성
-  const handleGenerateRevelations = useCallback(async () => {
-    if (scenario.characters.length < 1) {
-      toast.error('캐릭터가 1명 이상 필요합니다');
-      return;
-    }
-    setIsGeneratingRevelations(true);
-    try {
-      const { scenarioInput, context } = buildScenarioContext();
-      const response = await generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context);
-
-      if (response.data?.characterRevelations) {
-        updateStoryOpening({
-          characterRevelations: response.data.characterRevelations.map((rev) => ({
-            characterName: rev.characterName,
-            revelationLayers: rev.revelationLayers,
-            ultimateSecret: rev.ultimateSecret,
-          })),
-        });
-        toast.success('점진적 캐릭터 공개가 생성되었습니다');
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '캐릭터 공개 설정 생성에 실패했습니다');
-    } finally {
-      setIsGeneratingRevelations(false);
-    }
-  }, [buildScenarioContext, scenario.characters.length]);
-
-  // 이머전트 내러티브 AI 생성 (ActionHistory 기반)
-  const handleGenerateEmergentNarrative = useCallback(async () => {
-    if (scenario.characters.length < 2) {
-      toast.error('캐릭터가 2명 이상 필요합니다');
-      return;
-    }
-    setIsGeneratingEmergent(true);
-    try {
-      const { scenarioInput, context } = buildScenarioContext();
-      const response = await generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context);
-
-      if (response.data) {
-        updateStoryOpening({
-          emergentNarrative: {
-            enabled: response.data.enabled,
-            triggers: response.data.triggers.map((trigger) => ({
-              triggerId: trigger.triggerId,
-              name: trigger.name,
-              conditions: trigger.conditions,
-              generatedEvent: trigger.generatedEvent,
-              triggered: false, // 초기 상태
-              oneTime: trigger.oneTime,
-            })),
-            dynamicEventGuidelines: response.data.dynamicEventGuidelines,
-          },
-        });
-        toast.success('이머전트 내러티브 트리거가 생성되었습니다');
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '이머전트 내러티브 생성에 실패했습니다');
-    } finally {
-      setIsGeneratingEmergent(false);
-    }
-  }, [buildScenarioContext, scenario.characters.length]);
-
-  // 모든 2025 Enhanced 기능 일괄 생성
+  // [v1.4] 스토리 오프닝만 AI 생성 (2025 Enhanced 기능은 수동 입력)
   const handleGenerateAllEnhanced = useCallback(async () => {
     if (scenario.characters.length < 2) {
       toast.error('캐릭터가 2명 이상 필요합니다');
@@ -353,65 +211,24 @@ ${characterDetails}`;
     setIsGeneratingAll(true);
     try {
       const { scenarioInput, context } = buildScenarioContext();
-
-      const [openingRes, introRes, hiddenRes, revRes] = await Promise.all([
-        generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
-        generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context),
-        generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context),
-        generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context),
-      ]);
-
-      const updates: Partial<StoryOpening> = {};
+      const openingRes = await generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context);
 
       if (openingRes.data) {
-        updates.prologue = openingRes.data.prologue;
-        updates.incitingIncident = openingRes.data.incitingIncident;
-        updates.firstCharacterToMeet = openingRes.data.firstCharacterToMeet;
-        updates.firstEncounterContext = openingRes.data.firstEncounterContext;
-        updates.protagonistSetup = openingRes.data.protagonistSetup;
-        updates.openingTone = openingRes.data.openingTone;
-        updates.characterIntroductionStyle = openingRes.data.characterIntroductionStyle;
-        updates.timeOfDay = openingRes.data.timeOfDay;
-        updates.openingLocation = openingRes.data.openingLocation;
-        updates.thematicElements = openingRes.data.thematicElements;
-        updates.npcRelationshipExposure = openingRes.data.npcRelationshipExposure || 'hidden';
+        updateStoryOpening({
+          prologue: openingRes.data.prologue,
+          incitingIncident: openingRes.data.incitingIncident,
+          firstCharacterToMeet: openingRes.data.firstCharacterToMeet,
+          firstEncounterContext: openingRes.data.firstEncounterContext,
+          protagonistSetup: openingRes.data.protagonistSetup,
+          openingTone: openingRes.data.openingTone,
+          characterIntroductionStyle: openingRes.data.characterIntroductionStyle,
+          timeOfDay: openingRes.data.timeOfDay,
+          openingLocation: openingRes.data.openingLocation,
+          thematicElements: openingRes.data.thematicElements,
+          npcRelationshipExposure: openingRes.data.npcRelationshipExposure || 'hidden',
+        });
+        toast.success('스토리 오프닝이 생성되었습니다');
       }
-
-      if (introRes.data?.characterIntroductionSequence) {
-        updates.characterIntroductionSequence = introRes.data.characterIntroductionSequence;
-        setUseIntroSequence(true);
-
-        // [일관성 보장] 시퀀스의 첫 캐릭터와 firstCharacterToMeet 동기화
-        const firstInSequence = introRes.data.characterIntroductionSequence.find((s) => s.order === 1);
-        if (firstInSequence) {
-          updates.firstCharacterToMeet = firstInSequence.characterName;
-          updates.firstEncounterContext = firstInSequence.encounterContext;
-        }
-      }
-
-      if (hiddenRes.data?.hiddenNPCRelationships) {
-        updates.hiddenNPCRelationships = hiddenRes.data.hiddenNPCRelationships.map((rel) => ({
-          relationId: rel.relationId,
-          characterA: rel.characterA,
-          characterB: rel.characterB,
-          actualValue: rel.actualValue,
-          relationshipType: rel.relationshipType,
-          backstory: rel.backstory,
-          visibility: rel.visibility as 'hidden' | 'hinted',
-          discoveryMethods: [{
-            method: rel.discoveryMethod,
-            revealsTo: 'revealed' as const,
-            hintText: rel.discoveryHint,
-          }],
-        }));
-      }
-
-      if (revRes.data?.characterRevelations) {
-        updates.characterRevelations = revRes.data.characterRevelations;
-      }
-
-      updateStoryOpening(updates);
-      toast.success('스토리 오프닝 시스템이 모두 생성되었습니다');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '생성에 실패했습니다');
     } finally {
@@ -419,7 +236,7 @@ ${characterDetails}`;
     }
   }, [buildScenarioContext, scenario.characters.length]);
 
-  const isAnyGenerating = isGeneratingOpening || isGeneratingIntroductions || isGeneratingHiddenRels || isGeneratingRevelations || isGeneratingEmergent || isGeneratingAll;
+  const isAnyGenerating = isGeneratingOpening || isGeneratingAll;
 
   // 첫 번째 캐릭터 선택을 위한 옵션
   const characterOptions = scenario.characters
@@ -907,21 +724,11 @@ ${characterDetails}`;
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerateIntroductions}
-              disabled={isAnyGenerating || scenario.characters.length < 2}
-              className="border-indigo-300 hover:bg-indigo-50"
+              onClick={handleShowDeprecatedMessage}
+              className="border-gray-300 text-gray-500 hover:bg-gray-50"
             >
-              {isGeneratingIntroductions ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  AI 생성
-                </>
-              )}
+              <Lock className="mr-2 h-4 w-4" />
+              수동 입력
             </Button>
           </div>
         </CardHeader>
@@ -1099,21 +906,11 @@ ${characterDetails}`;
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerateHiddenRelationships}
-              disabled={isAnyGenerating || scenario.characters.length < 2}
-              className="border-rose-300 hover:bg-rose-50"
+              onClick={handleShowDeprecatedMessage}
+              className="border-gray-300 text-gray-500 hover:bg-gray-50"
             >
-              {isGeneratingHiddenRels ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  AI 생성
-                </>
-              )}
+              <Lock className="mr-2 h-4 w-4" />
+              수동 입력
             </Button>
           </div>
         </CardHeader>
@@ -1163,7 +960,7 @@ ${characterDetails}`;
             <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
               <Link2 className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p>숨겨진 NPC 관계가 없습니다.</p>
-              <p className="text-sm">AI 생성 버튼을 눌러 NPC들 간의 비밀 관계를 추가하세요.</p>
+              <p className="text-sm">수동으로 NPC들 간의 비밀 관계를 추가하세요.</p>
             </div>
           )}
         </CardContent>
@@ -1185,21 +982,11 @@ ${characterDetails}`;
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerateRevelations}
-              disabled={isAnyGenerating || scenario.characters.length < 1}
-              className="border-amber-300 hover:bg-amber-50"
+              onClick={handleShowDeprecatedMessage}
+              className="border-gray-300 text-gray-500 hover:bg-gray-50"
             >
-              {isGeneratingRevelations ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  AI 생성
-                </>
-              )}
+              <Lock className="mr-2 h-4 w-4" />
+              수동 입력
             </Button>
           </div>
         </CardHeader>
@@ -1249,7 +1036,7 @@ ${characterDetails}`;
             <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
               <Lock className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p>점진적 캐릭터 공개 설정이 없습니다.</p>
-              <p className="text-sm">AI 생성 버튼을 눌러 캐릭터별 비밀 공개 레이어를 추가하세요.</p>
+              <p className="text-sm">수동으로 캐릭터별 비밀 공개 레이어를 추가하세요.</p>
             </div>
           )}
         </CardContent>
@@ -1270,21 +1057,11 @@ ${characterDetails}`;
           <Button
             variant="outline"
             size="sm"
-            onClick={handleGenerateEmergentNarrative}
-            disabled={isAnyGenerating || scenario.characters.length < 2}
-            className="shrink-0 border-kairos-gold text-kairos-gold hover:bg-kairos-gold/10"
+            onClick={handleShowDeprecatedMessage}
+            className="shrink-0 border-gray-300 text-gray-500 hover:bg-gray-50"
           >
-            {isGeneratingEmergent ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                생성 중...
-              </>
-            ) : (
-              <>
-                <Wand2 className="mr-2 h-4 w-4" />
-                AI 자동 생성
-              </>
-            )}
+            <Lock className="mr-2 h-4 w-4" />
+            수동 입력
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">

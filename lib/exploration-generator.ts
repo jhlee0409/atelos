@@ -211,7 +211,8 @@ export const generateExplorationResult = async (
       } | null;
       rewards?: {
         statChanges?: { [key: string]: number } | null;
-        flagsAcquired?: string[] | null;
+        // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 significantDiscoveries로 대체
+        significantDiscoveries?: string[] | null;
         infoGained?: string | null;
       };
     }>(response);
@@ -236,7 +237,8 @@ export const generateExplorationResult = async (
       rewards: parsed.rewards || parsed.discoveredItem
         ? {
             statChanges: parsed.rewards?.statChanges || undefined,
-            flagsAcquired: parsed.rewards?.flagsAcquired || undefined,
+            // [v1.4] significantDiscoveries로 대체
+            significantDiscoveries: parsed.rewards?.significantDiscoveries || undefined,
             infoGained,
           }
         : undefined,
@@ -322,7 +324,8 @@ export const generateEnhancedExplorationResult = async (
       } | null;
       rewards?: {
         statChanges?: { [key: string]: number } | null;
-        flagsAcquired?: string[] | null;
+        // [v1.4 REMOVED] flagsAcquired - significantDiscoveries로 대체
+        significantDiscoveries?: string[] | null;
         infoGained?: string | null;
       };
     }>(response);
@@ -344,15 +347,18 @@ export const generateEnhancedExplorationResult = async (
       notifications.push(`발견: ${parsed.discoveredItem.name}`);
     }
 
+    // [v1.4] significantDiscoveries 통합
+    const significantDiscoveries = [
+      ...(parsed.rewards?.significantDiscoveries || []),
+      ...explorationResult.newDiscoveries.map((d) => d.name),
+    ].filter((item, index, self) => self.indexOf(item) === index); // 중복 제거
+
     return {
       locationId: location.locationId,
       narrative: parsed.narrative,
       rewards: {
         statChanges: parsed.rewards?.statChanges || undefined,
-        flagsAcquired: [
-          ...(parsed.rewards?.flagsAcquired || []),
-          ...explorationResult.newDiscoveries.flatMap((d) => d.effects?.flagsAcquired || []),
-        ].filter((flag, index, self) => self.indexOf(flag) === index), // 중복 제거
+        significantDiscoveries: significantDiscoveries.length > 0 ? significantDiscoveries : undefined,
         infoGained,
       },
       discoveredItems: explorationResult.newDiscoveries,
@@ -384,7 +390,8 @@ export const generateEnhancedExplorationResult = async (
               }
               return acc;
             }, {} as Record<string, number>),
-            flagsAcquired: explorationResult.newDiscoveries.flatMap((d) => d.effects?.flagsAcquired || []),
+            // [v1.4] significantDiscoveries로 대체
+            significantDiscoveries: explorationResult.newDiscoveries.map((d) => d.name),
           }
         : undefined,
       discoveredItems: explorationResult.newDiscoveries,

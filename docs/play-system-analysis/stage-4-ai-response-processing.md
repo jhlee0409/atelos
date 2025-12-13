@@ -37,7 +37,7 @@ interface AIResponse {
     scenarioStats: Record<string, number>;     // 스탯 변화
     survivorStatus: Array<{ name, newStatus }>;// 생존자 상태
     hiddenRelationships_change: Array<...>;    // 관계 변화
-    flags_acquired: string[];                  // 획득 플래그
+    // [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
     locations_discovered?: Array<{name, description}>; // 발견 장소
   };
 }
@@ -67,8 +67,8 @@ AIResponse
     │       ├─→ 플레이어 이름 정규화 ("나", "리더" → "(플레이어)")
     │       └─→ -100~100 범위 clamp
     │
-    ├─→ 6. flags_acquired 처리
-    │       └─→ context.flags에 적용 (boolean/count)
+    ├─→ 6. [v1.4 REMOVED] flags_acquired 처리
+    │       └─→ @deprecated - ActionHistory로 대체됨
     │
     ├─→ 7. 시간 처리 (remainingHours 또는 Day 태그)
     │
@@ -207,7 +207,7 @@ Stage 3 핸들러
             │
             ├─→ 스탯 증폭 적용 ─────→ context.scenarioStats
             ├─→ 관계 변화 적용 ─────→ community.hiddenRelationships
-            ├─→ 플래그 획득 ────────→ context.flags
+            ├─→ [v1.4 REMOVED] 플래그 획득 → ActionHistory로 대체
             ├─→ 캐릭터 아크 ────────→ characterArcs
             ├─→ 새 캐릭터 감지 ─────→ protagonistKnowledge.metCharacters ★
             ├─→ 장소 발견 ──────────→ protagonistKnowledge.informationPieces ★
@@ -216,7 +216,7 @@ Stage 3 핸들러
 
 Stage 5 (엔딩)에서 활용:
     ├─→ context.scenarioStats ─→ 엔딩 조건 체크
-    ├─→ context.flags ──────────→ 엔딩 조건 체크
+    ├─→ actionHistory ─────────→ 동적 엔딩 AI 프롬프트 (v1.4)
     ├─→ protagonistKnowledge ──→ 동적 엔딩 AI 프롬프트 ★
     └─→ npcRelationshipStates ─→ 동적 엔딩 AI 프롬프트 ★
 ```
@@ -278,7 +278,7 @@ Stage 5 (엔딩)에서 활용:
 saveState = {
   context: {
     scenarioStats: { ...amplified },      // 증폭된 스탯 값
-    flags: { ...withNewFlags },           // 새 플래그 포함
+    // [v1.4 REMOVED] flags - ActionHistory로 대체됨
     protagonistKnowledge: {
       metCharacters: [...withNewChars],   // 새로 만난 캐릭터
       hintedRelationships: [...withHints], // ★ 힌트된 관계
@@ -308,7 +308,7 @@ saveState = {
 | `protagonistKnowledge.informationPieces` | 플레이어가 아는 정보 기반 엔딩 |
 | `npcRelationshipStates` | 공개된 관계(revealed)만 엔딩에 명시 |
 | `context.scenarioStats` | 엔딩 조건 체크 |
-| `context.flags` | 엔딩 조건 체크 |
+| `actionHistory` | 동적 엔딩 조건 체크 (v1.4) |
 | `characterArcs` | 캐릭터별 엔딩 결과 |
 
 ---
@@ -317,7 +317,7 @@ saveState = {
 
 - [x] 스탯 증폭 시스템 정상 동작 확인
 - [x] 관계 변화 다양한 형식 파싱 확인
-- [x] 플래그 획득 처리 확인
+- [x] [v1.4 REMOVED] 플래그 획득 처리 → ActionHistory로 대체됨
 - [x] 캐릭터 아크 업데이트 확인
 - [x] [v1.2] 새로 만난 캐릭터 자동 감지 확인
 - [x] [Stage 4] locations_discovered → informationPieces 추가 확인

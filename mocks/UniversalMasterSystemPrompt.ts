@@ -159,10 +159,10 @@ You MUST output ONLY valid JSON in this exact structure:
   "statChanges": {
     "scenarioStats": {"statId_from_STAT_ID_LIST": change_amount},
     "survivorStatus": [{"name": "한글캐릭터이름", "newStatus": "status"}],
-    "hiddenRelationships_change": [{"pair": "한글이름A-한글이름B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"]
+    "hiddenRelationships_change": [{"pair": "한글이름A-한글이름B", "change": number}]
   }
 }
+// [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
 
 ## RELATIONSHIP FORMAT (CRITICAL)
 - **USE KOREAN NAMES**: For hiddenRelationships_change, use Korean character names ONLY

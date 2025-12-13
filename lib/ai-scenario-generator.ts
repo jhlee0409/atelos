@@ -1,5 +1,6 @@
 // AI 시나리오 생성 클라이언트 함수
 
+// v1.4: deprecated 카테고리 제거 (Dynamic Ending System 채택)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
@@ -11,11 +12,7 @@ export type GenerationCategory =
   | 'genre'
   | 'idea_suggestions'
   | 'story_opening'
-  | 'character_introductions'
-  | 'hidden_relationships'
-  | 'character_revelations'
-  | 'gameplay_config'
-  | 'emergent_narrative';
+  | 'gameplay_config';
 
 export interface GenerationContext {
   genre?: string[];
@@ -54,14 +51,6 @@ export interface StatResult {
   polarity: 'positive' | 'negative';
 }
 
-/** @deprecated Flags system has been removed. Use ActionHistory instead. */
-export interface FlagResult {
-  flagName: string;
-  type: 'boolean' | 'count';
-  description: string;
-  triggerCondition: string;
-}
-
 export interface RelationshipResult {
   personA: string;
   personB: string;
@@ -76,7 +65,7 @@ export interface EndingResult {
   isGoalSuccess: boolean;
   suggestedConditions: {
     stats: { statId: string; comparison: string; value: number }[];
-    flags: string[];
+    // [v1.4 REMOVED] flags - Dynamic Ending System에서 ActionHistory로 대체
   };
 }
 
@@ -139,94 +128,9 @@ export interface StoryOpeningResult {
 }
 
 // =============================================================================
-// 2025 Enhanced: 캐릭터 소개 시퀀스
-// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
-// =============================================================================
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export type ExpectedTiming = 'opening' | 'day1' | 'day2' | 'event-driven';
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface CharacterIntroductionResult {
-  characterName: string;
-  order: number;
-  encounterContext: string;
-  firstImpressionKeywords: string[];
-  expectedTiming: ExpectedTiming;
-}
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface CharacterIntroductionsResult {
-  characterIntroductionSequence: CharacterIntroductionResult[];
-}
-
-// =============================================================================
-// 2025 Enhanced: 숨겨진 NPC 관계
-// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
-// =============================================================================
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export type RelationshipVisibility = 'hidden' | 'hinted' | 'suspected' | 'revealed';
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export type DiscoveryMethod = 'dialogue' | 'exploration' | 'observation' | 'event' | 'item';
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface HiddenNPCRelationshipResult {
-  relationId: string;
-  characterA: string;
-  characterB: string;
-  actualValue: number;
-  relationshipType: string;
-  backstory: string;
-  visibility: 'hidden' | 'hinted';
-  discoveryHint: string;
-  discoveryMethod: DiscoveryMethod;
-}
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface HiddenRelationshipsResult {
-  hiddenNPCRelationships: HiddenNPCRelationshipResult[];
-}
-
-// =============================================================================
-// 2025 Enhanced: 점진적 캐릭터 공개
-// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
-// =============================================================================
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export type RevelationType = 'personality' | 'backstory' | 'secret' | 'motivation' | 'relationship';
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export type RevelationStyle = 'direct' | 'subtle' | 'accidental' | 'confession';
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface RevelationLayerResult {
-  trustThreshold: number;
-  revelationType: RevelationType;
-  content: string;
-  revelationStyle: RevelationStyle;
-}
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface CharacterRevelationResult {
-  characterName: string;
-  revelationLayers: RevelationLayerResult[];
-  ultimateSecret?: string;
-}
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface CharacterRevelationsResult {
-  characterRevelations: CharacterRevelationResult[];
-}
-
-// =============================================================================
 // 게임플레이 설정 (GameplayConfig Generation)
+// v1.4: 실제 게임에서 사용되는 필드만 유지
 // =============================================================================
-
-export interface RouteScoreConfigResult {
-  routeName: string;
-  actionPatterns?: { description: string; actionType?: 'choice' | 'dialogue' | 'exploration'; targetKeywords?: string[]; score: number }[];
-  statScores?: { statId: string; comparison: '>=' | '<=' | '>' | '<' | '=='; threshold: number; score: number }[];
-}
 
 export interface GameplayConfigResult {
   routeActivationRatio: number;
@@ -240,83 +144,12 @@ export interface GameplayConfigResult {
   actionPointsPerDay: number;
   criticalStatThreshold: number;
   warningStatThreshold: number;
-  routeScores: RouteScoreConfigResult[];
-  tokenBudgetMultiplier: number;
-  useGenreFallback: boolean;
-  customFallbackChoices?: {
-    prompt: string;
-    choice_a: string;
-    choice_b: string;
-  };
   reasoning: string; // AI가 왜 이렇게 설정했는지 설명
 }
 
 // =============================================================================
-// 이머전트 내러티브 (EmergentNarrative Generation)
-// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
+// AI 응답 타입
 // =============================================================================
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface StorySiftingTriggerResult {
-  triggerId: string;
-  name: string;
-  conditions: {
-    charactersMetTogether?: string[];
-    relationshipsDiscovered?: string[];
-    actionPatternKeywords?: string[];
-    statConditions?: { statId: string; comparison: 'gte' | 'lte' | 'eq'; value: number }[];
-    dayRange?: { min?: number; max?: number };
-    requiredTriggers?: string[];
-  };
-  generatedEvent: {
-    eventType: 'revelation' | 'confrontation' | 'alliance' | 'betrayal' | 'discovery';
-    eventSeed: string;
-    involvedCharacters: string[];
-    tone: 'dramatic' | 'subtle' | 'comedic' | 'tragic';
-  };
-  oneTime: boolean;
-}
-
-/** @deprecated v1.3: 플레이 시스템에서 미사용 */
-export interface EmergentNarrativeResult {
-  enabled: boolean;
-  triggers: StorySiftingTriggerResult[];
-  dynamicEventGuidelines: string;
-  reasoning: string;
-}
-
-// =============================================================================
-// 탐색 위치 설정 (Locations Generation)
-// =============================================================================
-
-/**
- * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
- * 이제 위치는 AI 서사를 통해 동적으로 발견됩니다.
- * storyOpening.openingLocation에서 시작 위치만 설정하고,
- * AI 응답의 locations_discovered 필드를 통해 새 위치가 추가됩니다.
- */
-export interface ScenarioLocationResult {
-  locationId: string;
-  name: string;
-  description: string;
-  icon: 'warehouse' | 'entrance' | 'medical' | 'roof' | 'basement' | 'quarters' | 'office' | 'corridor' | 'exterior' | 'hidden';
-  initialStatus: 'available' | 'locked' | 'hidden';
-  unlockCondition?: {
-    requiredDay?: number;
-    requiredExploration?: string;
-  };
-  dangerLevel?: 0 | 1 | 2 | 3;
-  explorationCooldown?: number;
-}
-
-/**
- * @deprecated v1.2: 동적 위치 시스템으로 대체됨.
- * 위치는 더 이상 사전 생성되지 않습니다.
- */
-export interface LocationsResult {
-  locations: ScenarioLocationResult[];
-  reasoning: string;
-}
 
 export interface AIGenerationResponse<T> {
   success: boolean;
@@ -416,29 +249,9 @@ export const CATEGORY_INFO: Record<
     description: '게임 시작 시 플레이어를 세계관에 몰입시키는 오프닝을 생성합니다.',
     placeholder: '시나리오 정보가 자동으로 사용됩니다',
   },
-  character_introductions: {
-    label: '캐릭터 소개 시퀀스',
-    description: '각 캐릭터가 주인공을 1:1로 만나는 순서와 맥락을 설계합니다.',
-    placeholder: '캐릭터 목록이 자동으로 사용됩니다',
-  },
-  hidden_relationships: {
-    label: '숨겨진 관계',
-    description: 'NPC들 간의 비밀 관계를 설계합니다. 플레이어는 게임 중 발견합니다.',
-    placeholder: '캐릭터 목록이 자동으로 사용됩니다',
-  },
-  character_revelations: {
-    label: '점진적 캐릭터 공개',
-    description: '신뢰도에 따라 캐릭터 정보가 단계적으로 공개되도록 설계합니다.',
-    placeholder: '캐릭터 목록이 자동으로 사용됩니다',
-  },
   gameplay_config: {
     label: '게임플레이 설정',
-    description: '시나리오 특성에 맞는 게임플레이 설정을 자동 생성합니다 (루트 점수, 액션 포인트 등).',
-    placeholder: '플래그, 스탯, 장르 정보가 자동으로 사용됩니다',
-  },
-  emergent_narrative: {
-    label: '이머전트 내러티브',
-    description: '플레이어 행동 조합에서 자연스럽게 발생하는 동적 스토리 이벤트 트리거를 생성합니다.',
-    placeholder: '캐릭터, 플래그, 관계 정보가 자동으로 사용됩니다',
+    description: '시나리오 특성에 맞는 게임플레이 설정을 자동 생성합니다 (액션 포인트, 서사 단계 등).',
+    placeholder: '스탯, 장르 정보가 자동으로 사용됩니다',
   },
 };

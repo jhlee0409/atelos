@@ -28,7 +28,7 @@ import {
   ScenarioOverviewResult,
   CharacterResult,
   StatResult,
-  FlagResult,
+  // [v1.4 REMOVED] FlagResult - Dynamic Ending System에서 ActionHistory로 대체
   EndingResult,
   TraitsResult,
 } from '@/lib/ai-scenario-generator';
@@ -165,7 +165,7 @@ type GenerationResult =
   | { type: 'scenario_overview'; data: ScenarioOverviewResult }
   | { type: 'characters'; data: { characters: CharacterResult[] } }
   | { type: 'stats'; data: { stats: StatResult[] } }
-  | { type: 'flags'; data: { flags: FlagResult[] } }
+  // [v1.4 REMOVED] flags type - Dynamic Ending System에서 ActionHistory로 대체
   | { type: 'endings'; data: { endings: EndingResult[] } }
   | { type: 'traits'; data: TraitsResult }
   | { type: 'keywords'; data: { keywords: string[] } }
@@ -217,8 +217,7 @@ export function AIScenarioGenerator({
         return (data as { characters: unknown[] }).characters?.length || 0;
       case 'stats':
         return (data as { stats: unknown[] }).stats?.length || 0;
-      case 'flags':
-        return (data as { flags: unknown[] }).flags?.length || 0;
+      // [v1.4 REMOVED] flags case - Dynamic Ending System에서 ActionHistory로 대체
       case 'endings':
         return (data as { endings: unknown[] }).endings?.length || 0;
       case 'traits': {
@@ -340,27 +339,7 @@ export function AIScenarioGenerator({
         );
       }
 
-      case 'flags': {
-        const flags = result.data.flags || [];
-        return (
-          <div className="space-y-2">
-            {flags.map((flag, idx) => (
-              <ExpandableResultCard
-                key={idx}
-                title={flag.flagName}
-                description={flag.description}
-                selected={selectedIndices.has(idx)}
-                onToggle={() => toggleSelection(idx)}
-              >
-                <div className="space-y-1">
-                  <div><strong>타입:</strong> {flag.type === 'boolean' ? '불린' : '카운트'}</div>
-                  <div><strong>발동 조건:</strong> {flag.triggerCondition}</div>
-                </div>
-              </ExpandableResultCard>
-            ))}
-          </div>
-        );
-      }
+      // [v1.4 REMOVED] flags case - Dynamic Ending System에서 ActionHistory로 대체
 
       case 'endings': {
         const endings = result.data.endings || [];
@@ -384,12 +363,7 @@ export function AIScenarioGenerator({
                         .join(', ')}
                     </div>
                   )}
-                  {ending.suggestedConditions?.flags?.length > 0 && (
-                    <div>
-                      <strong>플래그 조건:</strong>{' '}
-                      {ending.suggestedConditions.flags.join(', ')}
-                    </div>
-                  )}
+                  {/* [v1.4 REMOVED] suggestedConditions.flags - Dynamic Ending System에서 ActionHistory로 대체 */}
                 </div>
               </ExpandableResultCard>
             ))}

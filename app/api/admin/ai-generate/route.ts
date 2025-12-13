@@ -24,8 +24,8 @@ const getGeminiClient = (): GoogleGenerativeAI => {
 
 // 카테고리별 생성 타입
 // v1.2: 'locations' 카테고리 제거됨 (동적 위치 시스템으로 대체)
-// v1.3: 'character_introductions', 'hidden_relationships', 'character_revelations', 'emergent_narrative'
-//       카테고리 deprecated (플레이 시스템에서 미사용, ScenarioWizard에서 생성 제거)
+// v1.3: deprecated 카테고리들 제거 (플레이 시스템에서 미사용)
+// v1.4: Dynamic Ending System 채택 - flags 카테고리 불필요 (ActionHistory로 대체)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
@@ -37,11 +37,7 @@ export type GenerationCategory =
   | 'genre'
   | 'idea_suggestions'
   | 'story_opening'
-  | 'character_introductions' // @deprecated v1.3
-  | 'hidden_relationships' // @deprecated v1.3
-  | 'character_revelations' // @deprecated v1.3
-  | 'gameplay_config'
-  | 'emergent_narrative'; // @deprecated v1.3
+  | 'gameplay_config';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -329,129 +325,8 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
   },
 
   // ==========================================================================
-  // 2025 Enhanced: 1:1 캐릭터 소개 시퀀스
-  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
-  // ==========================================================================
-  character_introductions: {
-    type: SchemaType.OBJECT,
-    properties: {
-      characterIntroductionSequence: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            characterName: { type: SchemaType.STRING, description: '캐릭터 이름' },
-            order: { type: SchemaType.INTEGER, description: '소개 순서 (1부터 시작)' },
-            encounterContext: { type: SchemaType.STRING, description: '만남의 맥락 (50-100자)' },
-            firstImpressionKeywords: {
-              type: SchemaType.ARRAY,
-              items: { type: SchemaType.STRING },
-              description: '첫인상 키워드 (2-3개)',
-            },
-            expectedTiming: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              description: '만남 예상 시점',
-              enum: ['opening', 'day1', 'day2', 'event-driven'],
-            },
-          },
-          required: ['characterName', 'order', 'encounterContext', 'firstImpressionKeywords', 'expectedTiming'],
-        },
-        description: '캐릭터별 1:1 소개 시퀀스',
-      },
-    },
-    required: ['characterIntroductionSequence'],
-  },
-
-  // ==========================================================================
-  // 2025 Enhanced: 숨겨진 NPC 관계 시스템
-  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
-  // ==========================================================================
-  hidden_relationships: {
-    type: SchemaType.OBJECT,
-    properties: {
-      hiddenNPCRelationships: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            relationId: { type: SchemaType.STRING, description: '관계 ID (예: REL_001)' },
-            characterA: { type: SchemaType.STRING, description: 'NPC A 이름' },
-            characterB: { type: SchemaType.STRING, description: 'NPC B 이름' },
-            actualValue: { type: SchemaType.INTEGER, description: '실제 관계 값 (-100~100)' },
-            relationshipType: { type: SchemaType.STRING, description: '관계 성격 (예: 과거 연인, 비밀 동료)' },
-            backstory: { type: SchemaType.STRING, description: '상세 배경 (100-200자)' },
-            visibility: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              description: '초기 가시성',
-              enum: ['hidden', 'hinted'],
-            },
-            discoveryHint: { type: SchemaType.STRING, description: '발견 힌트 텍스트' },
-            discoveryMethod: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              description: '주요 발견 방법',
-              enum: ['dialogue', 'exploration', 'observation', 'event', 'item'],
-            },
-          },
-          required: ['relationId', 'characterA', 'characterB', 'actualValue', 'relationshipType', 'backstory', 'visibility', 'discoveryHint', 'discoveryMethod'],
-        },
-        description: 'NPC들 간의 숨겨진 관계',
-      },
-    },
-    required: ['hiddenNPCRelationships'],
-  },
-
-  // ==========================================================================
-  // 2025 Enhanced: 점진적 캐릭터 공개 시스템
-  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
-  // ==========================================================================
-  character_revelations: {
-    type: SchemaType.OBJECT,
-    properties: {
-      characterRevelations: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            characterName: { type: SchemaType.STRING, description: '캐릭터 이름' },
-            revelationLayers: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  trustThreshold: { type: SchemaType.INTEGER, description: '신뢰도 임계값 (-100~100)' },
-                  revelationType: {
-                    type: SchemaType.STRING,
-                    format: 'enum',
-                    description: '공개 정보 유형',
-                    enum: ['personality', 'backstory', 'secret', 'motivation', 'relationship'],
-                  },
-                  content: { type: SchemaType.STRING, description: '공개 내용 (50-100자)' },
-                  revelationStyle: {
-                    type: SchemaType.STRING,
-                    format: 'enum',
-                    description: '공개 방식',
-                    enum: ['direct', 'subtle', 'accidental', 'confession'],
-                  },
-                },
-                required: ['trustThreshold', 'revelationType', 'content', 'revelationStyle'],
-              },
-              description: '신뢰도별 공개 레이어',
-            },
-            ultimateSecret: { type: SchemaType.STRING, description: '최고 신뢰도에서만 공개되는 비밀' },
-          },
-          required: ['characterName', 'revelationLayers'],
-        },
-        description: '캐릭터별 점진적 공개 설정',
-      },
-    },
-    required: ['characterRevelations'],
-  },
-
-  // ==========================================================================
   // 게임플레이 설정 (GameplayConfig)
+  // v1.4: 실제 게임에서 사용되는 필드만 유지
   // ==========================================================================
   gameplay_config: {
     type: SchemaType.OBJECT,
@@ -486,193 +361,18 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
         type: SchemaType.NUMBER,
         description: '경고 스탯 임계값 비율 (criticalStatThreshold보다 높아야 함)',
       },
-      routeScores: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            routeName: { type: SchemaType.STRING, description: '루트 이름 (예: 탈출, 항전, 협상)' },
-            actionPatterns: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  description: { type: SchemaType.STRING, description: '패턴 설명 (예: 탈출 관련 행동)' },
-                  actionType: {
-                    type: SchemaType.STRING,
-                    format: 'enum',
-                    enum: ['choice', 'dialogue', 'exploration'],
-                    description: '액션 타입 (선택)',
-                  },
-                  targetKeywords: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING },
-                    description: '매칭할 키워드 (예: 탈출, 도망, 차량)',
-                  },
-                  score: { type: SchemaType.INTEGER, description: '점수 (10~50)' },
-                },
-                required: ['description', 'targetKeywords', 'score'],
-              },
-              description: '행동 패턴별 점수 (ActionHistory 기반)',
-            },
-            statScores: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  statId: { type: SchemaType.STRING, description: '스탯 ID' },
-                  comparison: {
-                    type: SchemaType.STRING,
-                    format: 'enum',
-                    enum: ['>=', '<=', '>', '<', '=='],
-                  },
-                  threshold: { type: SchemaType.INTEGER, description: '임계값' },
-                  score: { type: SchemaType.INTEGER, description: '점수' },
-                },
-                required: ['statId', 'comparison', 'threshold', 'score'],
-              },
-              description: '스탯 조건별 점수 (선택)',
-            },
-          },
-          required: ['routeName', 'actionPatterns'],
-        },
-        description: '루트별 점수 설정',
-      },
-      tokenBudgetMultiplier: {
-        type: SchemaType.NUMBER,
-        description: 'AI 토큰 예산 배수 (0.8~1.5, 복잡한 시나리오는 높게)',
-      },
-      useGenreFallback: {
-        type: SchemaType.BOOLEAN,
-        description: '장르 기반 폴백 선택지 사용 여부',
-      },
-      customFallbackChoices: {
-        type: SchemaType.OBJECT,
-        properties: {
-          prompt: { type: SchemaType.STRING, description: '커스텀 폴백 프롬프트' },
-          choice_a: { type: SchemaType.STRING, description: '선택지 A' },
-          choice_b: { type: SchemaType.STRING, description: '선택지 B' },
-        },
-        required: ['prompt', 'choice_a', 'choice_b'],
-      },
       reasoning: {
         type: SchemaType.STRING,
         description: '이 설정을 선택한 이유 설명',
       },
     },
-    required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'routeScores', 'tokenBudgetMultiplier', 'useGenreFallback', 'reasoning'],
+    required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'reasoning'],
   },
-
-  // ==========================================================================
-  // 이머전트 내러티브 (EmergentNarrative)
-  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
-  // ==========================================================================
-  emergent_narrative: {
-    type: SchemaType.OBJECT,
-    properties: {
-      enabled: {
-        type: SchemaType.BOOLEAN,
-        description: '이머전트 내러티브 활성화 여부',
-      },
-      triggers: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            triggerId: { type: SchemaType.STRING, description: '트리거 ID (영문, 예: trigger_alliance_reveal)' },
-            name: { type: SchemaType.STRING, description: '트리거 이름 (한글, 내부 식별용)' },
-            conditions: {
-              type: SchemaType.OBJECT,
-              properties: {
-                charactersMetTogether: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                  description: '함께 만나야 하는 캐릭터 조합',
-                },
-                relationshipsDiscovered: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                  description: '발견해야 하는 관계 (예: "캐릭터A-캐릭터B")',
-                },
-                actionPatternKeywords: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                  description: '플레이어 행동에 포함되어야 하는 키워드 조합',
-                },
-                statConditions: {
-                  type: SchemaType.ARRAY,
-                  items: {
-                    type: SchemaType.OBJECT,
-                    properties: {
-                      statId: { type: SchemaType.STRING },
-                      comparison: { type: SchemaType.STRING, format: 'enum', enum: ['gte', 'lte', 'eq'] },
-                      value: { type: SchemaType.INTEGER },
-                    },
-                    required: ['statId', 'comparison', 'value'],
-                  },
-                  description: '스탯 조건',
-                },
-                dayRange: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    min: { type: SchemaType.INTEGER, description: '최소 일차' },
-                    max: { type: SchemaType.INTEGER, description: '최대 일차' },
-                  },
-                  description: '발동 가능 일차 범위',
-                },
-                requiredTriggers: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                  description: '선행 트리거 ID 목록',
-                },
-              },
-            },
-            generatedEvent: {
-              type: SchemaType.OBJECT,
-              properties: {
-                eventType: {
-                  type: SchemaType.STRING,
-                  format: 'enum',
-                  enum: ['revelation', 'confrontation', 'alliance', 'betrayal', 'discovery'],
-                  description: '이벤트 유형',
-                },
-                eventSeed: { type: SchemaType.STRING, description: 'AI에게 전달할 이벤트 시드 (150자 이내)' },
-                involvedCharacters: {
-                  type: SchemaType.ARRAY,
-                  items: { type: SchemaType.STRING },
-                  description: '관련 캐릭터들',
-                },
-                tone: {
-                  type: SchemaType.STRING,
-                  format: 'enum',
-                  enum: ['dramatic', 'subtle', 'comedic', 'tragic'],
-                  description: '이벤트 톤',
-                },
-              },
-              required: ['eventType', 'eventSeed', 'involvedCharacters', 'tone'],
-            },
-            oneTime: { type: SchemaType.BOOLEAN, description: '1회성 여부 (true 권장)' },
-          },
-          required: ['triggerId', 'name', 'conditions', 'generatedEvent', 'oneTime'],
-        },
-        description: '스토리 시프팅 트리거 목록 (3-6개 권장)',
-      },
-      dynamicEventGuidelines: {
-        type: SchemaType.STRING,
-        description: 'AI가 동적 이벤트 생성 시 참고할 가이드라인',
-      },
-      reasoning: {
-        type: SchemaType.STRING,
-        description: '이 설정을 선택한 이유 설명',
-      },
-    },
-    required: ['enabled', 'triggers', 'dynamicEventGuidelines', 'reasoning'],
-  },
-  // v1.2: 'locations' 스키마 제거됨 - 동적 위치 시스템으로 대체
 };
 
 // 카테고리별 최적 temperature 설정
 // 창의적 작업: 0.7-0.9, 구조적 작업: 0.3-0.5
+// v1.4: deprecated 카테고리 제거, Dynamic Ending System 채택
 const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   scenario_overview: 0.8, // 창의적 - 독특한 시나리오 생성
   characters: 0.75, // 창의적 - 개성있는 캐릭터
@@ -683,19 +383,12 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   keywords: 0.6, // 중간 - 적절한 키워드
   genre: 0.4, // 구조적 - 정확한 장르 분류
   idea_suggestions: 0.9, // 매우 창의적 - 다양하고 독특한 아이디어
-  // 스토리 오프닝 시스템 (Phase 7)
   story_opening: 0.75, // 창의적 - 몰입감 있는 오프닝 생성
-  character_introductions: 0.65, // 중간 - 캐릭터 맥락에 맞는 소개
-  hidden_relationships: 0.6, // 중간 - 흥미로우면서 논리적인 숨겨진 관계
-  character_revelations: 0.65, // 중간 - 점진적 공개 레이어 설계
-  // 게임플레이 설정
   gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
-  // 이머전트 내러티브
-  emergent_narrative: 0.7, // 창의적 - 흥미로운 트리거 조합 생성
-  // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
 };
 
 // 카테고리별 maxOutputTokens 설정
+// v1.4: deprecated 카테고리 제거, Dynamic Ending System 채택
 const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   scenario_overview: 2000,
   characters: 4000, // 여러 캐릭터 생성
@@ -706,16 +399,8 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   keywords: 1000, // 간단한 목록
   genre: 1000, // 간단한 목록
   idea_suggestions: 2000, // 여러 아이디어
-  // 스토리 오프닝 시스템 (Phase 7)
   story_opening: 3000, // 프롤로그, 촉발 사건, 주인공 설정 포함
-  character_introductions: 3000, // 캐릭터별 소개 시퀀스
-  hidden_relationships: 4000, // 복잡한 숨겨진 관계 구조
-  character_revelations: 4000, // 캐릭터별 다중 레이어 공개
-  // 게임플레이 설정
-  gameplay_config: 3000, // 루트 점수 설정 + 설명
-  // 이머전트 내러티브
-  emergent_narrative: 4000, // 복잡한 트리거 조건 + 이벤트
-  // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
+  gameplay_config: 2000, // 간소화된 게임 설정 + 설명
 };
 
 interface AIGenerateRequestBody {
@@ -1231,159 +916,8 @@ ${baseContext}
     },
 
     // ========================================================================
-    // 2025 Enhanced: 1:1 캐릭터 소개 시퀀스
-    // ========================================================================
-    character_introductions: {
-      systemPrompt: `<role>캐릭터 등장 시퀀스 디자이너</role>
-
-<task>각 캐릭터가 주인공을 1:1로 만나는 순서와 맥락을 설계합니다. 영화적 구성으로 각 만남을 기억에 남게 만들어주세요.</task>
-
-<principles>
-- 각 캐릭터의 첫 등장은 그 인물의 성격과 역할을 암시해야 합니다.
-- 만남의 순서는 스토리 전개상 자연스러워야 합니다.
-- 첫인상 키워드는 AI가 캐릭터를 묘사할 때 참조합니다.
-</principles>
-
-<timing_guidelines>
-- opening: 오프닝 시퀀스에서 만남 (촉발 사건 직후)
-- day1: 1일차 중 만남
-- day2: 2일차 이후 만남
-- event-driven: 특정 이벤트/조건 충족 시 만남
-</timing_guidelines>
-
-<encounter_context_tips>
-- 캐릭터의 역할에 맞는 상황에서 만나게 하세요 (의사는 치료 상황, 군인은 방어 상황 등)
-- 첫 만남에서 갈등이나 긴장감이 있으면 더 기억에 남습니다.
-- 단순한 소개보다 상호작용이 있는 만남이 좋습니다.
-</encounter_context_tips>`,
-      userPrompt: `<request>다음 캐릭터들의 1:1 소개 시퀀스를 설계해주세요.</request>
-
-<scenario_context>
-${input}
-</scenario_context>
-${baseContext}
-
-<requirements>
-- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
-- 모든 캐릭터에 대해 소개 순서 지정 (order: 1, 2, 3...)
-- 각 만남의 구체적인 맥락 작성 (encounterContext)
-- 첫인상 키워드 2-3개 (성격, 외모, 분위기 등)
-- 만남 예상 시점 지정 (opening/day1/day2/event-driven)
-- characterName 철자가 existing_characters와 정확히 일치해야 함
-</requirements>`,
-    },
-
-    // ========================================================================
-    // 2025 Enhanced: 숨겨진 NPC 관계 시스템
-    // ========================================================================
-    hidden_relationships: {
-      systemPrompt: `<role>숨겨진 관계 설계자</role>
-
-<task>NPC들 간의 비밀 관계를 설계합니다. 플레이어(주인공)는 게임 시작 시 이 관계들을 모르며, 탐색과 대화를 통해 점진적으로 발견합니다.</task>
-
-<relationship_types>
-- 과거 연인 / 전 배우자
-- 비밀 동료 / 공모자
-- 가족 관계 (숨겨진)
-- 원수 / 적대 관계
-- 빚진 관계 / 은혜
-- 비밀 협정 / 거래
-</relationship_types>
-
-<discovery_methods>
-- dialogue: 특정 캐릭터와의 대화에서 힌트
-- exploration: 특정 장소 탐색 시 단서 발견
-- observation: 두 캐릭터가 함께 있을 때 관찰
-- event: 특정 이벤트 발생 시 드러남
-- item: 아이템(편지, 사진 등) 발견 시
-</discovery_methods>
-
-<design_principles>
-- 숨겨진 관계는 스토리 전개에 영향을 주어야 합니다.
-- 발견했을 때 "아하!" 모먼트가 있어야 합니다.
-- 너무 쉽게 발견되어서도, 너무 어려워서도 안 됩니다.
-- 힌트는 미묘하지만 돌이켜보면 납득이 가는 수준으로.
-</design_principles>`,
-      userPrompt: `<request>다음 캐릭터들 간의 숨겨진 관계를 설계해주세요.</request>
-
-<scenario_context>
-${input}
-</scenario_context>
-${baseContext}
-
-<requirements>
-- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
-- characterA와 characterB는 existing_characters와 정확히 일치해야 함
-- 캐릭터 수에 따라 2-4개의 숨겨진 관계 설계
-- 각 관계의 배경 스토리 상세히 작성
-- 발견 힌트와 발견 방법 지정
-- 초기 visibility는 hidden 또는 hinted로 설정
-- relationId는 REL_001, REL_002 형식으로
-</requirements>
-
-<critical>characterA와 characterB에 사용하는 이름은 반드시 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다. 새로운 캐릭터 이름을 만들지 마세요.</critical>`,
-    },
-
-    // ========================================================================
-    // 2025 Enhanced: 점진적 캐릭터 공개 시스템
-    // ========================================================================
-    character_revelations: {
-      systemPrompt: `<role>캐릭터 심층 설계자</role>
-
-<task>각 캐릭터의 숨겨진 면을 신뢰도에 따라 단계적으로 공개하도록 설계합니다. 플레이어와의 관계가 깊어질수록 더 깊은 비밀이 드러납니다.</task>
-
-<revelation_types>
-- personality: 겉으로 드러나지 않는 성격 측면
-- backstory: 과거 사연
-- secret: 숨기고 있는 비밀
-- motivation: 진짜 동기, 목적
-- relationship: 다른 인물과의 관계
-</revelation_types>
-
-<revelation_styles>
-- direct: 직접 말해줌 ("사실 나는...")
-- subtle: 행동이나 대화에서 자연스럽게 드러남
-- accidental: 실수로 드러남 (말실수, 물건 발견 등)
-- confession: 감정적 순간에 고백
-</revelation_styles>
-
-<trust_thresholds>
-- -50 이하: 적대적 - 숨기려 함
-- -20 ~ 20: 중립 - 표면적 정보만
-- 20 ~ 50: 우호적 - 일부 개인 정보 공개
-- 50 ~ 70: 친밀 - 과거사, 고민 공유
-- 70 ~ 90: 깊은 신뢰 - 비밀 공유
-- 90 이상: 완전한 신뢰 - 궁극의 비밀
-</trust_thresholds>
-
-<design_tips>
-- 각 캐릭터마다 3-5개의 공개 레이어 설계
-- 낮은 신뢰도에서 공개되는 정보는 표면적인 것
-- 높은 신뢰도의 비밀은 캐릭터의 핵심과 연결
-- ultimateSecret은 시나리오 전체에 영향을 줄 수 있는 중대한 비밀
-</design_tips>`,
-      userPrompt: `<request>다음 캐릭터들의 점진적 공개 레이어를 설계해주세요.</request>
-
-<scenario_context>
-${input}
-</scenario_context>
-${baseContext}
-
-<requirements>
-- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
-- characterName은 existing_characters와 정확히 일치해야 함
-- 각 캐릭터마다 3-5개의 revelationLayers 설계
-- 신뢰도 임계값은 점진적으로 증가 (예: 20, 40, 60, 80)
-- 각 레이어의 공개 내용은 구체적으로 (50-100자)
-- ultimateSecret은 가장 높은 신뢰도에서만 공개되는 핵심 비밀
-- 공개 방식(revelationStyle)은 내용에 맞게 선택
-</requirements>
-
-<critical>characterName에 사용하는 이름은 반드시 context의 existing_characters에 있는 이름과 정확히 일치해야 합니다. 새로운 캐릭터 이름을 만들지 마세요.</critical>`,
-    },
-
-    // ========================================================================
     // 게임플레이 설정 (GameplayConfig)
+    // v1.4: 실제 게임에서 사용되는 필드만 유지
     // ========================================================================
     gameplay_config: {
       systemPrompt: `<role>인터랙티브 게임 밸런스 설계자</role>
@@ -1414,35 +948,14 @@ ${baseContext}
    - 긴장감 있는 게임: 0.4-0.5
 
 6. **warningStatThreshold**: 경고 표시 비율 (critical보다 높아야 함)
-
-7. **routeScores**: 루트별 점수 설정 (ActionHistory 패턴 기반)
-   - 각 루트에 관련된 행동 패턴 키워드를 매핑
-   - 중요 패턴: 40-50점
-   - 보조 패턴: 20-30점
-   - 기본 패턴: 10-20점
-
-8. **tokenBudgetMultiplier** (0.8~1.5): AI 토큰 예산 배수
-   - 복잡한 시나리오: 1.2-1.5
-   - 단순한 시나리오: 0.8-1.0
-
-9. **useGenreFallback**: 장르 기반 폴백 선택지 사용 여부
-
-10. **customFallbackChoices** (선택): 시나리오 맞춤 폴백 선택지
 </gameplay_config_parameters>
-
-<route_design_principles>
-- 일반적으로 3개의 루트를 설계합니다: 탈출형, 방어형, 협상형
-- 각 루트는 2-4개의 관련 행동 패턴(키워드)으로 구성됩니다
-- ActionHistory에서 패턴 점수 합계가 가장 높은 루트가 현재 루트로 표시됩니다
-- 시나리오 특성에 따라 루트 이름과 구성을 조정하세요
-</route_design_principles>
 
 <genre_specific_tips>
 - **액션/스릴러**: 높은 AP(4-5), 낮은 위험 임계값, 빠른 루트 활성화
 - **미스터리/추리**: 낮은 AP(2-3), 느린 서사 전개, 높은 엔딩 체크 비율
 - **호러/서바이벌**: 중간 AP, 높은 위험 임계값, 빠른 엔딩 체크
 - **드라마/로맨스**: 낮은 AP(2-3), 느린 전개, 캐릭터 관계 중심
-- **SF/판타지**: 높은 토큰 예산, 복잡한 루트 구조
+- **SF/판타지**: 중간-높은 AP, 중간 서사 전개
 </genre_specific_tips>`,
       userPrompt: `<request>다음 시나리오에 최적화된 게임플레이 설정을 생성해주세요.</request>
 
@@ -1453,91 +966,9 @@ ${baseContext}
 
 <requirements>
 - 시나리오의 장르, 분위기, 페이스에 맞는 설정 선택
-- routeScores에 시나리오 테마에 맞는 행동 패턴 키워드 설정
-- **반드시** existing_stats에 있는 스탯만 statScores에 사용 (사용하는 경우)
-- 행동 패턴을 탈출/방어/협상 등의 루트로 분류
 - 각 설정값에 대한 이유를 reasoning에 설명
-- customFallbackChoices는 시나리오 특성이 기본 장르 폴백과 맞지 않을 때만 제공
-</requirements>
-
-<critical>
-- statScores를 사용할 경우 existing_stats 목록에 있는 statId만 사용
-- targetKeywords는 시나리오 내용에서 자연스럽게 등장할 한글 키워드를 사용
-</critical>`,
+</requirements>`,
     },
-
-    // ========================================================================
-    // 이머전트 내러티브 (EmergentNarrative)
-    // ========================================================================
-    emergent_narrative: {
-      systemPrompt: `<role>이머전트 내러티브 설계자</role>
-
-<task>플레이어의 행동 조합에서 자연스럽게 발생하는 동적 스토리 이벤트 트리거를 설계합니다.</task>
-
-<concept>
-이머전트 내러티브는 개발자가 직접 작성하지 않은 스토리 이벤트가 플레이어의 선택 조합에서 자연스럽게 "창발"하는 시스템입니다.
-예: 플레이어가 캐릭터 A와 B를 모두 만나고, 특정 행동 패턴을 보이면 → A와 B의 과거 관계가 드러나는 이벤트 발생
-</concept>
-
-<trigger_design>
-각 트리거는 다음 요소로 구성됩니다:
-1. **triggerId**: 영문 식별자 (예: trigger_alliance_reveal, trigger_betrayal_hint)
-2. **name**: 한글 이름 (예: "동맹 관계 폭로", "배신의 조짐")
-3. **conditions**: 발동 조건들
-   - charactersMetTogether: 특정 캐릭터들을 모두 만났을 때
-   - relationshipsDiscovered: 특정 관계를 발견했을 때
-   - actionPatternKeywords: 플레이어 행동에 특정 키워드들이 포함되었을 때
-   - statConditions: 스탯이 특정 조건을 만족할 때
-   - dayRange: 특정 일차 범위에서만 발동
-   - requiredTriggers: 선행 트리거가 발동된 후에만 발동
-4. **generatedEvent**: 발동 시 생성될 이벤트
-   - eventType: revelation(폭로), confrontation(대립), alliance(동맹), betrayal(배신), discovery(발견)
-   - eventSeed: AI가 이벤트 생성 시 참고할 시드 텍스트
-   - involvedCharacters: 관련 캐릭터들
-   - tone: dramatic(극적), subtle(은근), comedic(코믹), tragic(비극적)
-5. **oneTime**: 1회성 여부 (대부분 true 권장)
-</trigger_design>
-
-<event_types>
-- **revelation**: 숨겨진 정보가 드러남 (과거사, 비밀 관계)
-- **confrontation**: 캐릭터 간 대립/충돌 발생
-- **alliance**: 예상치 못한 협력 관계 형성
-- **betrayal**: 배신이나 이중 정체 폭로
-- **discovery**: 중요한 물건/정보/장소 발견
-</event_types>
-
-<design_principles>
-- 3-6개의 트리거 설계 (너무 많으면 복잡해짐)
-- 조건은 달성 가능하되 너무 쉽지 않게
-- 이벤트는 스토리에 영향을 주되 게임을 망치지 않게
-- 트리거 간 연쇄 가능하도록 설계 (requiredTriggers 활용)
-- 장르 톤에 맞는 이벤트 유형 선택
-</design_principles>`,
-      userPrompt: `<request>다음 시나리오에 맞는 이머전트 내러티브 트리거를 설계해주세요.</request>
-
-<scenario_context>
-${input}
-</scenario_context>
-${baseContext}
-
-<requirements>
-- enabled는 항상 true로 설정
-- 3-6개의 트리거 설계
-- **반드시** existing_characters 목록에 있는 캐릭터 이름만 사용
-- actionPatternKeywords는 시나리오 테마에 맞는 한글 키워드 사용
-- **반드시** existing_stats 목록에 있는 스탯만 statConditions에 사용
-- eventSeed는 구체적이고 AI가 이벤트 생성 시 참고할 수 있도록 작성 (150자 이내)
-- dynamicEventGuidelines는 전반적인 이벤트 생성 가이드라인 (200자 이내)
-- reasoning에 설계 의도 설명
-</requirements>
-
-<critical>
-- charactersMetTogether, involvedCharacters는 existing_characters에 있는 이름만 사용
-- actionPatternKeywords는 시나리오 내용에서 자연스럽게 등장할 한글 키워드 사용
-- statConditions의 statId는 existing_stats에 있는 ID만 사용
-</critical>`,
-    },
-    // v1.2: 'locations' 프롬프트 제거됨 - 동적 위치 시스템으로 대체
   };
 
   return prompts[category];
@@ -1548,9 +979,9 @@ export async function POST(request: NextRequest) {
     const body: AIGenerateRequestBody = await request.json();
     const { category, input, context } = body;
 
-    // idea_suggestions, gameplay_config, emergent_narrative는 빈 입력 허용 (컨텍스트 기반 자동 생성)
-    // v1.2: 'locations' 제거됨 - 동적 위치 시스템으로 대체
-    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config', 'emergent_narrative'];
+    // idea_suggestions, gameplay_config는 빈 입력 허용 (컨텍스트 기반 자동 생성)
+    // v1.4: deprecated 카테고리 제거
+    const categoriesAllowingEmptyInput = ['idea_suggestions', 'gameplay_config'];
     if (!category || (!categoriesAllowingEmptyInput.includes(category) && !input)) {
       return NextResponse.json(
         { error: 'category와 input은 필수입니다.' },

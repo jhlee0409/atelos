@@ -659,8 +659,7 @@ export interface RelationshipChangeRecord {
 export interface ChangeSummaryData {
   statChanges: StatChangeRecord[];
   relationshipChanges: RelationshipChangeRecord[];
-  /** @deprecated Flags system removed. */
-  flagsAcquired?: string[];
+  // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 ActionHistory로 대체
   timestamp: number;
 }
 
@@ -737,8 +736,7 @@ export interface AIResponse {
     scenarioStats: { [key: string]: number };
     survivorStatus: { name: string; newStatus: string }[];
     hiddenRelationships_change: any[]; // Type can be refined if needed
-    /** @deprecated Flags system removed. */
-    flags_acquired?: string[];
+    // [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
     /** v1.2: 동적 위치 시스템 - 서사에서 발견/언급된 새 장소 */
     locations_discovered?: Array<{
       name: string;
@@ -776,8 +774,7 @@ export interface KeyDecision {
   choice: string; // 플레이어가 선택한 선택지 텍스트
   consequence: string; // 선택의 결과 요약 (50자 이내)
   category: 'survival' | 'relationship' | 'moral' | 'strategic';
-  /** @deprecated Flags system removed. Use significantEvents in ActionHistory instead. */
-  flagsAcquired?: string[];
+  // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 ActionHistory.significantEvents로 대체
   impactedCharacters?: string[]; // 영향받은 캐릭터들
 }
 

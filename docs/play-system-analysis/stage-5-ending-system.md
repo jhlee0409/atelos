@@ -7,8 +7,8 @@
 
 | 시스템 | 트리거 조건 | 생성 방식 |
 |--------|------------|----------|
-| **레거시 엔딩** | `dynamicEndingConfig.enabled = false` | 스탯/플래그 조건 매칭 |
-| **동적 엔딩** | `dynamicEndingConfig.enabled = true` | AI가 ActionHistory 기반 생성 |
+| **레거시 엔딩** | `dynamicEndingConfig.enabled = false` | 스탯 조건 매칭 (deprecated) |
+| **동적 엔딩** | `dynamicEndingConfig.enabled = true` | AI가 ActionHistory 기반 생성 (v1.4 권장) |
 
 **핵심 파일**:
 - `lib/ending-checker.ts`: 레거시 엔딩 조건 체크 (deprecated)
@@ -26,10 +26,9 @@
 | 데이터 | Stage 4 결과 | Stage 5 용도 |
 |--------|-------------|-------------|
 | `context.scenarioStats` | 증폭 적용된 스탯 | 레거시 엔딩 조건 체크 |
-| `context.flags` | 획득 플래그 | 레거시 엔딩 조건 체크 |
+| `actionHistory` | 전체 행동 기록 (v1.4) | 동적 엔딩 AI 프롬프트 ★ |
 | `protagonistKnowledge` | 발견 정보 | 동적 엔딩 AI 프롬프트 ★ |
 | `npcRelationshipStates` | 관계 가시성 | 동적 엔딩 AI 프롬프트 ★ |
-| `actionHistory` | 전체 행동 기록 | 동적 엔딩 AI 프롬프트 ★ |
 | `characterArcs` | 캐릭터 발전 | 엔딩 결과 표시 |
 
 ---
@@ -78,7 +77,7 @@ checkEndingConditions(playerState, endingArchetypes, survivorCount)
 // 조건 타입
 - required_stat: { statId, comparison, value }
 - survivor_count: { comparison, value }
-- required_flag: { flagName } // 현재 미구현
+// [v1.4 REMOVED] required_flag - Dynamic Ending System에서 ActionHistory로 대체
 ```
 
 ### 4.2 조건 비교 연산자

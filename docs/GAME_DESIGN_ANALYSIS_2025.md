@@ -3,6 +3,9 @@
 **작성일**: 2025-12-10
 **목적**: AI 채팅형 인터랙티브 내러티브 게임으로서의 경쟁력 분석
 
+> ⚠️ **v1.4 업데이트 노트 (2025-12-13)**: `flags_acquired` 관련 내용은 deprecated됨.
+> Dynamic Ending System 도입으로 플래그 기반 시스템이 `ActionHistory`로 대체됨.
+
 ---
 
 ## 목차

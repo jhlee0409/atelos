@@ -17,7 +17,6 @@ import type {
   Character,
   PlayerState,
   EndingArchetype,
-  ScenarioFlag,
   GameMode,
   DialogueTopic,
   ExplorationLocation,
@@ -678,7 +677,7 @@ const updateSaveState = (
   // 변화 추적 배열 초기화
   const trackedStatChanges: StatChangeRecord[] = [];
   const trackedRelationshipChanges: RelationshipChangeRecord[] = [];
-  const trackedFlagsAcquired: string[] = [];
+  // [v1.4 REMOVED] trackedFlagsAcquired - Dynamic Ending System에서 ActionHistory로 대체
 
   newSaveState.log = aiResponse.log;
   newSaveState.dilemma = aiResponse.dilemma;
@@ -693,10 +692,10 @@ const updateSaveState = (
   const {
     scenarioStats,
     survivorStatus,
-    flags_acquired,
     hiddenRelationships_change,
     locations_discovered,
   } = aiResponse.statChanges;
+  // [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
 
   // 시나리오에서 알려진 캐릭터 이름 목록 생성 (관계 파싱에 사용)
   const knownCharacterNames = scenario.characters.map((c) => c.characterName);
@@ -985,23 +984,8 @@ const updateSaveState = (
     });
   }
 
-  // v1.2: flags_acquired를 context.flags에 적용 (ending/route 조건에 필요)
-  if (flags_acquired && flags_acquired.length > 0) {
-    flags_acquired.forEach((flagName: string) => {
-      if (flagName && typeof flagName === 'string') {
-        const normalizedFlag = flagName.startsWith('FLAG_') ? flagName : `FLAG_${flagName}`;
-        // boolean 플래그는 true로, count 플래그는 +1
-        const currentValue = newSaveState.context.flags[normalizedFlag];
-        if (typeof currentValue === 'number') {
-          newSaveState.context.flags[normalizedFlag] = currentValue + 1;
-        } else {
-          newSaveState.context.flags[normalizedFlag] = true;
-        }
-        trackedFlagsAcquired.push(normalizedFlag);
-        console.log(`🏴 플래그 획득: ${normalizedFlag}`);
-      }
-    });
-  }
+  // [v1.4 REMOVED] flags_acquired 처리 제거 - Dynamic Ending System에서 ActionHistory로 대체
+  // flags 기반 루트/엔딩 조건은 더 이상 사용되지 않습니다.
 
   // =============================================================================
   // 기존 Day 전환 로직 제거됨 (Phase 4: 행동 게이지 시스템으로 대체)
@@ -1218,14 +1202,13 @@ const updateSaveState = (
   // 변화 요약 생성 및 저장
   const hasAnyChanges =
     trackedStatChanges.length > 0 ||
-    trackedRelationshipChanges.length > 0 ||
-    trackedFlagsAcquired.length > 0;
+    trackedRelationshipChanges.length > 0;
 
   if (hasAnyChanges) {
     const changeSummary: ChangeSummaryData = {
       statChanges: trackedStatChanges,
       relationshipChanges: trackedRelationshipChanges,
-      flagsAcquired: trackedFlagsAcquired,
+      // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 ActionHistory로 대체
       timestamp: Date.now(),
     };
 
@@ -1243,7 +1226,6 @@ const updateSaveState = (
     console.log('📋 변화 요약:', {
       stats: trackedStatChanges.length,
       relationships: trackedRelationshipChanges.length,
-      flags: trackedFlagsAcquired.length,
     });
   }
 

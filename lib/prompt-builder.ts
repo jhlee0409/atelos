@@ -256,48 +256,7 @@ IMPORTANT: Reference these past decisions naturally in the narrative when releva
 - Create callbacks to meaningful moments`;
 };
 
-/**
- * 플래그 딕셔너리를 AI 프롬프트용으로 포맷팅
- * AI가 어떤 플래그를 언제 부여해야 하는지 명확하게 안내
- */
-const formatFlagDictionaryForPrompt = (scenario: ScenarioData): string => {
-  if (!scenario.flagDictionary || scenario.flagDictionary.length === 0) {
-    return '';
-  }
-
-  const flagsWithTriggers = scenario.flagDictionary
-    .filter(flag => flag.triggerCondition) // 트리거 조건이 있는 것만
-    .map(flag => {
-      const flagName = flag.flagName.startsWith('FLAG_') ? flag.flagName : `FLAG_${flag.flagName}`;
-      return `- ${flagName}: ${flag.description} (조건: ${flag.triggerCondition})`;
-    })
-    .join('\n');
-
-  const flagsWithoutTriggers = scenario.flagDictionary
-    .filter(flag => !flag.triggerCondition)
-    .map(flag => {
-      const flagName = flag.flagName.startsWith('FLAG_') ? flag.flagName : `FLAG_${flag.flagName}`;
-      return `- ${flagName}: ${flag.description}`;
-    })
-    .join('\n');
-
-  return `FLAGS_ACQUIRED GUIDELINES (이벤트 플래그 부여 - 중요!):
-플레이어의 행동에 따라 아래 플래그를 flags_acquired에 추가하세요.
-플래그는 루트 결정과 엔딩 조건에 영향을 미칩니다.
-
-**조건 기반 플래그 (조건 충족 시 반드시 부여):**
-${flagsWithTriggers || '(없음)'}
-
-**상황 기반 플래그 (관련 행동 시 부여):**
-${flagsWithoutTriggers || '(없음)'}
-
-**플래그 부여 규칙:**
-1. 플레이어가 조건에 해당하는 행동을 하면 즉시 부여
-2. 같은 플래그를 중복 부여해도 됨 (count 타입)
-3. 플래그 부여 시 서사에 해당 행동의 결과를 반영
-4. 매 턴 최소 1개 이상의 플래그 부여를 권장
-예: 협상 시도 → ["FLAG_NEGOTIATE_ATTEMPT"], 방어 강화 → ["FLAG_DEFENSE_ACTION"]`;
-};
+// [v1.4 REMOVED] formatFlagDictionaryForPrompt - Dynamic Ending System에서 ActionHistory로 대체
 
 // 토큰 최적화된 프롬프트 빌더 (메인 함수)
 export const buildOptimizedGamePrompt = (
@@ -781,7 +740,6 @@ Output JSON:
     "scenarioStats": {"statId": change_amount},
     "survivorStatus": [{"name": "character", "newStatus": "status"}],
     "hiddenRelationships_change": [{"pair": "A-B", "change": number}],
-    "flags_acquired": ["FLAG_NAME"],
     "locations_discovered": [{"name": "장소명", "description": "장소 설명"}]
   }
 }
@@ -801,8 +759,6 @@ LOCATIONS_DISCOVERED GUIDELINES (동적 장소 발견):
 - 예: 탐색 중 새 통로 발견 → {"name": "지하 통로", "description": "어둡고 습한 지하 통로"}
 - 이미 알려진 장소는 중복 추가하지 말 것
 - 플레이어가 실제로 방문 가능해진 장소만 추가
-
-${formatFlagDictionaryForPrompt(scenario)}
 
 Focus: Character-driven narrative, emotional engagement, Korean immersion, consistent stat changes.
 

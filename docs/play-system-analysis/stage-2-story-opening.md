@@ -205,7 +205,7 @@ return {
     scenarioStats: {},           // 오프닝에서는 스탯 변화 없음
     survivorStatus: [],
     hiddenRelationships_change: [],
-    flags_acquired: [],
+    // [v1.4 REMOVED] flags_acquired - ActionHistory로 대체됨
   },
 };
 ```

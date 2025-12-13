@@ -238,7 +238,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, [synopsisResult]);
 
-  // 시스템(스탯) 생성 - locations 제거됨 (동적 위치 시스템으로 대체)
+  // 시스템(스탯) 생성 - v1.4: Dynamic Ending System 채택으로 flags 제거
   const handleGenerateSystem = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -268,9 +268,7 @@ ${characterDetails}`;
         totalDays: targetLength === 'short' ? 5 : targetLength === 'long' ? 10 : 7,
       };
 
-      // 스탯만 생성 (locations는 동적 위치 시스템으로 대체됨)
       const statsResponse = await generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context);
-
       setStats(statsResponse.data.stats || []);
       setCurrentStep('system');
     } catch (err) {
@@ -375,6 +373,7 @@ ${characterDetails}`;
         buffs: (traits.buffs || []).map((t) => convertTraitResult(t, 'positive')),
         debuffs: (traits.debuffs || []).map((t) => convertTraitResult(t, 'negative')),
       },
+      // v1.4: flagDictionary 제거됨 - Dynamic Ending System에서 ActionHistory로 대체
       status: 'in_progress',
       // 스토리 오프닝 시스템 (Phase 7) - 간소화됨
       storyOpening: storyOpening ? {
@@ -789,8 +788,6 @@ ${characterDetails}`;
               </div>
             </div>
 
-            {/* 탐색 위치 UI 제거됨 - 동적 위치 시스템으로 대체 */}
-
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -980,10 +977,6 @@ ${characterDetails}`;
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{stats.length}</div>
                 <div className="text-xs text-zinc-500">스탯</div>
-              </div>
-              <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">✓</div>
-                <div className="text-xs text-zinc-500">동적 엔딩</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{storyOpening ? '✓' : '-'}</div>

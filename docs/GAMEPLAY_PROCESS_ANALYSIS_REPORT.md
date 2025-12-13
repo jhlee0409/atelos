@@ -3,6 +3,12 @@
 **작성일**: 2025-12-09
 **목적**: 지속적인 이슈 발생 원인 분석 및 시스템 개선 방안 도출
 
+> ⚠️ **v1.4 업데이트 노트 (2025-12-13)**:
+> 이 문서는 레거시 시스템 분석입니다. v1.4에서 Dynamic Ending System이 도입되면서:
+> - `flagDictionary`, `flags_acquired` → `ActionHistory`로 대체됨
+> - 플래그 기반 엔딩 조건 → ActionHistory + 스탯 기반 동적 엔딩
+> - 자세한 내용은 `docs/DYNAMIC_ENDING_SYSTEM_SPEC.md` 참조
+
 ---
 
 ## 목차
