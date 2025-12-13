@@ -45,6 +45,7 @@ import {
   generateWithAI,
   type CharacterResult,
   type StatResult,
+  type FlagsResult,
   type RelationshipResult,
   type TraitsResult,
   type TraitResult,
@@ -103,6 +104,8 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [relationships, setRelationships] = useState<RelationshipResult[]>([]);
   const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
+  // v1.4: 플래그 생성 지원
+  const [flags, setFlags] = useState<FlagsResult>({ flags: [] });
 
   // 스토리 오프닝 시스템 (Phase 7) - 간소화됨
   const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
@@ -238,7 +241,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, [synopsisResult]);
 
-  // 시스템(스탯) 생성 - locations 제거됨 (동적 위치 시스템으로 대체)
+  // 시스템(스탯 + 플래그) 생성 - v1.4: flags 추가, locations 제거됨 (동적 위치 시스템으로 대체)
   const handleGenerateSystem = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -268,10 +271,14 @@ ${characterDetails}`;
         totalDays: targetLength === 'short' ? 5 : targetLength === 'long' ? 10 : 7,
       };
 
-      // 스탯만 생성 (locations는 동적 위치 시스템으로 대체됨)
-      const statsResponse = await generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context);
+      // v1.4: 스탯과 플래그를 병렬로 생성
+      const [statsResponse, flagsResponse] = await Promise.all([
+        generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context),
+        generateWithAI<FlagsResult>('flags', scenarioInput, context),
+      ]);
 
       setStats(statsResponse.data.stats || []);
+      setFlags(flagsResponse.data || { flags: [] });
       setCurrentStep('system');
     } catch (err) {
       setError(err instanceof Error ? err.message : '시스템 생성에 실패했습니다.');
@@ -375,6 +382,14 @@ ${characterDetails}`;
         buffs: (traits.buffs || []).map((t) => convertTraitResult(t, 'positive')),
         debuffs: (traits.debuffs || []).map((t) => convertTraitResult(t, 'negative')),
       },
+      // v1.4: flagDictionary 추가
+      flagDictionary: (flags.flags || []).map((f) => ({
+        flagName: f.flagName,
+        description: f.description,
+        type: f.type,
+        initial: f.type === 'boolean' ? false : 0,
+        triggerCondition: f.triggerCondition,
+      })),
       status: 'in_progress',
       // 스토리 오프닝 시스템 (Phase 7) - 간소화됨
       storyOpening: storyOpening ? {
@@ -434,7 +449,7 @@ ${characterDetails}`;
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, storyOpening, gameplayConfig, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, flags, storyOpening, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -789,7 +804,30 @@ ${characterDetails}`;
               </div>
             </div>
 
-            {/* 탐색 위치 UI 제거됨 - 동적 위치 시스템으로 대체 */}
+            {/* v1.4: 플래그 목록 표시 */}
+            {flags.flags && flags.flags.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  🏴 플래그 ({flags.flags.length}개)
+                </h4>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {flags.flags.map((flag, idx) => (
+                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-zinc-400">{flag.flagName}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {flag.type === 'boolean' ? '참/거짓' : '카운트'}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">{flag.description}</div>
+                      <div className="text-xs text-zinc-600 mt-0.5">
+                        트리거: {flag.triggerCondition}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
@@ -981,9 +1019,10 @@ ${characterDetails}`;
                 <div className="text-lg font-bold">{stats.length}</div>
                 <div className="text-xs text-zinc-500">스탯</div>
               </div>
+              {/* v1.4: 플래그 개수 표시 */}
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">✓</div>
-                <div className="text-xs text-zinc-500">동적 엔딩</div>
+                <div className="text-lg font-bold">{flags.flags?.length || 0}</div>
+                <div className="text-xs text-zinc-500">플래그</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
                 <div className="text-lg font-bold">{storyOpening ? '✓' : '-'}</div>
