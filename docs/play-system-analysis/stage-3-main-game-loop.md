@@ -180,7 +180,9 @@ Stage 2 완료 상태
 
 ---
 
-## 6. 구현된 개선사항 (커밋 5e501f4)
+## 6. 구현된 개선사항
+
+### 6.1 커밋 5e501f4 (초기)
 
 | 항목 | handlePlayerChoice | handleDialogueSelect | handleExplore |
 |------|-------------------|---------------------|---------------|
@@ -190,6 +192,16 @@ Stage 2 완료 상태
 | 기존 엔딩 조건 통일 | ✅ canCheckEnding | ✅ canCheckEnding | ✅ canCheckEnding |
 | 시간제한 엔딩 체크 | ✅ 기존 | ✅ **추가됨** | ✅ **추가됨** |
 
+### 6.2 Stage 3 개선 (현재)
+
+| 개선 | 설명 | 위치 |
+|------|------|------|
+| **#1** metCharacters 자동 추가 | 대화한 캐릭터가 metCharacters에 없으면 자동 추가 | handleDialogueSelect:2235-2245 |
+| **#2** keyDecisions 대화 기록 | infoGained 있을 때 중요 대화로 keyDecisions에 기록 | handleDialogueSelect:2213-2232 |
+| **#2** keyDecisions 탐색 기록 | 발견물(newDiscoveries) 있을 때 keyDecisions에 기록 | handleExplore:2592-2612 |
+
+**테스트**: `tests/unit/main-game-loop.test.ts` 12개 테스트 추가
+
 ---
 
 ## 7. 추가 개선 필요사항
@@ -198,9 +210,9 @@ Stage 2 완료 상태
 
 | 이슈 | 현재 상태 | 개선 제안 |
 |------|----------|----------|
-| metCharacters 자동 추가 없음 | 대화해도 metCharacters 미변경 | 첫 대화 시 자동 추가 |
+| ~~metCharacters 자동 추가 없음~~ | ✅ **해결됨** - Stage 3 개선 #1 | - |
 | discoveredRelationships 업데이트 없음 | 모든 핸들러에서 미구현 | NPC 관계 힌트 발견 시 업데이트 (Stage 4에서 일부 구현) |
-| keyDecisions 대화/탐색 미기록 | choice만 기록 | 중요 대화/탐색 기록 고려 |
+| ~~keyDecisions 대화/탐색 미기록~~ | ✅ **해결됨** - Stage 3 개선 #2 | - |
 | actionContext.urgentMatters 미사용 | 업데이트만 하고 활용 안 함 | AI 프롬프트에 긴급 상황 강조 |
 
 ### 7.2 핸들러 간 차이점 (일관성 검토 필요)
@@ -235,6 +247,7 @@ saveState = {
     actionContext: updated,               // 맥락 업데이트
     protagonistKnowledge: {
       ...knowledge,
+      metCharacters: [..., newCharacter], // ★ Stage 3 개선 #1: 대화 시 추가
       informationPieces: [..., newPieces], // ★ Stage 3에서 추가
     },
   },
@@ -242,7 +255,7 @@ saveState = {
     hiddenRelationships: { ...updated },  // 관계 변화 적용
   },
   characterArcs: [...updated],            // 대화 시 업데이트
-  keyDecisions: [..., newDecision],       // 선택 시 추가
+  keyDecisions: [..., newDecision],       // ★ Stage 3 개선 #2: 선택/대화/탐색 시 추가
 };
 ```
 
@@ -265,7 +278,9 @@ saveState = {
 - [x] Dynamic Ending 체크 3개 핸들러 일관성 확인
 - [x] 기존 엔딩 체크 조건 통일 확인
 - [x] 시간제한 엔딩 체크 3개 핸들러 확인
-- [ ] metCharacters 자동 추가 (향후 개선)
+- [x] **[Stage 3 개선 #1]** metCharacters 자동 추가 (handleDialogueSelect)
+- [x] **[Stage 3 개선 #2]** keyDecisions 대화 기록 (infoGained 있을 때)
+- [x] **[Stage 3 개선 #2]** keyDecisions 탐색 기록 (발견물 있을 때)
 - [ ] discoveredRelationships 핸들러 업데이트 (Stage 4 부분 구현)
 
 ---

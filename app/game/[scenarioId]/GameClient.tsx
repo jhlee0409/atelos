@@ -2209,6 +2209,39 @@ export default function GameClient({ scenario }: GameClientProps) {
           newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
           console.log(`📝 주인공 지식 업데이트: ${characterName}에게서 정보 획득`);
         }
+
+        // [Stage 3 개선 #2] 중요 대화 keyDecisions 기록
+        const currentDayForDecision = newSaveState.context.currentDay || 1;
+        const turnForDecision = newSaveState.context.turnsInCurrentDay || 0;
+        const dialogueKeyDecision = {
+          day: currentDayForDecision,
+          turn: turnForDecision,
+          choice: `[${characterName}와 대화] ${topic.label}`,
+          consequence: dialogueResponse.infoGained.slice(0, 50),
+          category: 'relationship' as const,
+          impactedCharacters: [characterName],
+        };
+
+        if (!newSaveState.keyDecisions) {
+          newSaveState.keyDecisions = [];
+        }
+        newSaveState.keyDecisions.push(dialogueKeyDecision);
+        if (newSaveState.keyDecisions.length > 20) {
+          newSaveState.keyDecisions.shift();
+        }
+        console.log(`📝 중요 대화 기록: ${characterName}에게서 정보 획득 - keyDecisions에 추가`);
+      }
+
+      // [Stage 3 개선 #1] 대화 후 metCharacters 자동 추가
+      if (newSaveState.context.protagonistKnowledge) {
+        const currentMetCharacters = newSaveState.context.protagonistKnowledge.metCharacters || [];
+        if (!currentMetCharacters.includes(characterName)) {
+          newSaveState.context.protagonistKnowledge.metCharacters = [
+            ...currentMetCharacters,
+            characterName,
+          ];
+          console.log(`📝 metCharacters 업데이트: ${characterName} 추가 (대화)`);
+        }
       }
 
       // Dynamic Ending System: ActionHistory 기록 (대화) - v1.2: 시너지 보너스 반영
@@ -2555,6 +2588,28 @@ export default function GameClient({ scenario }: GameClientProps) {
           newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
         }
         console.log(`📝 주인공 지식 업데이트: ${worldStateResult.newDiscoveries.length}개 발견물 추가`);
+
+        // [Stage 3 개선 #2] 중요 탐색 keyDecisions 기록 (발견물이 있을 때)
+        const currentDayForDecision = newSaveState.context.currentDay || 1;
+        const turnForDecision = newSaveState.context.turnsInCurrentDay || 0;
+        const discoveryNames = worldStateResult.newDiscoveries.map(d => d.name).join(', ');
+        const explorationKeyDecision = {
+          day: currentDayForDecision,
+          turn: turnForDecision,
+          choice: `[${location.name} 탐색]`,
+          consequence: `발견: ${discoveryNames}`.slice(0, 50),
+          category: 'strategic' as const,
+          impactedCharacters: [] as string[],
+        };
+
+        if (!newSaveState.keyDecisions) {
+          newSaveState.keyDecisions = [];
+        }
+        newSaveState.keyDecisions.push(explorationKeyDecision);
+        if (newSaveState.keyDecisions.length > 20) {
+          newSaveState.keyDecisions.shift();
+        }
+        console.log(`📝 중요 탐색 기록: ${location.name}에서 발견물 획득 - keyDecisions에 추가`);
       }
 
       // Dynamic Ending System: ActionHistory 기록 (탐색)

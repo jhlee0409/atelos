@@ -173,11 +173,17 @@
 - **기존 구현 확인**: metCharacters 업데이트 (이미 구현됨, 문서만 업데이트)
 - **테스트**: `tests/unit/story-opening.test.ts` 17개 테스트 추가
 
-### 커밋 5e501f4 (Stage 3)
+### 커밋 5e501f4 (Stage 3 - 초기)
 - handleExplore에 시너지 보너스 체크 추가
 - handleDialogueSelect, handleExplore에 protagonistKnowledge.informationPieces 업데이트
 - handleDialogueSelect, handleExplore에 Dynamic Ending 체크 추가
 - 3개 핸들러 엔딩 체크 일관성 확보
+
+### Stage 3 개선 (현재 커밋)
+- **#1** metCharacters 자동 추가: handleDialogueSelect에서 대화한 캐릭터 metCharacters에 자동 추가
+- **#2** keyDecisions 대화 기록: infoGained 있을 때 중요 대화로 keyDecisions에 기록
+- **#2** keyDecisions 탐색 기록: 발견물(newDiscoveries) 있을 때 keyDecisions에 기록
+- **테스트**: `tests/unit/main-game-loop.test.ts` 12개 테스트 추가
 
 ### 커밋 1b11b62 (Stage 4)
 - locations_discovered → protagonistKnowledge.informationPieces 추가
@@ -198,7 +204,7 @@
 
 | 이슈 | 현재 상태 | Stage |
 |------|----------|-------|
-| handleDialogueSelect 대화 캐릭터 metCharacters 미추가 | updateSaveState 서사 감지에 의존 | 3 |
+| ~~handleDialogueSelect 대화 캐릭터 metCharacters 미추가~~ | ✅ **해결됨** - Stage 3 개선 #1 | 3 |
 | discoveredRelationships 미사용 | 빈 배열로만 전달 | 4, 5 |
 | 힌트 → 공개 전환 없음 | 'hinted' 설정만 | 4 |
 
@@ -210,7 +216,7 @@
 | ~~오프닝 후 metCharacters 업데이트 없음~~ | ✅ **해결됨** - 기존 구현 확인, 문서 업데이트 | 2 |
 | ~~characterArcs 첫 만남 moment 없음~~ | ✅ **해결됨** - Stage 2 개선 #1 | 2 |
 | ~~actionContext 오프닝 미반영~~ | ✅ **해결됨** - Stage 2 개선 #2 | 2 |
-| keyDecisions 대화/탐색 미기록 | choice만 기록 | 3 |
+| ~~keyDecisions 대화/탐색 미기록~~ | ✅ **해결됨** - Stage 3 개선 #2 | 3 |
 | characterArcs 엔딩 프롬프트 반영 | AI가 새로 생성 | 5 |
 
 ### 낮음 (향후 확장)
@@ -228,7 +234,7 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 216개 테스트 통과 (Stage 1: 19개, Stage 2: 17개 추가)
+├── pnpm test 228개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개 추가)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -243,7 +249,12 @@
 ├── [Stage 2] characterArcs 첫 만남 moment 테스트 (4개)
 ├── [Stage 2] actionContext 오프닝 반영 테스트 (5개)
 ├── [Stage 2] protagonistKnowledge 업데이트 테스트 (4개)
-└── [Stage 2] 오프닝 완료 시 상태 통합 테스트 (1개)
+├── [Stage 2] 오프닝 완료 시 상태 통합 테스트 (1개)
+├── [Stage 3] handleDialogueSelect metCharacters 자동 추가 테스트 (4개)
+├── [Stage 3] keyDecisions 대화 기록 테스트 (3개)
+├── [Stage 3] keyDecisions 탐색 기록 테스트 (3개)
+├── [Stage 3] keyDecisions 최대 개수 유지 테스트 (1개)
+└── [Stage 3] 대화 후 상태 통합 테스트 (1개)
 
 ❌ 추가 검증 필요
 ├── hiddenNPCRelationships 빈 배열 시나리오
