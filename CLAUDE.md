@@ -80,6 +80,7 @@ atelos/
 │   │   └── GameClient.tsx            # Main game client component
 │   └── api/
 │       ├── gemini/route.ts           # Main AI API endpoint
+│       ├── generate-ending/route.ts  # Dynamic ending generation (SDT-based)
 │       ├── scenarios/                # Public scenarios API
 │       │   ├── route.ts              # GET active scenarios
 │       │   └── [id]/route.ts         # GET scenario by ID
@@ -108,6 +109,7 @@ atelos/
 │   │   ├── ExplorationPanel.tsx      # Location exploration system
 │   │   ├── TimelineProgress.tsx      # Day/time visualization
 │   │   ├── EndingProgress.tsx        # Ending progress tracker
+│   │   ├── DynamicEndingDisplay.tsx  # Dynamic ending result display (SDT scores)
 │   │   ├── KeyDecisionPanel.tsx      # Decision history panel
 │   │   └── ChangeSummary.tsx         # Stat/relationship change display
 │   ├── admin/                        # Admin section components
@@ -120,9 +122,12 @@ atelos/
 │   │       ├── BaseContent.tsx       # Basic scenario info
 │   │       ├── CharacterContent.tsx  # Character management
 │   │       ├── SystemRulesContent.tsx # Stats, endings
-│   │       ├── CoreStoryElementsContent.tsx
+│   │       ├── StoryOpeningContent.tsx # Story opening configuration
+│   │       ├── GameplayConfigContent.tsx # Gameplay settings
+│   │       ├── DynamicEndingConfigContent.tsx # Dynamic ending system settings
+│   │       ├── LocationsContent.tsx  # Dynamic location system info
 │   │       ├── ScenarioHeader.tsx
-│   │       └── StickySidebar.tsx
+│   │       └── StickySidebar.tsx     # Validation sidebar
 │   ├── landing/                      # Landing page components
 │   │   ├── Hero.tsx
 │   │   ├── Features.tsx
@@ -137,6 +142,7 @@ atelos/
 │   └── theme-provider.tsx            # Dark/light theme support
 ├── lib/                              # Core business logic
 │   ├── gemini-client.ts              # Gemini API wrapper
+│   ├── game-ai-client.ts             # Game AI client functions
 │   ├── game-builder.ts               # Initial game state & fallbacks
 │   ├── ending-checker.ts             # Ending condition evaluation
 │   ├── chat-history-manager.ts       # Chat history compression
@@ -157,8 +163,18 @@ atelos/
 │   ├── ai-narrative-engine.ts        # AI Narrative Engine (ending prediction, seeds)
 │   ├── action-engagement-system.ts   # Action synergy, combo, dynamic AP system
 │   ├── prompt-enhancers.ts           # Prompt Quality Enhancement (Choice Diversity, Character Balancing)
+│   ├── prompt-builder.ts             # AI prompt construction with persona
+│   ├── story-writer-persona.ts       # 도경 persona (v2.1 with dynamic features)
+│   ├── context-manager.ts            # Context & discovered clues management
+│   ├── exploration-generator.ts      # Exploration narrative generation
+│   ├── dialogue-generator.ts         # Dialogue generation
+│   ├── gameplay-config.ts            # Dynamic gameplay configuration
+│   ├── world-state-manager.ts        # World state management
+│   ├── play-test-logger.ts           # Development play testing logger
 │   ├── scenario-api.ts               # Scenario API client functions
 │   └── scenario-mapping-utils.ts     # Scenario data transformations
+├── contexts/
+│   └── AuthContext.tsx               # Admin authentication context
 ├── constants/
 │   ├── korean-english-mapping.ts     # i18n mappings for stats/roles
 │   ├── comparison-operators.ts       # Condition evaluation operators
@@ -198,6 +214,8 @@ atelos/
    - `/admin` → Scenario list
    - `/admin/new` → AI-powered scenario creation wizard
    - `/admin/[id]` → Edit existing scenario
+   - Authentication managed via `AuthContext` (`contexts/AuthContext.tsx`)
+   - `useAuth()` hook provides `login()`, `logout()`, `isAuthenticated`, `user`
 
 ### Key System Components
 
@@ -297,6 +315,65 @@ gameplayConfig?: {
 - Time limit ending triggers after configured days (ENDING_TIME_UP)
 - Falls back to default "결단의 시간" ending if no conditions met
 
+#### Dynamic Ending System (v1.4) - SDT-Based
+
+AI-generated personalized endings based on Self-Determination Theory (SDT):
+
+**Core Components:**
+- `DynamicEndingConfig`: Configuration for AI ending generation
+- `ActionHistoryEntry`: Player action tracking for narrative analysis
+- `DynamicEndingResult`: AI-generated ending structure
+- `/api/generate-ending`: API endpoint for ending generation
+
+**SDT Evaluation Criteria:**
+- **Autonomy (자율성)**: Player choices meaningfully reflected in ending
+- **Competence (유능감)**: Goal achievement evaluated fairly
+- **Relatedness (관계성)**: Character relationships determine fates
+
+**Goal Achievement Levels:**
+- `triumph`: Perfect success - all goals exceeded
+- `success`: Goals achieved
+- `partial`: Some goals achieved
+- `pyrrhic`: Victory with heavy costs
+- `failure`: Goals not met
+- `subverted`: Unexpected outcome
+- `tragic`: Dramatic failure with meaning
+
+**Key Types:**
+```typescript
+interface DynamicEndingConfig {
+  enabled: boolean;
+  endingDay: number;
+  warningDays: number;
+  evaluationCriteria: {
+    goalWeight: number;      // 0-1
+    relationshipWeight: number;
+    moralWeight: number;
+    narrativeWeight: number;
+  };
+  narrativeGuidelines: string;
+  endingToneHints: string[];
+}
+
+interface ActionHistoryEntry {
+  day: number;
+  actionType: 'choice' | 'dialogue' | 'exploration';
+  content: string;
+  target?: string;
+  isCustomInput?: boolean;
+  consequence: {
+    statsChanged: { statId: string; delta: number; newValue: number }[];
+    relationshipsChanged: { character: string; delta: number; newValue: number }[];
+    significantEvents: string[];
+  };
+  narrativeSummary: string;
+  moralAlignment?: 'selfless' | 'pragmatic' | 'selfish' | 'neutral';
+}
+```
+
+**Admin UI**: `DynamicEndingConfigContent.tsx` - Configure SDT weights, ending day, tone hints
+**Game UI**: `DynamicEndingDisplay.tsx` - Display generated ending with character fates, SDT scores
+
 #### Route System (`RouteIndicator.tsx`)
 
 Determines narrative path based on scenario's `routeScores` configuration:
@@ -329,8 +406,10 @@ The game supports multiple interaction modes beyond standard choice selection:
 - Can affect relationship values and provide in-game information
 
 **Exploration System**:
-- Day-gated locations: storage, entrance, medical (Day 1+), roof (Day 3+), basement (Day 5+)
-- Genre-specific locations (e.g., crew quarters for SF scenarios)
+- **v1.2 Dynamic Location System**: Locations discovered through AI narrative
+- Initial location set via `storyOpening.openingLocation`
+- New locations revealed via `AIResponse.statChanges.locations_discovered`
+- Legacy static locations (`ScenarioData.locations`) deprecated
 - AI generates exploration narratives and rewards
 - Rewards include: stat changes, significant discoveries, information
 
@@ -424,12 +503,12 @@ checkStoryBeatTriggers(saveState, scenario)
 analyzeCharacterArcProgression(characterArcs)
 ```
 
-#### Story Writer Persona System (도경 v2.1)
+#### Story Writer Persona System (도경 v2.1) - `lib/story-writer-persona.ts`
 
 AI가 일관된 작가 페르소나로 서사를 생성:
 
 **페르소나 특성:**
-- 이름: 도경 (導京) - "서울로 이끄는 자"
+- 이름: 도경 (道境) - "이야기의 길을 여는 자"
 - 역할: 인터랙티브 내러티브 전문 작가
 - 스타일: 장르별 톤 조절, 캐릭터 일관성 유지
 - 원칙: 플레이어 선택 존중, 과도한 개입 자제
@@ -439,6 +518,37 @@ AI가 일관된 작가 페르소나로 서사를 생성:
 - 장르별 스타일 자동 적용 (GENRE_NARRATIVE_STYLES)
 - 캐릭터 대화 스타일 일관성 유지
 - 플레이어 행동 패턴 인식 및 보상 (콤보/시너지)
+
+**v2.1 Enhanced Features:**
+- `GENRE_EMOTION_POOLS`: 장르별 감정 표현 풀 (스릴러, 호러, 드라마, SF, 판타지, 포스트 아포칼립스)
+- `GENRE_DILEMMA_POOLS`: 장르별 딜레마 유형
+- `PlayerBehaviorPattern`: 플레이어 성향 분석 (aggressive/cautious/diplomatic/exploratory/balanced)
+- `CumulativeTensionState`: 누적 텐션 관리
+- `calculateRecommendedTension()`: 서사 진행 기반 긴장도 권장
+- `detectChoiceInfluence()`: 이전 선택이 현재 서사에 미친 영향 감지
+- `buildDynamicPersonaPrompt()`: 컨텍스트 기반 동적 프롬프트 생성
+
+#### Play Test Logger (`lib/play-test-logger.ts`)
+
+개발 중 게임 플로우 검증을 위한 로깅 시스템:
+
+**사용법 (브라우저 콘솔):**
+```javascript
+window.__ATELOS__.verify()    // 검증 체크리스트 출력
+window.__ATELOS__.getReport() // 전체 리포트 객체
+window.__ATELOS__.export()    // JSON 문자열 (복사용)
+window.__ATELOS__.clear()     // 로그 초기화
+copy(window.__ATELOS__.export()) // 클립보드에 복사
+```
+
+**검증 단계:**
+- **Stage 1**: 게임 초기화 (protagonistKnowledge, characterArcs, worldState, actionContext)
+- **Stage 2**: 스토리 오프닝 (chatHistory, metCharacters, moments)
+- **Stage 3**: 메인 루프 (핸들러 동작, 시너지, AP 소모)
+- **Stage 4**: AI 응답 처리 (스탯 증폭, urgentMatters, NPC 관계 힌트)
+- **Stage 5**: 엔딩 (Dynamic Ending 트리거, 프롬프트 데이터 전달)
+
+개발 환경(`NODE_ENV=development`)에서 자동 활성화됨.
 
 #### Context Linking System (Phase 5)
 
@@ -562,6 +672,7 @@ Key functions:
 | Route | Method | Description |
 |-------|--------|-------------|
 | `/api/gemini` | POST | Main AI endpoint for game responses |
+| `/api/generate-ending` | POST | Dynamic ending generation (SDT-based) |
 | `/api/scenarios` | GET | List active scenarios for lobby |
 | `/api/scenarios/[id]` | GET | Get scenario by ID |
 
@@ -825,8 +936,10 @@ Custom colors defined in `tailwind.config.ts`:
 
 ### Admin Access Issues
 1. Check `ADMIN_PASSWORD` environment variable is set
-2. Clear sessionStorage if stuck (`sessionStorage.removeItem('atelos_admin_auth')`)
-3. Verify `/api/admin/auth` endpoint is responding
+2. Use AuthContext hooks: `useAuth()` provides `login()`, `logout()`, `isAuthenticated`
+3. Clear browser storage if stuck (session managed via cookies)
+4. Verify `/api/admin/auth` endpoint is responding
+5. Check `contexts/AuthContext.tsx` for authentication flow
 
 ### Firebase Issues
 1. Verify all `FIREBASE_*` environment variables are set
@@ -844,6 +957,21 @@ Custom colors defined in `tailwind.config.ts`:
 2. Verify `storyOpening.protagonistSetup.name` differs from all NPC character names
 3. If collision detected, system auto-clears protagonist name (AI uses pronouns instead)
 4. Check `firstCharacterToMeet` matches an actual character in `scenario.characters`
+
+### Dynamic Ending Issues
+1. Verify `dynamicEndingConfig.enabled` is true in scenario
+2. Check `actionHistory` is being populated (use Play Test Logger)
+3. Verify `endingDay` is set correctly (default: 7)
+4. Check `/api/generate-ending` response for errors
+5. Look for SDT evaluation criteria weights (sum should be ~1.0)
+6. If fallback ending triggers, check API connectivity
+
+### Play Test Logger Issues
+1. Logger only active in development mode (`NODE_ENV=development`)
+2. Access via `window.__ATELOS__` in browser console
+3. Run `window.__ATELOS__.verify()` to see verification checklist
+4. Check for ❌ (fail) or ⚠️ (warn) items in output
+5. Export report with `copy(window.__ATELOS__.export())`
 
 ## 🚨 개발 규칙 (MANDATORY)
 
@@ -866,6 +994,8 @@ Custom colors defined in `tailwind.config.ts`:
 | Action Engagement | N/A (런타임) | N/A | `prompt-builder.ts` | `ChoiceButtons` (콤보) |
 | AI Narrative Engine | N/A (런타임) | N/A | `prompt-builder.ts` | N/A |
 | Story Writer Persona | N/A (프롬프트) | N/A | `prompt-builder.ts` | N/A |
+| Dynamic Ending | `createInitialSaveState` | 4개 핸들러 | `generate-ending API` | `DynamicEndingDisplay` |
+| Play Test Logger | `createInitialSaveState` | 각 Stage 로깅 | N/A | 브라우저 콘솔 |
 
 ### 3-Way Integration
 
@@ -886,9 +1016,11 @@ AI 생성 (ai-generate/route.ts) → Admin (ScenarioEditor/*) → 게임 (GameCl
 | `title`, `synopsis`, `playerGoal` | scenario_overview | BaseContent | GameClient |
 | `characters` | characters | CharacterContent | GameClient |
 | `scenarioStats` | stats | SystemRulesContent | StatsBar |
-| `endingArchetypes` | endings | CoreStoryElementsContent | ending-checker |
+| `endingArchetypes` | endings | SystemRulesContent | ending-checker (레거시) |
 | `storyOpening` | story_opening | StoryOpeningContent | GameClient |
 | `gameplayConfig` | gameplay_config | GameplayConfigContent | gameplay-config |
+| `dynamicEndingConfig` | dynamic_ending | DynamicEndingConfigContent | generate-ending API |
+| `locations` (deprecated) | - | LocationsContent | ExplorationPanel |
 
 ### GameClient 핸들러 일관성
 
