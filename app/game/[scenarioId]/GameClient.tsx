@@ -1988,6 +1988,29 @@ export default function GameClient({ scenario }: GameClientProps) {
           content: dialogueResponse.infoGained,
           timestamp: Date.now() + 2,
         });
+
+        // [Stage 3] protagonistKnowledge 업데이트: 정보 조각 추가
+        if (newSaveState.context.protagonistKnowledge) {
+          const currentDay = newSaveState.context.currentDay || 1;
+          const newInfoPiece = {
+            id: `dialogue_info_${characterName}_${Date.now()}`,
+            content: dialogueResponse.infoGained,
+            source: {
+              type: 'dialogue' as const,
+              characterName,
+            },
+            discoveredAt: {
+              day: currentDay,
+              turn: newSaveState.context.turnsInCurrentDay || 0,
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+          console.log(`📝 주인공 지식 업데이트: ${characterName}에게서 정보 획득`);
+        }
       }
 
       // Dynamic Ending System: ActionHistory 기록 (대화) - v1.2: 시너지 보너스 반영
@@ -2053,11 +2076,23 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
       }
 
+      // [Stage 3] Dynamic Ending System: 동적 엔딩 체크 (handlePlayerChoice와 동일)
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDayForDynamic = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDayForDynamic >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // 동적 엔딩 생성
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (canCheckEnding(currentDay, scenario)) {
+      // [Stage 3] Dynamic Ending이 비활성화된 경우에만 기존 엔딩 체크
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -2154,6 +2189,33 @@ export default function GameClient({ scenario }: GameClientProps) {
       // 탐색 결과를 채팅 히스토리에 추가
       const newSaveState = { ...saveState };
 
+      // [Stage 3] v1.2: 시너지 보너스 체크 (대화 → 탐색: infoUnlock, 선택 → 탐색: preparation)
+      let synergyClueBonusApplied = false;
+      const recentActions = newSaveState.context.actionsThisDay || [];
+      if (recentActions.length > 0) {
+        const lastAction = recentActions[recentActions.length - 1];
+        const synergy = getActionSynergy(lastAction.actionType, 'exploration');
+
+        if (synergy?.mechanicEffect?.statBonus && explorationResult.rewards?.statChanges) {
+          // 시너지 보너스를 첫 번째 양수 스탯 변화에 적용
+          const statsToBoost = Object.entries(explorationResult.rewards.statChanges)
+            .filter(([, v]) => (v as number) > 0);
+
+          if (statsToBoost.length > 0) {
+            const [statId] = statsToBoost[0];
+            explorationResult.rewards.statChanges[statId] =
+              (explorationResult.rewards.statChanges[statId] || 0) + synergy.mechanicEffect.statBonus;
+            console.log(`✨ 탐색 시너지 보너스 적용: ${statId} +${synergy.mechanicEffect.statBonus} (${synergy.bonus})`);
+          }
+        }
+
+        // infoUnlock 보너스: 대화에서 들은 정보가 탐색에 도움
+        if (synergy?.mechanicEffect?.infoUnlock) {
+          synergyClueBonusApplied = true;
+          console.log(`✨ 정보 시너지 적용: 대화에서 얻은 힌트가 탐색에 도움 (${synergy.bonus})`);
+        }
+      }
+
       // 플레이어 행동
       newSaveState.chatHistory.push({
         type: 'player',
@@ -2247,6 +2309,54 @@ export default function GameClient({ scenario }: GameClientProps) {
             timestamp: Date.now() + 2,
           });
         }
+
+        // [Stage 3] protagonistKnowledge 업데이트: 탐색으로 얻은 정보 추가
+        if (newSaveState.context.protagonistKnowledge && explorationResult.rewards.infoGained) {
+          const currentDay = newSaveState.context.currentDay || 1;
+          const newInfoPiece = {
+            id: `exploration_info_${location.locationId}_${Date.now()}`,
+            content: explorationResult.rewards.infoGained,
+            source: {
+              type: 'exploration' as const,
+              locationId: location.locationId,
+            },
+            discoveredAt: {
+              day: currentDay,
+              turn: newSaveState.context.turnsInCurrentDay || 0,
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+          console.log(`📝 주인공 지식 업데이트: ${location.name} 탐색으로 정보 획득`);
+        }
+      }
+
+      // [Stage 3] WorldState 발견물도 protagonistKnowledge에 추가
+      if (newSaveState.context.protagonistKnowledge && worldStateResult?.newDiscoveries.length) {
+        const currentDay = newSaveState.context.currentDay || 1;
+        for (const discovery of worldStateResult.newDiscoveries) {
+          const newInfoPiece = {
+            id: `discovery_${discovery.id}_${Date.now()}`,
+            content: `${discovery.name}: ${discovery.description || ''}`,
+            source: {
+              type: 'exploration' as const,
+              locationId: location.locationId,
+            },
+            discoveredAt: {
+              day: currentDay,
+              turn: newSaveState.context.turnsInCurrentDay || 0,
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+        }
+        console.log(`📝 주인공 지식 업데이트: ${worldStateResult.newDiscoveries.length}개 발견물 추가`);
       }
 
       // Dynamic Ending System: ActionHistory 기록 (탐색)
@@ -2331,11 +2441,23 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
       }
 
+      // [Stage 3] Dynamic Ending System: 동적 엔딩 체크 (handlePlayerChoice와 동일)
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDayForDynamic = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDayForDynamic >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // 동적 엔딩 생성
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (canCheckEnding(currentDay, scenario)) {
+      // [Stage 3] Dynamic Ending이 비활성화된 경우에만 기존 엔딩 체크
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
