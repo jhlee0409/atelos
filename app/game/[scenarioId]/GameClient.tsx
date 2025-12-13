@@ -267,10 +267,10 @@ const getInitialTrustLevel = (
   scenario: ScenarioData
 ): number => {
   // initialRelationships에서 플레이어-캐릭터 관계 찾기
-  const playerRelation = scenario.initialRelationships.find(
+  const playerRelation = scenario.initialRelationships?.find(
     (rel) =>
-      (rel.pair[0] === '(플레이어)' && rel.pair[1] === characterName) ||
-      (rel.pair[1] === '(플레이어)' && rel.pair[0] === characterName)
+      (rel.personA === '(플레이어)' && rel.personB === characterName) ||
+      (rel.personB === '(플레이어)' && rel.personA === characterName)
   );
 
   return playerRelation?.value ?? 0;
@@ -1257,13 +1257,10 @@ const updateSaveState = (
         const newInfoPiece = {
           id: `location_${loc.name}_${Date.now()}`,
           content: `${loc.name} 발견: ${loc.description || '새로운 장소'}`,
-          source: {
-            type: 'exploration' as const,
-            locationId: loc.name,
-          },
+          source: `exploration:${loc.name}`,
           discoveredAt: {
             day: currentDay,
-            turn: newSaveState.context.turnsInCurrentDay || 0,
+            action: 'ai_response',
           },
         };
 
@@ -1353,7 +1350,7 @@ const updateSaveState = (
     const statNameMap: Record<string, string> = {};
 
     for (const stat of scenario.scenarioStats) {
-      statRanges[stat.id] = { min: stat.range?.min ?? 0, max: stat.range?.max ?? 100 };
+      statRanges[stat.id] = { min: stat.min ?? 0, max: stat.max ?? 100 };
       statNameMap[stat.id] = stat.name;
     }
 
@@ -1364,7 +1361,8 @@ const updateSaveState = (
       const range = statRanges[statId];
       if (!range) continue;
 
-      const percentage = (value - range.min) / (range.max - range.min);
+      const numValue = typeof value === 'number' ? value : 0;
+      const percentage = (numValue - range.min) / (range.max - range.min);
       if (percentage <= CRITICAL_THRESHOLD) {
         const statName = statNameMap[statId] || statId;
         urgentMatters.push(`${statName} 위험 수준 (${Math.round(percentage * 100)}%)`);
@@ -2312,13 +2310,10 @@ export default function GameClient({ scenario }: GameClientProps) {
           const newInfoPiece = {
             id: `dialogue_info_${characterName}_${Date.now()}`,
             content: dialogueResponse.infoGained,
-            source: {
-              type: 'dialogue' as const,
-              characterName,
-            },
+            source: `dialogue:${characterName}`,
             discoveredAt: {
               day: currentDay,
-              turn: newSaveState.context.turnsInCurrentDay || 0,
+              action: 'dialogue',
             },
           };
 
@@ -2421,7 +2416,7 @@ export default function GameClient({ scenario }: GameClientProps) {
       // [PlayTestLogger] Stage 3 로깅 (대화 액션)
       playTestLogger.logStage3Action('dialogue', {
         characterName,
-        topic: topic.id,
+        topic: topic.topicId,
         relationshipChange: dialogueResponse.relationshipChange,
         infoGained: dialogueResponse.infoGained,
       }, stateAfterAP);
@@ -2681,13 +2676,10 @@ export default function GameClient({ scenario }: GameClientProps) {
           const newInfoPiece = {
             id: `exploration_info_${location.locationId}_${Date.now()}`,
             content: explorationResult.rewards.infoGained,
-            source: {
-              type: 'exploration' as const,
-              locationId: location.locationId,
-            },
+            source: `exploration:${location.locationId}`,
             discoveredAt: {
               day: currentDay,
-              turn: newSaveState.context.turnsInCurrentDay || 0,
+              action: 'exploration',
             },
           };
 
@@ -2705,15 +2697,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         const currentDay = newSaveState.context.currentDay || 1;
         for (const discovery of worldStateResult.newDiscoveries) {
           const newInfoPiece = {
-            id: `discovery_${discovery.id}_${Date.now()}`,
+            id: `discovery_${discovery.name}_${Date.now()}`,
             content: `${discovery.name}: ${discovery.description || ''}`,
-            source: {
-              type: 'exploration' as const,
-              locationId: location.locationId,
-            },
+            source: `exploration:${location.locationId}`,
             discoveredAt: {
               day: currentDay,
-              turn: newSaveState.context.turnsInCurrentDay || 0,
+              action: 'exploration',
             },
           };
 
