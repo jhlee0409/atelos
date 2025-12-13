@@ -24,6 +24,8 @@ const getGeminiClient = (): GoogleGenerativeAI => {
 
 // 카테고리별 생성 타입
 // v1.2: 'locations' 카테고리 제거됨 (동적 위치 시스템으로 대체)
+// v1.3: 'character_introductions', 'hidden_relationships', 'character_revelations', 'emergent_narrative'
+//       카테고리 deprecated (플레이 시스템에서 미사용, ScenarioWizard에서 생성 제거)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
@@ -35,11 +37,11 @@ export type GenerationCategory =
   | 'genre'
   | 'idea_suggestions'
   | 'story_opening'
-  | 'character_introductions'
-  | 'hidden_relationships'
-  | 'character_revelations'
+  | 'character_introductions' // @deprecated v1.3
+  | 'hidden_relationships' // @deprecated v1.3
+  | 'character_revelations' // @deprecated v1.3
   | 'gameplay_config'
-  | 'emergent_narrative';
+  | 'emergent_narrative'; // @deprecated v1.3
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -328,6 +330,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
 
   // ==========================================================================
   // 2025 Enhanced: 1:1 캐릭터 소개 시퀀스
+  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
   // ==========================================================================
   character_introductions: {
     type: SchemaType.OBJECT,
@@ -362,6 +365,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
 
   // ==========================================================================
   // 2025 Enhanced: 숨겨진 NPC 관계 시스템
+  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
   // ==========================================================================
   hidden_relationships: {
     type: SchemaType.OBJECT,
@@ -401,6 +405,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
 
   // ==========================================================================
   // 2025 Enhanced: 점진적 캐릭터 공개 시스템
+  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
   // ==========================================================================
   character_revelations: {
     type: SchemaType.OBJECT,
@@ -560,6 +565,7 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
 
   // ==========================================================================
   // 이머전트 내러티브 (EmergentNarrative)
+  // @deprecated v1.3: 플레이 시스템에서 미사용. ScenarioWizard에서 생성 제거됨.
   // ==========================================================================
   emergent_narrative: {
     type: SchemaType.OBJECT,

@@ -60,6 +60,7 @@ import {
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
 import { calculateDynamicAPCost, getActionSynergy, type DynamicAPCost } from '@/lib/action-engagement-system';
 import type { WorldState, WorldLocation } from '@/types';
+import playTestLogger from '@/lib/play-test-logger';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
 const LEGACY_STAT_MAPPING: Record<string, string> = {
@@ -199,28 +200,106 @@ const hasInsufficientAP = (
 };
 
 /**
- * 초기 만난 캐릭터 목록 생성 (storyOpening.firstCharacterToMeet 기반)
+ * 초기 만난 캐릭터 목록 생성 (storyOpening 설정 기반)
+ *
+ * characterIntroductionStyle에 따라:
+ * - 'gradual': 첫 번째 캐릭터만 (천천히 소개)
+ * - 'immediate': 모든 캐릭터 (즉시 소개)
+ * - 'contextual': firstCharacterToMeet만 (기본값)
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 초기에 만난 캐릭터 이름 배열
  */
 const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
-  const firstCharacter = scenario.storyOpening?.firstCharacterToMeet;
+  const storyOpening = scenario.storyOpening;
+  const introStyle = storyOpening?.characterIntroductionStyle || 'contextual';
+  const introSequence = storyOpening?.characterIntroductionSequence;
+  const firstCharacter = storyOpening?.firstCharacterToMeet;
 
-  // 캐릭터 소개 시퀀스가 있으면 첫 번째 캐릭터 사용
-  const introSequence = scenario.storyOpening?.characterIntroductionSequence;
-  if (introSequence && introSequence.length > 0) {
+  // 1. 'immediate' 스타일: 모든 캐릭터를 즉시 만남
+  if (introStyle === 'immediate') {
+    if (introSequence && introSequence.length > 0) {
+      return introSequence
+        .sort((a, b) => a.order - b.order)
+        .map((s) => s.characterName);
+    }
+    // introSequence가 없으면 모든 NPC
+    const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+    return npcs.map((c) => c.characterName);
+  }
+
+  // 2. 'gradual' 스타일: 첫 번째 캐릭터만 (나머지는 게임 진행 중 추가)
+  if (introStyle === 'gradual' && introSequence && introSequence.length > 0) {
     const firstInSequence = introSequence.find((s) => s.order === 1);
     if (firstInSequence) {
       return [firstInSequence.characterName];
     }
+    // [Stage 1 개선 #3] order=1이 없으면 경고 로그 출력 후 첫 번째 항목 사용
+    console.warn(
+      `⚠️ [getInitialMetCharacters] 'gradual' 스타일에서 order=1인 캐릭터가 없습니다. ` +
+      `첫 번째 시퀀스 항목을 사용합니다: ${introSequence[0].characterName}`
+    );
+    return [introSequence[0].characterName];
   }
 
-  // firstCharacterToMeet이 설정되어 있으면 사용
+  // 3. 'contextual' 또는 기본: firstCharacterToMeet 사용
   if (firstCharacter) {
     return [firstCharacter];
   }
 
-  // 둘 다 없으면 첫 번째 NPC 캐릭터 사용
+  // 4. 폴백: 첫 번째 NPC 캐릭터
   const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
   return npcs.length > 0 ? [npcs[0].characterName] : [];
+};
+
+/**
+ * [Stage 1 개선 #1] 캐릭터의 초기 신뢰도를 initialRelationships에서 가져오기
+ *
+ * 플레이어-캐릭터 간 관계가 initialRelationships에 정의되어 있으면 해당 값 사용,
+ * 없으면 기본값 0 반환
+ *
+ * @param characterName 캐릭터 이름
+ * @param scenario 시나리오 데이터
+ * @returns 초기 trustLevel 값
+ */
+const getInitialTrustLevel = (
+  characterName: string,
+  scenario: ScenarioData
+): number => {
+  // initialRelationships에서 플레이어-캐릭터 관계 찾기
+  const playerRelation = scenario.initialRelationships?.find(
+    (rel) =>
+      (rel.personA === '(플레이어)' && rel.personB === characterName) ||
+      (rel.personB === '(플레이어)' && rel.personA === characterName)
+  );
+
+  return playerRelation?.value ?? 0;
+};
+
+/**
+ * [Stage 1 개선 #4] storyOpening 기본값 병합 헬퍼
+ *
+ * storyOpening이 undefined이거나 부분적으로 정의된 경우 기본값으로 채움
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 기본값이 병합된 StoryOpening
+ */
+const getStoryOpeningWithDefaults = (
+  scenario: ScenarioData
+): ScenarioData['storyOpening'] => {
+  const defaults = {
+    characterIntroductionStyle: 'contextual' as const,
+    npcRelationshipExposure: 'hidden' as const,
+  };
+
+  if (!scenario.storyOpening) {
+    return defaults;
+  }
+
+  return {
+    ...defaults,
+    ...scenario.storyOpening,
+  };
 };
 
 /**
@@ -240,6 +319,64 @@ const getInitialSurvivors = (
       traits: c.currentTrait ? [c.currentTrait.displayName || c.currentTrait.traitName] : [],
       status: 'normal',
     }));
+};
+
+/**
+ * 캐릭터 소개 시퀀스에서 다음에 만날 캐릭터 가져오기
+ *
+ * 'gradual' 스타일에서 게임 진행 중 순차적으로 캐릭터를 소개할 때 사용
+ * 이미 만난 캐릭터를 건너뛰고 다음 순서의 캐릭터를 반환
+ *
+ * @param scenario 시나리오 데이터
+ * @param metCharacters 이미 만난 캐릭터 목록
+ * @returns 다음에 만날 캐릭터 정보 또는 null
+ */
+const getNextCharacterToIntroduce = (
+  scenario: ScenarioData,
+  metCharacters: string[]
+): { characterName: string; encounterContext: string; order: number } | null => {
+  const introSequence = scenario.storyOpening?.characterIntroductionSequence;
+
+  if (!introSequence || introSequence.length === 0) {
+    return null;
+  }
+
+  // 순서대로 정렬 후 아직 만나지 않은 첫 캐릭터 찾기
+  const sortedSequence = [...introSequence].sort((a, b) => a.order - b.order);
+
+  for (const intro of sortedSequence) {
+    if (!metCharacters.includes(intro.characterName)) {
+      return {
+        characterName: intro.characterName,
+        encounterContext: intro.encounterContext,
+        order: intro.order,
+      };
+    }
+  }
+
+  return null; // 모든 캐릭터를 이미 만남
+};
+
+/**
+ * NPC 관계의 가시성 상태 업데이트
+ *
+ * 플레이어가 특정 관계를 발견했을 때 가시성 변경
+ *
+ * @param currentStates 현재 관계 상태 배열
+ * @param relationId 업데이트할 관계 ID
+ * @param newVisibility 새 가시성 ('hinted' | 'revealed')
+ * @returns 업데이트된 상태 배열
+ */
+const updateNPCRelationshipVisibility = (
+  currentStates: { relationId: string; visibility: string }[],
+  relationId: string,
+  newVisibility: 'hinted' | 'revealed'
+): { relationId: string; visibility: string }[] => {
+  return currentStates.map((state) =>
+    state.relationId === relationId
+      ? { ...state, visibility: newVisibility }
+      : state
+  );
 };
 
 // =============================================================================
@@ -348,13 +485,47 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
-      // [2025 Enhanced] 주인공 지식 시스템 - 만난 캐릭터만 추적
-      protagonistKnowledge: {
-        metCharacters: getInitialMetCharacters(scenario),
-        discoveredRelationships: [],
-        hintedRelationships: [],
-        informationPieces: [],
-      },
+
+      // =======================================================================
+      // [2025 Enhanced] 주인공 지식 시스템
+      // 게임 진행 중 주인공이 알게 되는 정보를 추적
+      // [Stage 1 개선 #2] 배열 깊은 병합 (스프레드 대신 concat + 중복 제거)
+      // =======================================================================
+      protagonistKnowledge: (() => {
+        const baseMetCharacters = getInitialMetCharacters(scenario);
+        const initialKnowledge = scenario.storyOpening?.initialProtagonistKnowledge;
+
+        return {
+          // metCharacters: 기본값 + 시나리오 정의값 병합 (중복 제거)
+          metCharacters: [
+            ...new Set([
+              ...baseMetCharacters,
+              ...(initialKnowledge?.metCharacters || []),
+            ]),
+          ],
+          // 나머지 배열 필드: 시나리오 값 그대로 사용
+          discoveredRelationships: initialKnowledge?.discoveredRelationships || [],
+          hintedRelationships: initialKnowledge?.hintedRelationships || [],
+          informationPieces: initialKnowledge?.informationPieces || [],
+        };
+      })(),
+
+      // =======================================================================
+      // [2025 Enhanced] 숨겨진 NPC 관계 가시성 추적
+      // 플레이어가 아직 발견하지 못한 NPC 간의 관계를 추적
+      // AI 프롬프트에서 "이 관계는 아직 비밀" 등으로 활용
+      // =======================================================================
+      npcRelationshipStates:
+        scenario.storyOpening?.hiddenNPCRelationships?.map((rel) => ({
+          relationId: rel.relationId,
+          visibility: rel.visibility || 'hidden',
+        })) || [],
+
+      // =======================================================================
+      // [2025 Enhanced] 이머전트 내러티브 트리거 추적
+      // 발동된 스토리 이벤트 ID를 기록하여 중복 발동 방지
+      // =======================================================================
+      triggeredStoryEvents: [],
     },
     community: {
       // 처음에는 만난 캐릭터만 survivors에 포함 (나머지는 스토리 진행 중 추가)
@@ -371,13 +542,14 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       choice_b: '... 로딩 중 ...',
     },
     // 캐릭터 아크 초기화
+    // [Stage 1 개선 #1] trustLevel을 initialRelationships에서 가져옴
     characterArcs: charactersWithTraits
       .filter((c) => c.characterName !== '(플레이어)')
       .map((c) => ({
         characterName: c.characterName,
         moments: [],
         currentMood: 'anxious' as const,
-        trustLevel: 0,
+        trustLevel: getInitialTrustLevel(c.characterName, scenario),
       })),
     // 회상 시스템 - 주요 결정 기록 초기화
     keyDecisions: [],
@@ -427,6 +599,21 @@ import type {
   RelationshipChangeRecord,
   ChangeSummaryData,
 } from '@/types';
+
+// [남은 이슈 #3] informationPieces 중복 체크 헬퍼 함수
+const addInformationPiece = (
+  pieces: { id: string; content: string; source: string; discoveredAt: { day: number; action: string } }[],
+  newPiece: { id: string; content: string; source: string; discoveredAt: { day: number; action: string } }
+): boolean => {
+  // ID 기반 중복 체크
+  const exists = pieces.some((p) => p.id === newPiece.id);
+  if (exists) {
+    console.log(`📝 중복 정보 무시: ${newPiece.id}`);
+    return false;
+  }
+  pieces.push(newPiece);
+  return true;
+};
 
 // State updater function v2.0
 const updateSaveState = (
@@ -1062,6 +1249,127 @@ const updateSaveState = (
       locations_discovered
     );
     console.log('🗺️ 새로 발견된 장소:', locations_discovered.map((l) => l.name).join(', '));
+
+    // [Stage 4] 발견된 장소를 protagonistKnowledge.informationPieces에도 추가
+    if (newSaveState.context.protagonistKnowledge) {
+      const currentDay = newSaveState.context.currentDay || 1;
+      locations_discovered.forEach((loc) => {
+        const newInfoPiece = {
+          id: `location_${loc.name}_${Date.now()}`,
+          content: `${loc.name} 발견: ${loc.description || '새로운 장소'}`,
+          source: `exploration:${loc.name}`,
+          discoveredAt: {
+            day: currentDay,
+            action: 'ai_response',
+          },
+        };
+
+        if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+          newSaveState.context.protagonistKnowledge.informationPieces = [];
+        }
+        // [남은 이슈 #3] 중복 체크 후 추가
+        addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
+      });
+      console.log(`📝 주인공 지식 업데이트: ${locations_discovered.length}개 장소 발견 정보 추가`);
+    }
+  }
+
+  // [Stage 4] NPC 관계 힌트 감지 및 npcRelationshipStates 업데이트
+  // AI 서사에서 숨겨진 NPC 관계가 언급되면 visibility를 'hinted' 또는 'revealed'로 변경
+  if (newSaveState.context.npcRelationshipStates && scenario.storyOpening?.hiddenNPCRelationships) {
+    const narrative = aiResponse.log || '';
+    const hiddenRelationships = scenario.storyOpening.hiddenNPCRelationships;
+
+    // [Stage 4 개선] 명시적 관계 키워드 목록
+    const RELATIONSHIP_KEYWORDS = [
+      '사이', '관계', '실은', '알고 보니', '형제', '자매', '부모',
+      '연인', '친구였', '적이었', '동료였', '원수', '가족', '부부',
+    ];
+    const hasExplicitKeyword = RELATIONSHIP_KEYWORDS.some(keyword => narrative.includes(keyword));
+
+    hiddenRelationships.forEach((rel) => {
+      const relState = newSaveState.context.npcRelationshipStates?.find(
+        (r: { relationId: string }) => r.relationId === rel.relationId
+      );
+
+      if (!relState) return;
+
+      // 관계에 연결된 두 캐릭터 이름을 찾음
+      const relatedChars = rel.relationId.split('-');
+      // 서사에서 두 캐릭터가 함께 언급되었는지 확인
+      const bothMentioned = relatedChars.length >= 2 &&
+        relatedChars.every((charName: string) => narrative.includes(charName));
+
+      if (!bothMentioned) return;
+
+      // protagonistKnowledge 초기화
+      if (!newSaveState.context.protagonistKnowledge) return;
+      if (!newSaveState.context.protagonistKnowledge.hintedRelationships) {
+        newSaveState.context.protagonistKnowledge.hintedRelationships = [];
+      }
+      if (!newSaveState.context.protagonistKnowledge.discoveredRelationships) {
+        newSaveState.context.protagonistKnowledge.discoveredRelationships = [];
+      }
+
+      const pk = newSaveState.context.protagonistKnowledge;
+
+      if (relState.visibility === 'hidden') {
+        // [Stage 4 개선 #1] hidden → hinted (또는 명시적 키워드 시 바로 revealed)
+        if (hasExplicitKeyword) {
+          relState.visibility = 'revealed';
+          console.log(`💡 NPC 관계 공개: ${rel.relationId} -> revealed (명시적 키워드)`);
+          // discoveredRelationships에 추가
+          if (!pk.discoveredRelationships.includes(rel.relationId)) {
+            pk.discoveredRelationships.push(rel.relationId);
+          }
+        } else {
+          relState.visibility = 'hinted';
+          console.log(`💡 NPC 관계 힌트: ${rel.relationId} -> hinted`);
+          // hintedRelationships에 추가
+          if (!pk.hintedRelationships.includes(rel.relationId)) {
+            pk.hintedRelationships.push(rel.relationId);
+          }
+        }
+      } else if (relState.visibility === 'hinted') {
+        // [Stage 4 개선 #1] hinted → revealed (재언급 또는 명시적 키워드)
+        relState.visibility = 'revealed';
+        console.log(`💡 NPC 관계 공개: ${rel.relationId} -> revealed (재언급)`);
+        // [Stage 4 개선 #2] hintedRelationships에서 제거, discoveredRelationships에 추가
+        pk.hintedRelationships = pk.hintedRelationships.filter(id => id !== rel.relationId);
+        if (!pk.discoveredRelationships.includes(rel.relationId)) {
+          pk.discoveredRelationships.push(rel.relationId);
+        }
+      }
+      // revealed 상태면 변경 없음
+    });
+  }
+
+  // [남은 이슈 #2] urgentMatters 업데이트 - 스탯이 위험 수준(40% 이하)일 때 긴급 사안으로 추가
+  if (newSaveState.context.actionContext) {
+    const statRanges: Record<string, { min: number; max: number }> = {};
+    const statNameMap: Record<string, string> = {};
+
+    for (const stat of scenario.scenarioStats) {
+      statRanges[stat.id] = { min: stat.min ?? 0, max: stat.max ?? 100 };
+      statNameMap[stat.id] = stat.name;
+    }
+
+    const urgentMatters: string[] = [];
+    const CRITICAL_THRESHOLD = 0.4;
+
+    for (const [statId, value] of Object.entries(newSaveState.context.scenarioStats)) {
+      const range = statRanges[statId];
+      if (!range) continue;
+
+      const numValue = typeof value === 'number' ? value : 0;
+      const percentage = (numValue - range.min) / (range.max - range.min);
+      if (percentage <= CRITICAL_THRESHOLD) {
+        const statName = statNameMap[statId] || statId;
+        urgentMatters.push(`${statName} 위험 수준 (${Math.round(percentage * 100)}%)`);
+      }
+    }
+
+    newSaveState.context.actionContext.urgentMatters = urgentMatters;
   }
 
   return newSaveState;
@@ -1139,6 +1447,33 @@ export default function GameClient({ scenario }: GameClientProps) {
     setIsGeneratingEnding(true);
 
     try {
+      // [Stage 5] 주인공 지식 및 NPC 관계 상태 추출
+      const protagonistKnowledge = currentState.context.protagonistKnowledge;
+      const npcRelationshipStates = currentState.context.npcRelationshipStates;
+
+      // [Stage 5] 발견된 정보 요약
+      const discoveredInfo = {
+        metCharacters: protagonistKnowledge?.metCharacters || [],
+        discoveredRelationships: protagonistKnowledge?.discoveredRelationships || [],
+        hintedRelationships: protagonistKnowledge?.hintedRelationships || [],
+        informationPieces: (protagonistKnowledge?.informationPieces || [])
+          .map(p => p.content)
+          .slice(-20), // 최근 20개 정보만
+        revealedNPCRelations: (npcRelationshipStates || [])
+          .filter((r: { visibility: string }) => r.visibility !== 'hidden')
+          .map((r: { relationId: string; visibility: string }) => `${r.relationId}(${r.visibility})`),
+      };
+
+      // [Stage 5 개선 #1] characterArcs 요약 데이터 추출
+      const characterArcsSummary = (currentState.characterArcs || []).map(arc => ({
+        name: arc.characterName,
+        trustLevel: arc.trustLevel,
+        currentMood: arc.currentMood,
+        keyMoments: arc.moments
+          .slice(-5) // 최근 5개 모먼트만
+          .map(m => `Day${m.day}: ${m.description}`),
+      }));
+
       const response = await fetch('/api/generate-ending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1158,6 +1493,10 @@ export default function GameClient({ scenario }: GameClientProps) {
             relationships: currentState.community.hiddenRelationships,
             day: currentDay,
           },
+          // [Stage 5] 추가 컨텍스트
+          discoveredInfo,
+          // [Stage 5 개선 #1] 캐릭터 아크 정보
+          characterArcs: characterArcsSummary,
         }),
       });
 
@@ -1166,6 +1505,13 @@ export default function GameClient({ scenario }: GameClientProps) {
       if (result.success && result.ending) {
         console.log('✅ 동적 엔딩 생성 완료:', result.ending.title);
         setDynamicEnding(result.ending);
+
+        // [PlayTestLogger] Stage 5 로깅 (동적 엔딩)
+        playTestLogger.logStage5Ending('dynamic', {
+          title: result.ending.title,
+          sdtScore: result.ending.sdtScore,
+          satisfaction: result.ending.satisfaction,
+        });
       } else {
         console.error('❌ 동적 엔딩 생성 실패:', result.error);
       }
@@ -1216,6 +1562,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       setError(null);
       try {
         const initialState = createInitialSaveState(scenario);
+        // [PlayTestLogger] Stage 1 로깅
+        playTestLogger.logStage1(scenario, initialState);
+
         const aiSettings = getOptimalAISettings(1, 'medium', 0, scenario);
 
         // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
@@ -1307,13 +1656,108 @@ export default function GameClient({ scenario }: GameClientProps) {
               });
             }
 
+            // =================================================================
+            // [Stage 2] 스토리 오프닝 후 상태 업데이트
+            // protagonistKnowledge를 업데이트하여 첫 캐릭터를 만났음을 기록
+            // =================================================================
+            const firstCharacter = scenario.storyOpening?.firstCharacterToMeet;
+            const introSequence = scenario.storyOpening?.characterIntroductionSequence;
+            const firstInSequence = introSequence?.find((s) => s.order === 1);
+            const metCharacterName = firstInSequence?.characterName || firstCharacter;
+
+            // metCharacters 업데이트 (이미 포함되어 있지 않은 경우만)
+            const currentMetCharacters = initialState.context.protagonistKnowledge?.metCharacters || [];
+            const updatedMetCharacters = metCharacterName && !currentMetCharacters.includes(metCharacterName)
+              ? [...currentMetCharacters, metCharacterName]
+              : currentMetCharacters;
+
+            // 첫 만남에서 얻은 기본 정보 기록
+            const initialInformationPieces = initialState.context.protagonistKnowledge?.informationPieces || [];
+            const newInformationPieces = metCharacterName
+              ? [
+                  ...initialInformationPieces,
+                  {
+                    id: `opening_meet_${metCharacterName}`,
+                    content: `${metCharacterName}을(를) 처음 만났다.`,
+                    source: 'story_opening',
+                    discoveredAt: { day: 1, action: 'opening' },
+                  },
+                ]
+              : initialInformationPieces;
+
+            // =================================================================
+            // [Stage 2 개선 #1] characterArcs 첫 만남 moment 기록
+            // =================================================================
+            const updatedCharacterArcs = metCharacterName
+              ? (initialState.characterArcs || []).map((arc) => {
+                  if (arc.characterName === metCharacterName) {
+                    return {
+                      ...arc,
+                      moments: [
+                        ...arc.moments,
+                        {
+                          day: 1,
+                          type: 'relationship' as const,
+                          description: `${metCharacterName}과(와) 처음 만났다.`,
+                          relatedCharacter: '(플레이어)',
+                          impact: 'positive' as const,
+                        },
+                      ],
+                    };
+                  }
+                  return arc;
+                })
+              : initialState.characterArcs;
+
+            // =================================================================
+            // [Stage 2 개선 #2] actionContext 오프닝 반영
+            // =================================================================
+            const updatedActionContext = {
+              ...initialState.context.actionContext,
+              // 현재 상황을 오프닝 상황으로 업데이트
+              currentSituation: storyOpening.incitingIncident || initialState.context.actionContext?.currentSituation,
+              // 첫 만남 대화 기록 추가
+              todayActions: metCharacterName
+                ? {
+                    ...initialState.context.actionContext?.todayActions,
+                    dialogues: [
+                      ...(initialState.context.actionContext?.todayActions?.dialogues || []),
+                      { characterName: metCharacterName, topic: 'first_encounter' },
+                    ],
+                  }
+                : initialState.context.actionContext?.todayActions,
+            };
+
             // 상태 업데이트 (log 대신 chatHistory 직접 설정)
             const updatedState: SaveState = {
               ...initialState,
               log: storyOpening.fullLog,
               chatHistory,
               dilemma: storyOpening.dilemma,
+              context: {
+                ...initialState.context,
+                // [Stage 2] protagonistKnowledge 업데이트
+                protagonistKnowledge: {
+                  ...initialState.context.protagonistKnowledge,
+                  metCharacters: updatedMetCharacters,
+                  informationPieces: newInformationPieces,
+                },
+                // [Stage 2 개선 #2] actionContext 업데이트
+                actionContext: updatedActionContext,
+              },
+              // [Stage 2 개선 #1] characterArcs 업데이트
+              characterArcs: updatedCharacterArcs,
             };
+
+            console.log('📖 스토리 오프닝 완료 - 상태 업데이트:', {
+              metCharacters: updatedMetCharacters,
+              newInfo: newInformationPieces.length - initialInformationPieces.length,
+              characterArcsMoment: metCharacterName ? `${metCharacterName} 첫 만남 moment 추가` : '없음',
+              actionContextSituation: updatedActionContext.currentSituation?.substring(0, 50),
+            });
+
+            // [PlayTestLogger] Stage 2 로깅
+            playTestLogger.logStage2(updatedState, true);
 
             setSaveState(updatedState);
           } else {
@@ -1473,6 +1917,9 @@ export default function GameClient({ scenario }: GameClientProps) {
         scenario,
       );
 
+      // [PlayTestLogger] Stage 4 로깅 (AI 응답 처리)
+      playTestLogger.logStage4AIResponse(cleanedResponse, newSaveState, updatedSaveState);
+
       // 회상 시스템 - 주요 결정 기록
       // Bug fix: 상태 업데이트 전의 day/turn 사용 (newSaveState)
       const recordKeyDecision = () => {
@@ -1631,6 +2078,14 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       setSaveState(stateAfterAP);
 
+      // [PlayTestLogger] Stage 3 로깅 (선택 액션)
+      playTestLogger.logStage3Action('choice', {
+        choice: choiceDetails,
+        isCustomInput,
+        synergyApplied: !!apCostInfo,
+        apCost: apCostInfo?.finalCost || 1,
+      }, stateAfterAP);
+
       console.log('🔄 상태 업데이트 완료, 엔딩 조건 확인 시작...');
       if (shouldAdvanceDay) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진`);
@@ -1728,6 +2183,12 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       if (ending) {
         console.log(`🎉 엔딩 발동! -> ${ending.title}`);
+        // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩)
+        playTestLogger.logStage5Ending('legacy', {
+          endingId: ending.endingId,
+          title: ending.title,
+          isGoalSuccess: ending.isGoalSuccess,
+        });
         setTriggeredEnding(ending);
       }
     } catch (err) {
@@ -1842,6 +2303,60 @@ export default function GameClient({ scenario }: GameClientProps) {
           content: dialogueResponse.infoGained,
           timestamp: Date.now() + 2,
         });
+
+        // [Stage 3] protagonistKnowledge 업데이트: 정보 조각 추가
+        if (newSaveState.context.protagonistKnowledge) {
+          const currentDay = newSaveState.context.currentDay || 1;
+          const newInfoPiece = {
+            id: `dialogue_info_${characterName}_${Date.now()}`,
+            content: dialogueResponse.infoGained,
+            source: `dialogue:${characterName}`,
+            discoveredAt: {
+              day: currentDay,
+              action: 'dialogue',
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
+          console.log(`📝 주인공 지식 업데이트: ${characterName}에게서 정보 획득`);
+        }
+
+        // [Stage 3 개선 #2] 중요 대화 keyDecisions 기록
+        const currentDayForDecision = newSaveState.context.currentDay || 1;
+        const turnForDecision = newSaveState.context.turnsInCurrentDay || 0;
+        const dialogueKeyDecision = {
+          day: currentDayForDecision,
+          turn: turnForDecision,
+          choice: `[${characterName}와 대화] ${topic.label}`,
+          consequence: dialogueResponse.infoGained.slice(0, 50),
+          category: 'relationship' as const,
+          impactedCharacters: [characterName],
+        };
+
+        if (!newSaveState.keyDecisions) {
+          newSaveState.keyDecisions = [];
+        }
+        newSaveState.keyDecisions.push(dialogueKeyDecision);
+        if (newSaveState.keyDecisions.length > 20) {
+          newSaveState.keyDecisions.shift();
+        }
+        console.log(`📝 중요 대화 기록: ${characterName}에게서 정보 획득 - keyDecisions에 추가`);
+      }
+
+      // [Stage 3 개선 #1] 대화 후 metCharacters 자동 추가
+      if (newSaveState.context.protagonistKnowledge) {
+        const currentMetCharacters = newSaveState.context.protagonistKnowledge.metCharacters || [];
+        if (!currentMetCharacters.includes(characterName)) {
+          newSaveState.context.protagonistKnowledge.metCharacters = [
+            ...currentMetCharacters,
+            characterName,
+          ];
+          console.log(`📝 metCharacters 업데이트: ${characterName} 추가 (대화)`);
+        }
       }
 
       // Dynamic Ending System: ActionHistory 기록 (대화) - v1.2: 시너지 보너스 반영
@@ -1898,6 +2413,14 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 대화 후 선택 모드로 복귀
 
+      // [PlayTestLogger] Stage 3 로깅 (대화 액션)
+      playTestLogger.logStage3Action('dialogue', {
+        characterName,
+        topic: topic.topicId,
+        relationshipChange: dialogueResponse.relationshipChange,
+        infoGained: dialogueResponse.infoGained,
+      }, stateAfterAP);
+
       // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
       if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
         console.log(`💬 대화 비용 조정: ${apCostInfo.bonus}`);
@@ -1907,11 +2430,23 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (대화)`);
       }
 
+      // [Stage 3] Dynamic Ending System: 동적 엔딩 체크 (handlePlayerChoice와 동일)
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDayForDynamic = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDayForDynamic >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // 동적 엔딩 생성
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (canCheckEnding(currentDay, scenario)) {
+      // [Stage 3] Dynamic Ending이 비활성화된 경우에만 기존 엔딩 체크
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -1958,6 +2493,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
 
         if (ending) {
+          // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩 - 대화)
+          playTestLogger.logStage5Ending('legacy', {
+            endingId: ending.endingId,
+            title: ending.title,
+            isGoalSuccess: ending.isGoalSuccess,
+          });
           setTriggeredEnding(ending);
         }
       }
@@ -2007,6 +2548,33 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       // 탐색 결과를 채팅 히스토리에 추가
       const newSaveState = { ...saveState };
+
+      // [Stage 3] v1.2: 시너지 보너스 체크 (대화 → 탐색: infoUnlock, 선택 → 탐색: preparation)
+      let synergyClueBonusApplied = false;
+      const recentActions = newSaveState.context.actionsThisDay || [];
+      if (recentActions.length > 0) {
+        const lastAction = recentActions[recentActions.length - 1];
+        const synergy = getActionSynergy(lastAction.actionType, 'exploration');
+
+        if (synergy?.mechanicEffect?.statBonus && explorationResult.rewards?.statChanges) {
+          // 시너지 보너스를 첫 번째 양수 스탯 변화에 적용
+          const statsToBoost = Object.entries(explorationResult.rewards.statChanges)
+            .filter(([, v]) => (v as number) > 0);
+
+          if (statsToBoost.length > 0) {
+            const [statId] = statsToBoost[0];
+            explorationResult.rewards.statChanges[statId] =
+              (explorationResult.rewards.statChanges[statId] || 0) + synergy.mechanicEffect.statBonus;
+            console.log(`✨ 탐색 시너지 보너스 적용: ${statId} +${synergy.mechanicEffect.statBonus} (${synergy.bonus})`);
+          }
+        }
+
+        // infoUnlock 보너스: 대화에서 들은 정보가 탐색에 도움
+        if (synergy?.mechanicEffect?.infoUnlock) {
+          synergyClueBonusApplied = true;
+          console.log(`✨ 정보 시너지 적용: 대화에서 얻은 힌트가 탐색에 도움 (${synergy.bonus})`);
+        }
+      }
 
       // 플레이어 행동
       newSaveState.chatHistory.push({
@@ -2101,6 +2669,72 @@ export default function GameClient({ scenario }: GameClientProps) {
             timestamp: Date.now() + 2,
           });
         }
+
+        // [Stage 3] protagonistKnowledge 업데이트: 탐색으로 얻은 정보 추가
+        if (newSaveState.context.protagonistKnowledge && explorationResult.rewards.infoGained) {
+          const currentDay = newSaveState.context.currentDay || 1;
+          const newInfoPiece = {
+            id: `exploration_info_${location.locationId}_${Date.now()}`,
+            content: explorationResult.rewards.infoGained,
+            source: `exploration:${location.locationId}`,
+            discoveredAt: {
+              day: currentDay,
+              action: 'exploration',
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
+          console.log(`📝 주인공 지식 업데이트: ${location.name} 탐색으로 정보 획득`);
+        }
+      }
+
+      // [Stage 3] WorldState 발견물도 protagonistKnowledge에 추가
+      if (newSaveState.context.protagonistKnowledge && worldStateResult?.newDiscoveries.length) {
+        const currentDay = newSaveState.context.currentDay || 1;
+        for (const discovery of worldStateResult.newDiscoveries) {
+          const newInfoPiece = {
+            id: `discovery_${discovery.name}_${Date.now()}`,
+            content: `${discovery.name}: ${discovery.description || ''}`,
+            source: `exploration:${location.locationId}`,
+            discoveredAt: {
+              day: currentDay,
+              action: 'exploration',
+            },
+          };
+
+          if (!newSaveState.context.protagonistKnowledge.informationPieces) {
+            newSaveState.context.protagonistKnowledge.informationPieces = [];
+          }
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
+        }
+        console.log(`📝 주인공 지식 업데이트: ${worldStateResult.newDiscoveries.length}개 발견물 추가`);
+
+        // [Stage 3 개선 #2] 중요 탐색 keyDecisions 기록 (발견물이 있을 때)
+        const currentDayForDecision = newSaveState.context.currentDay || 1;
+        const turnForDecision = newSaveState.context.turnsInCurrentDay || 0;
+        const discoveryNames = worldStateResult.newDiscoveries.map(d => d.name).join(', ');
+        const explorationKeyDecision = {
+          day: currentDayForDecision,
+          turn: turnForDecision,
+          choice: `[${location.name} 탐색]`,
+          consequence: `발견: ${discoveryNames}`.slice(0, 50),
+          category: 'strategic' as const,
+          impactedCharacters: [] as string[],
+        };
+
+        if (!newSaveState.keyDecisions) {
+          newSaveState.keyDecisions = [];
+        }
+        newSaveState.keyDecisions.push(explorationKeyDecision);
+        if (newSaveState.keyDecisions.length > 20) {
+          newSaveState.keyDecisions.shift();
+        }
+        console.log(`📝 중요 탐색 기록: ${location.name}에서 발견물 획득 - keyDecisions에 추가`);
       }
 
       // Dynamic Ending System: ActionHistory 기록 (탐색)
@@ -2176,6 +2810,13 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 탐색 후 선택 모드로 복귀
 
+      // [PlayTestLogger] Stage 3 로깅 (탐색 액션)
+      playTestLogger.logStage3Action('exploration', {
+        locationId: location.locationId,
+        rewards: explorationResult.rewards,
+        newDiscoveries: worldStateResult?.newDiscoveries?.length || 0,
+      }, stateAfterAP);
+
       // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
       if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
         console.log(`🗺️ 탐색 비용 조정: ${apCostInfo.bonus}`);
@@ -2185,11 +2826,23 @@ export default function GameClient({ scenario }: GameClientProps) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진 (탐색)`);
       }
 
+      // [Stage 3] Dynamic Ending System: 동적 엔딩 체크 (handlePlayerChoice와 동일)
+      if (scenario.dynamicEndingConfig?.enabled) {
+        const currentDayForDynamic = stateAfterAP.context.currentDay || 1;
+        const endingDay = scenario.dynamicEndingConfig.endingDay;
+        if (currentDayForDynamic >= endingDay && !dynamicEnding && !isGeneratingEnding) {
+          // 동적 엔딩 생성
+          generateDynamicEnding(stateAfterAP, [...actionHistory]);
+          return; // 동적 엔딩 생성 중이므로 기존 엔딩 체크 건너뜀
+        }
+      }
+
       // 엔딩 체크 (엔딩 체크 시점 이후 항상 체크 - handlePlayerChoice와 동일)
       const currentDay = stateAfterAP.context.currentDay || 1;
       const survivorCount = stateAfterAP.community.survivors.length;
 
-      if (canCheckEnding(currentDay, scenario)) {
+      // [Stage 3] Dynamic Ending이 비활성화된 경우에만 기존 엔딩 체크
+      if (canCheckEnding(currentDay, scenario) && !scenario.dynamicEndingConfig?.enabled) {
         const currentPlayerState: PlayerState = {
           stats: stateAfterAP.context.scenarioStats,
           flags: stateAfterAP.context.flags,
@@ -2236,6 +2889,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
 
         if (ending) {
+          // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩 - 탐색)
+          playTestLogger.logStage5Ending('legacy', {
+            endingId: ending.endingId,
+            title: ending.title,
+            isGoalSuccess: ending.isGoalSuccess,
+          });
           setTriggeredEnding(ending);
         }
       }

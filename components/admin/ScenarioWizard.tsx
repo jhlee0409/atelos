@@ -32,7 +32,6 @@ import {
   Sparkles,
   RotateCcw,
   BookOpen,
-  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -52,13 +51,7 @@ import {
   type IdeaSuggestionsResult,
   type IdeaSuggestion,
   type StoryOpeningResult,
-  type CharacterIntroductionsResult,
-  type HiddenRelationshipsResult,
-  type CharacterRevelationsResult,
   type GameplayConfigResult,
-  type EmergentNarrativeResult,
-  type LocationsResult,
-  type ScenarioLocationResult,
 } from '@/lib/ai-scenario-generator';
 import type { ScenarioData, Trait, DynamicEndingConfig } from '@/types';
 
@@ -110,19 +103,12 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
   const [relationships, setRelationships] = useState<RelationshipResult[]>([]);
   const [traits, setTraits] = useState<TraitsResult>({ buffs: [], debuffs: [] });
   const [stats, setStats] = useState<StatResult[]>([]);
-  const [locations, setLocations] = useState<ScenarioLocationResult[]>([]);
 
-  // 스토리 오프닝 시스템 (Phase 7)
+  // 스토리 오프닝 시스템 (Phase 7) - 간소화됨
   const [storyOpening, setStoryOpening] = useState<StoryOpeningResult | null>(null);
-  const [characterIntroductions, setCharacterIntroductions] = useState<CharacterIntroductionsResult['characterIntroductionSequence']>([]);
-  const [hiddenRelationships, setHiddenRelationships] = useState<HiddenRelationshipsResult['hiddenNPCRelationships']>([]);
-  const [characterRevelations, setCharacterRevelations] = useState<CharacterRevelationsResult['characterRevelations']>([]);
 
-  // 게임플레이 설정 (GameplayConfig)
+  // 게임플레이 설정 (GameplayConfig) - 실제 사용 필드만
   const [gameplayConfig, setGameplayConfig] = useState<GameplayConfigResult | null>(null);
-
-  // 이머전트 내러티브 (EmergentNarrative)
-  const [emergentNarrative, setEmergentNarrative] = useState<EmergentNarrativeResult | null>(null);
 
   // 아이디어 추천
   const [ideaSuggestions, setIdeaSuggestions] = useState<IdeaSuggestion[]>([]);
@@ -252,7 +238,7 @@ export function ScenarioWizard({ onComplete, onCancel }: ScenarioWizardProps) {
     }
   }, [synopsisResult]);
 
-  // 시스템(스탯/탐색위치) 생성
+  // 시스템(스탯) 생성 - locations 제거됨 (동적 위치 시스템으로 대체)
   const handleGenerateSystem = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -282,14 +268,10 @@ ${characterDetails}`;
         totalDays: targetLength === 'short' ? 5 : targetLength === 'long' ? 10 : 7,
       };
 
-      // 스탯과 탐색 위치를 병렬로 생성
-      const [statsResponse, locationsResponse] = await Promise.all([
-        generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context),
-        generateWithAI<LocationsResult>('locations', scenarioInput, context),
-      ]);
+      // 스탯만 생성 (locations는 동적 위치 시스템으로 대체됨)
+      const statsResponse = await generateWithAI<{ stats: StatResult[] }>('stats', scenarioInput, context);
 
       setStats(statsResponse.data.stats || []);
-      setLocations(locationsResponse.data.locations || []);
       setCurrentStep('system');
     } catch (err) {
       setError(err instanceof Error ? err.message : '시스템 생성에 실패했습니다.');
@@ -298,7 +280,7 @@ ${characterDetails}`;
     }
   }, [synopsisResult, characters, targetLength]);
 
-  // 스토리 오프닝 생성 (Phase 7)
+  // 스토리 오프닝 생성 (Phase 7) - 간소화됨 (미사용 기능 제거)
   const handleGenerateStoryOpening = useCallback(async () => {
     if (!synopsisResult) return;
 
@@ -311,7 +293,6 @@ ${characterDetails}`;
         .map((c) => `- ${c.characterName} (${c.roleName}): ${c.backstory}`)
         .join('\n');
 
-      // 스토리 오프닝, 캐릭터 소개 시퀀스, 숨겨진 관계, 캐릭터 공개를 병렬로 생성
       const scenarioInput = `시나리오: ${synopsisResult.title}
 시놉시스: ${synopsisResult.synopsis}
 플레이어 목표: ${synopsisResult.playerGoal}
@@ -330,44 +311,19 @@ ${characterDetails}`;
         existingStats: stats.map((s) => s.id),
       };
 
-      // 병렬로 6개 카테고리 생성 (스토리 오프닝 + 게임플레이 설정 + 이머전트 내러티브)
-      const [
-        openingResponse,
-        introductionsResponse,
-        hiddenRelsResponse,
-        revelationsResponse,
-        gameplayConfigResponse,
-        emergentNarrativeResponse,
-      ] = await Promise.all([
+      // 병렬로 2개 카테고리만 생성 (story_opening + gameplay_config)
+      // 제거됨: character_introductions, hidden_relationships, character_revelations, emergent_narrative
+      const [openingResponse, gameplayConfigResponse] = await Promise.all([
         generateWithAI<StoryOpeningResult>('story_opening', scenarioInput, context),
-        characters.length >= 2
-          ? generateWithAI<CharacterIntroductionsResult>('character_introductions', scenarioInput, context)
-          : Promise.resolve({ data: { characterIntroductionSequence: [] } }),
-        characters.length >= 2
-          ? generateWithAI<HiddenRelationshipsResult>('hidden_relationships', scenarioInput, context)
-          : Promise.resolve({ data: { hiddenNPCRelationships: [] } }),
-        characters.length >= 1
-          ? generateWithAI<CharacterRevelationsResult>('character_revelations', scenarioInput, context)
-          : Promise.resolve({ data: { characterRevelations: [] } }),
         // 게임플레이 설정 생성 (스탯 기반)
         stats.length > 0
           ? generateWithAI<GameplayConfigResult>('gameplay_config', scenarioInput, context)
           : Promise.resolve({ data: null }),
-        // 이머전트 내러티브 생성 (캐릭터 기반)
-        characters.length >= 2
-          ? generateWithAI<EmergentNarrativeResult>('emergent_narrative', scenarioInput, context)
-          : Promise.resolve({ data: null }),
       ]);
 
       setStoryOpening(openingResponse.data);
-      setCharacterIntroductions(introductionsResponse.data.characterIntroductionSequence || []);
-      setHiddenRelationships(hiddenRelsResponse.data.hiddenNPCRelationships || []);
-      setCharacterRevelations(revelationsResponse.data.characterRevelations || []);
       if (gameplayConfigResponse.data) {
         setGameplayConfig(gameplayConfigResponse.data);
-      }
-      if (emergentNarrativeResponse.data) {
-        setEmergentNarrative(emergentNarrativeResponse.data);
       }
       setCurrentStep('story_opening');
     } catch (err) {
@@ -375,7 +331,7 @@ ${characterDetails}`;
     } finally {
       setIsLoading(false);
     }
-  }, [synopsisResult, characters]);
+  }, [synopsisResult, characters, stats]);
 
   // 완료 및 적용
   const handleComplete = useCallback(() => {
@@ -420,7 +376,7 @@ ${characterDetails}`;
         debuffs: (traits.debuffs || []).map((t) => convertTraitResult(t, 'negative')),
       },
       status: 'in_progress',
-      // 스토리 오프닝 시스템 (Phase 7)
+      // 스토리 오프닝 시스템 (Phase 7) - 간소화됨
       storyOpening: storyOpening ? {
         prologue: storyOpening.prologue,
         incitingIncident: storyOpening.incitingIncident,
@@ -433,48 +389,10 @@ ${characterDetails}`;
         openingLocation: storyOpening.openingLocation,
         thematicElements: storyOpening.thematicElements,
         npcRelationshipExposure: storyOpening.npcRelationshipExposure || 'hidden',
-        // 2025 Enhanced Features
-        characterIntroductionSequence: characterIntroductions.length > 0 ? characterIntroductions.map((intro) => ({
-          characterName: intro.characterName,
-          order: intro.order,
-          encounterContext: intro.encounterContext,
-          firstImpressionKeywords: intro.firstImpressionKeywords,
-          expectedTiming: intro.expectedTiming,
-        })) : undefined,
-        hiddenNPCRelationships: hiddenRelationships.length > 0 ? hiddenRelationships.map((rel) => ({
-          relationId: rel.relationId,
-          characterA: rel.characterA,
-          characterB: rel.characterB,
-          actualValue: rel.actualValue,
-          relationshipType: rel.relationshipType,
-          backstory: rel.backstory,
-          visibility: rel.visibility as 'hidden' | 'hinted',
-          discoveryMethods: [{
-            method: rel.discoveryMethod,
-            revealsTo: 'revealed' as const,
-            hintText: rel.discoveryHint,
-          }],
-        })) : undefined,
-        characterRevelations: characterRevelations.length > 0 ? characterRevelations.map((rev) => ({
-          characterName: rev.characterName,
-          revelationLayers: rev.revelationLayers,
-          ultimateSecret: rev.ultimateSecret,
-        })) : undefined,
-        // 이머전트 내러티브 (동적 스토리 이벤트)
-        emergentNarrative: emergentNarrative ? {
-          enabled: emergentNarrative.enabled,
-          triggers: emergentNarrative.triggers.map((trigger) => ({
-            triggerId: trigger.triggerId,
-            name: trigger.name,
-            conditions: trigger.conditions,
-            generatedEvent: trigger.generatedEvent,
-            triggered: false,
-            oneTime: trigger.oneTime,
-          })),
-          dynamicEventGuidelines: emergentNarrative.dynamicEventGuidelines,
-        } : undefined,
+        // 2025 Enhanced Features - 제거됨 (플레이 시스템에서 미사용)
+        // characterIntroductionSequence, hiddenNPCRelationships, characterRevelations, emergentNarrative
       } : undefined,
-      // 게임플레이 설정 (GameplayConfig)
+      // 게임플레이 설정 (GameplayConfig) - 실제 사용 필드만
       gameplayConfig: gameplayConfig ? {
         routeActivationRatio: gameplayConfig.routeActivationRatio,
         endingCheckRatio: gameplayConfig.endingCheckRatio,
@@ -482,22 +400,9 @@ ${characterDetails}`;
         actionPointsPerDay: gameplayConfig.actionPointsPerDay,
         criticalStatThreshold: gameplayConfig.criticalStatThreshold,
         warningStatThreshold: gameplayConfig.warningStatThreshold,
-        routeScores: gameplayConfig.routeScores,
-        tokenBudgetMultiplier: gameplayConfig.tokenBudgetMultiplier,
-        useGenreFallback: gameplayConfig.useGenreFallback,
-        customFallbackChoices: gameplayConfig.customFallbackChoices,
+        // 미사용 필드 제거: routeScores, tokenBudgetMultiplier, useGenreFallback, customFallbackChoices
       } : undefined,
-      // 탐색 위치 설정
-      locations: locations.length > 0 ? locations.map((loc) => ({
-        locationId: loc.locationId,
-        name: loc.name,
-        description: loc.description,
-        icon: loc.icon,
-        initialStatus: loc.initialStatus,
-        unlockCondition: loc.unlockCondition,
-        dangerLevel: loc.dangerLevel,
-        explorationCooldown: loc.explorationCooldown,
-      })) : undefined,
+      // 탐색 위치 설정 - 제거됨 (동적 위치 시스템으로 대체)
       // 동적 결말 시스템 (기본 활성화)
       dynamicEndingConfig: {
         enabled: true,
@@ -529,7 +434,7 @@ ${characterDetails}`;
     };
 
     onComplete(scenario);
-  }, [synopsisResult, characters, relationships, traits, stats, storyOpening, characterIntroductions, hiddenRelationships, characterRevelations, emergentNarrative, gameplayConfig, onComplete]);
+  }, [synopsisResult, characters, relationships, traits, stats, storyOpening, gameplayConfig, onComplete]);
 
   // 단계 이동
   const goToStep = (step: WizardStep) => {
@@ -873,34 +778,18 @@ ${characterDetails}`;
                 <BarChart3 className="w-4 h-4" />
                 스탯 ({stats.length}개)
               </h4>
-              <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
                 {stats.map((stat, idx) => (
                   <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
                     <div className="font-medium">{stat.name}</div>
                     <div className="text-xs text-zinc-500">{stat.id} ({stat.min}-{stat.max})</div>
+                    <div className="text-xs text-zinc-600">초기값: {stat.initialValue}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div>
-              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                탐색 위치 ({locations.length}개)
-              </h4>
-              <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
-                {locations.map((loc, idx) => (
-                  <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
-                    <div className="font-medium">{loc.name}</div>
-                    <div className="text-xs text-zinc-500">
-                      {loc.initialStatus === 'available' ? '접근 가능' :
-                       loc.initialStatus === 'locked' ? `Day ${loc.unlockCondition?.requiredDay || '?'} 해금` :
-                       '숨김'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* 탐색 위치 UI 제거됨 - 동적 위치 시스템으로 대체 */}
 
             <div className="flex gap-3">
               <Button
@@ -1014,48 +903,25 @@ ${characterDetails}`;
               </>
             )}
 
-            {/* 캐릭터 소개 시퀀스 */}
-            {characterIntroductions.length > 0 && (
+            {/* 게임플레이 설정 요약 */}
+            {gameplayConfig && (
               <div>
-                <h4 className="text-sm font-medium mb-2">캐릭터 소개 순서</h4>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                  {characterIntroductions
-                    .sort((a, b) => a.order - b.order)
-                    .map((intro, idx) => (
-                      <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm flex items-center gap-2">
-                        <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0">
-                          {intro.order}
-                        </Badge>
-                        <span className="font-medium">{intro.characterName}</span>
-                        <span className="text-zinc-500 text-xs">({intro.expectedTiming})</span>
-                        <span className="text-zinc-500 text-xs ml-auto">{intro.encounterContext.slice(0, 30)}...</span>
-                      </div>
-                    ))}
+                <h4 className="text-sm font-medium mb-2">게임플레이 설정</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 bg-zinc-800/30 rounded">
+                    <span className="text-zinc-500">하루 행동 포인트: </span>
+                    <span>{gameplayConfig.actionPointsPerDay}</span>
+                  </div>
+                  <div className="p-2 bg-zinc-800/30 rounded">
+                    <span className="text-zinc-500">엔딩 체크 비율: </span>
+                    <span>{Math.round((gameplayConfig.endingCheckRatio || 0.7) * 100)}%</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* 숨겨진 관계 */}
-            {hiddenRelationships.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">숨겨진 NPC 관계</h4>
-                <div className="space-y-2 max-h-[120px] overflow-y-auto">
-                  {hiddenRelationships.map((rel, idx) => (
-                    <div key={idx} className="p-2 bg-zinc-800/30 rounded text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{rel.characterA}</span>
-                        <span className="text-zinc-500">↔</span>
-                        <span className="font-medium">{rel.characterB}</span>
-                        <Badge variant={rel.visibility === 'hidden' ? 'destructive' : 'secondary'} className="text-xs ml-auto">
-                          {rel.visibility}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-zinc-500 mt-1">{rel.relationshipType}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* 캐릭터 소개 시퀀스 UI 제거됨 - 플레이 시스템에서 미사용 */}
+            {/* 숨겨진 관계 UI 제거됨 - 플레이 시스템에서 미사용 */}
 
             <div className="flex gap-3">
               <Button
@@ -1124,12 +990,12 @@ ${characterDetails}`;
                 <div className="text-xs text-zinc-500">오프닝</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">{hiddenRelationships.length}</div>
-                <div className="text-xs text-zinc-500">숨겨진 관계</div>
+                <div className="text-lg font-bold">{gameplayConfig ? '✓' : '-'}</div>
+                <div className="text-xs text-zinc-500">게임설정</div>
               </div>
               <div className="p-3 bg-zinc-800/30 rounded">
-                <div className="text-lg font-bold">{characterRevelations.length}</div>
-                <div className="text-xs text-zinc-500">캐릭터 비밀</div>
+                <div className="text-lg font-bold">{gameplayConfig?.actionPointsPerDay || 3}</div>
+                <div className="text-xs text-zinc-500">일일 AP</div>
               </div>
             </div>
 

@@ -140,10 +140,13 @@ export interface StoryOpeningResult {
 
 // =============================================================================
 // 2025 Enhanced: 캐릭터 소개 시퀀스
+// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
 // =============================================================================
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export type ExpectedTiming = 'opening' | 'day1' | 'day2' | 'event-driven';
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface CharacterIntroductionResult {
   characterName: string;
   order: number;
@@ -152,17 +155,22 @@ export interface CharacterIntroductionResult {
   expectedTiming: ExpectedTiming;
 }
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface CharacterIntroductionsResult {
   characterIntroductionSequence: CharacterIntroductionResult[];
 }
 
 // =============================================================================
 // 2025 Enhanced: 숨겨진 NPC 관계
+// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
 // =============================================================================
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export type RelationshipVisibility = 'hidden' | 'hinted' | 'suspected' | 'revealed';
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export type DiscoveryMethod = 'dialogue' | 'exploration' | 'observation' | 'event' | 'item';
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface HiddenNPCRelationshipResult {
   relationId: string;
   characterA: string;
@@ -175,17 +183,22 @@ export interface HiddenNPCRelationshipResult {
   discoveryMethod: DiscoveryMethod;
 }
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface HiddenRelationshipsResult {
   hiddenNPCRelationships: HiddenNPCRelationshipResult[];
 }
 
 // =============================================================================
 // 2025 Enhanced: 점진적 캐릭터 공개
+// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
 // =============================================================================
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export type RevelationType = 'personality' | 'backstory' | 'secret' | 'motivation' | 'relationship';
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export type RevelationStyle = 'direct' | 'subtle' | 'accidental' | 'confession';
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface RevelationLayerResult {
   trustThreshold: number;
   revelationType: RevelationType;
@@ -193,12 +206,14 @@ export interface RevelationLayerResult {
   revelationStyle: RevelationStyle;
 }
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface CharacterRevelationResult {
   characterName: string;
   revelationLayers: RevelationLayerResult[];
   ultimateSecret?: string;
 }
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface CharacterRevelationsResult {
   characterRevelations: CharacterRevelationResult[];
 }
@@ -238,8 +253,10 @@ export interface GameplayConfigResult {
 
 // =============================================================================
 // 이머전트 내러티브 (EmergentNarrative Generation)
+// @deprecated v1.3: 플레이 시스템에서 미사용. 생성 시스템에서 제거됨.
 // =============================================================================
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface StorySiftingTriggerResult {
   triggerId: string;
   name: string;
@@ -260,6 +277,7 @@ export interface StorySiftingTriggerResult {
   oneTime: boolean;
 }
 
+/** @deprecated v1.3: 플레이 시스템에서 미사용 */
 export interface EmergentNarrativeResult {
   enabled: boolean;
   triggers: StorySiftingTriggerResult[];

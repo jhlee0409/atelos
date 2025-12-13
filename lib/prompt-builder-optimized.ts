@@ -189,6 +189,9 @@ export const buildOptimizedGamePromptV2 = (
     characterArcs?: import('@/types').CharacterArc[]; // v1.2: 캐릭터 발전 상태 (미사용, 타입 호환성)
     worldState?: import('@/types').WorldState; // v1.2: 월드 상태 (미사용, 타입 호환성)
     metCharacters?: string[]; // v1.2: 만난 캐릭터 (미사용, 타입 호환성)
+    // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템 (미사용, 타입 호환성)
+    npcRelationshipStates?: { relationId: string; visibility: string }[];
+    protagonistKnowledge?: import('@/types').ProtagonistKnowledge;
   } = {},
 ): GamePromptData => {
   const {
