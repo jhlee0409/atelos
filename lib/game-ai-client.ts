@@ -369,7 +369,6 @@ export const cleanAndValidateAIResponse = (
       scenarioStats: response?.statChanges?.scenarioStats || {},
       survivorStatus: response?.statChanges?.survivorStatus || [],
       hiddenRelationships_change: response?.statChanges?.hiddenRelationships_change || [],
-      flags_acquired: response?.statChanges?.flags_acquired || [],
     },
   };
 
@@ -572,7 +571,6 @@ export interface AIResponse {
     scenarioStats: { [key: string]: number };
     survivorStatus: { name: string; newStatus: string }[];
     hiddenRelationships_change: any[];
-    flags_acquired: string[];
   };
 }
 
@@ -742,7 +740,8 @@ export const generateGameResponse = async (
       metadata: {
         day: saveState.context.currentDay,
         statChanges: cleanedResponse.statChanges.scenarioStats,
-        isKeyEvent: cleanedResponse.statChanges.flags_acquired.length > 0,
+        // [v1.4] isKeyEvent는 ActionHistory로 대체됨 - significantEvents에서 판단
+        isKeyEvent: Object.values(cleanedResponse.statChanges.scenarioStats).some(v => Math.abs(v) >= 15),
       },
     });
 
@@ -780,7 +779,6 @@ export const generateGameResponse = async (
         scenarioStats: {},
         survivorStatus: [],
         hiddenRelationships_change: [],
-        flags_acquired: [],
       },
     };
 
@@ -964,7 +962,6 @@ export const generateInitialDilemma = async (
           scenarioStats: {},
           survivorStatus: [],
           hiddenRelationships_change: [],
-          flags_acquired: [],
         },
       };
     } catch (error) {
@@ -1032,7 +1029,6 @@ export const generateInitialDilemmaWithOpening = async (
           scenarioStats: {},
           survivorStatus: [],
           hiddenRelationships_change: [],
-          flags_acquired: [],
         },
       };
 
@@ -1196,8 +1192,7 @@ export const validateGameResponse = (
     }
 
     // 스탯 변화 검증
-    const { scenarioStats, survivorStatus, flags_acquired } =
-      response.statChanges;
+    const { scenarioStats, survivorStatus } = response.statChanges;
 
     if (scenarioStats && typeof scenarioStats !== 'object') {
       console.warn('⚠️ scenarioStats가 객체가 아닙니다.');
@@ -1209,10 +1204,7 @@ export const validateGameResponse = (
       return false;
     }
 
-    if (flags_acquired && !Array.isArray(flags_acquired)) {
-      console.warn('⚠️ flags_acquired가 배열이 아닙니다.');
-      return false;
-    }
+    // [v1.4 REMOVED] flags_acquired 검증 제거 - Dynamic Ending System으로 대체
 
     // 언어 품질 검증
     const logValidation = validateKoreanContent(response.log);

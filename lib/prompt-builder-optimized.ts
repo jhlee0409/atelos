@@ -61,11 +61,11 @@ OUTPUT:
   },
   "statChanges": {
     "scenarioStats": {},
-    "flags_acquired": [],
     "survivorStatus": [],
     "hiddenRelationships_change": []
   }
 }`;
+// [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
 
 // 초경량 프롬프트 (150-200 토큰) - JSON 형식 명시
 const ULTRA_LITE_TEMPLATE = `Korean survival game. Day {{DAY}}/7.
@@ -83,13 +83,13 @@ You MUST respond with ONLY this JSON (no other text):
   },
   "statChanges": {
     "scenarioStats": {"USE_STAT_IDS_ABOVE": 5},
-    "flags_acquired": [],
     "survivorStatus": [],
     "hiddenRelationships_change": []
   }
 }
 
 Rules: Korean only. 3 choices (active/cautious/wait). Choices must end with ~한다/~이다.`;
+// [v1.4 REMOVED] flags_acquired - Dynamic Ending System에서 ActionHistory로 대체
 
 // 캐릭터 정보 압축
 const compressCharacters = (characters: Character[]): string => {

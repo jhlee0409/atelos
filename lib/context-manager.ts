@@ -105,7 +105,7 @@ export const updateContextAfterExploration = (
   narrative: string,
   rewards?: {
     statChanges?: Record<string, number>;
-    flagsAcquired?: string[]; // @deprecated - use significantDiscoveries
+    // [v1.4 REMOVED] flagsAcquired - significantDiscoveries로 대체됨
     significantDiscoveries?: string[]; // v1.2: 발견한 주요 사항들
     infoGained?: string;
   },

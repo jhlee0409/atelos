@@ -271,7 +271,7 @@ class PlayTestLogger {
           logLength: (aiResponse.log as string)?.length || 0,
           hasStatChanges: !!aiResponse.statChanges,
           hasRelationshipChanges: !!aiResponse.relationshipChanges,
-          flagsAcquired: aiResponse.flagsAcquired,
+          // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 ActionHistory로 대체
         },
         statChanges,
         urgentMatters: afterState.context.actionContext?.urgentMatters || [],

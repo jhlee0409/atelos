@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus, Users, Flag } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
+// [v1.4 REMOVED] Flag icon - Dynamic Ending System에서 flagsAcquired 제거
 
 export interface StatChange {
   statId: string;
@@ -21,7 +22,7 @@ export interface RelationshipChange {
 export interface ChangeSummaryData {
   statChanges: StatChange[];
   relationshipChanges: RelationshipChange[];
-  flagsAcquired: string[];
+  // [v1.4 REMOVED] flagsAcquired - Dynamic Ending System에서 ActionHistory로 대체
   timestamp: number;
 }
 
@@ -34,8 +35,7 @@ export const ChangeSummary = ({
 }) => {
   const hasChanges =
     data.statChanges.length > 0 ||
-    data.relationshipChanges.length > 0 ||
-    data.flagsAcquired.length > 0;
+    data.relationshipChanges.length > 0;
 
   if (!hasChanges) return null;
 
@@ -92,17 +92,7 @@ export const ChangeSummary = ({
             </span>
           </span>
         ))}
-        {data.flagsAcquired.map((flag, idx) => (
-          <span
-            key={`flag-${idx}`}
-            className="inline-flex items-center gap-1 rounded bg-purple-900/30 px-1.5 py-0.5"
-          >
-            <Flag className="h-3 w-3 text-purple-400" />
-            <span className="text-purple-300">
-              {flag.replace('FLAG_', '').replace(/_/g, ' ')}
-            </span>
-          </span>
-        ))}
+        {/* [v1.4 REMOVED] flagsAcquired 렌더링 - Dynamic Ending System에서 ActionHistory로 대체 */}
       </div>
     );
   }
@@ -177,22 +167,7 @@ export const ChangeSummary = ({
         </div>
       )}
 
-      {/* 획득한 플래그 */}
-      {data.flagsAcquired.length > 0 && (
-        <div className="mt-2 border-t border-zinc-800 pt-2">
-          <div className="flex flex-wrap gap-1">
-            {data.flagsAcquired.map((flag, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 rounded bg-purple-900/40 px-2 py-1 text-xs text-purple-300"
-              >
-                <Flag className="h-3 w-3" />
-                {flag.replace('FLAG_', '').replace(/_/g, ' ')}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* [v1.4 REMOVED] 획득한 플래그 - Dynamic Ending System에서 ActionHistory로 대체 */}
     </div>
   );
 };

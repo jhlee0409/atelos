@@ -65,7 +65,7 @@ export interface EndingResult {
   isGoalSuccess: boolean;
   suggestedConditions: {
     stats: { statId: string; comparison: string; value: number }[];
-    flags: string[];
+    // [v1.4 REMOVED] flags - Dynamic Ending System에서 ActionHistory로 대체
   };
 }
 

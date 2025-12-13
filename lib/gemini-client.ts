@@ -158,16 +158,7 @@ const extractFieldsWithRegex = <T>(text: string): T | null => {
       survivorStatus.push({ name: statusMatch[1], newStatus: statusMatch[2] });
     }
 
-    // flags_acquired 추출
-    const flags_acquired: string[] = [];
-    const flagsMatch = text.match(/"flags_acquired"\s*:\s*\[(.*?)\]/);
-    if (flagsMatch) {
-      const flagPattern = /"([^"]+)"/g;
-      let flagMatch;
-      while ((flagMatch = flagPattern.exec(flagsMatch[1])) !== null) {
-        flags_acquired.push(flagMatch[1]);
-      }
-    }
+    // [v1.4 REMOVED] flags_acquired 추출 제거 - Dynamic Ending System에서 ActionHistory로 대체
 
     const result = {
       log,
@@ -180,7 +171,6 @@ const extractFieldsWithRegex = <T>(text: string): T | null => {
         scenarioStats,
         survivorStatus,
         hiddenRelationships_change: [],
-        flags_acquired,
       },
     };
 

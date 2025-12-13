@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
 import { KeyDecision } from '@/types';
-import { getKoreanFlagName } from '@/constants/korean-english-mapping';
-import { ChevronDown, ChevronUp, History, Sword, Heart, Scale, Compass, Flag, Users } from 'lucide-react';
+// [v1.4 REMOVED] getKoreanFlagName - Dynamic Ending System에서 flagsAcquired 제거
+import { ChevronDown, ChevronUp, History, Sword, Heart, Scale, Compass, Users } from 'lucide-react';
+// [v1.4 REMOVED] Flag icon - Dynamic Ending System에서 flagsAcquired 제거
 import { useState } from 'react';
 
 interface KeyDecisionPanelProps {
@@ -108,20 +109,7 @@ const DecisionCard = ({
             → {decision.consequence}
           </div>
 
-          {/* 획득 플래그 */}
-          {decision.flagsAcquired && decision.flagsAcquired.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {decision.flagsAcquired.map((flag, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400"
-                >
-                  <Flag className="h-2 w-2" />
-                  {getKoreanFlagName(flag) || flag.replace('FLAG_', '')}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* [v1.4 REMOVED] 획득 플래그 - Dynamic Ending System에서 ActionHistory로 대체 */}
 
           {/* 영향받은 캐릭터 */}
           {decision.impactedCharacters && decision.impactedCharacters.length > 0 && (
