@@ -599,6 +599,21 @@ import type {
   ChangeSummaryData,
 } from '@/types';
 
+// [남은 이슈 #3] informationPieces 중복 체크 헬퍼 함수
+const addInformationPiece = (
+  pieces: { id: string; content: string; source: string; discoveredAt: { day: number; action: string } }[],
+  newPiece: { id: string; content: string; source: string; discoveredAt: { day: number; action: string } }
+): boolean => {
+  // ID 기반 중복 체크
+  const exists = pieces.some((p) => p.id === newPiece.id);
+  if (exists) {
+    console.log(`📝 중복 정보 무시: ${newPiece.id}`);
+    return false;
+  }
+  pieces.push(newPiece);
+  return true;
+};
+
 // State updater function v2.0
 const updateSaveState = (
   currentSaveState: SaveState,
@@ -1254,7 +1269,8 @@ const updateSaveState = (
         if (!newSaveState.context.protagonistKnowledge.informationPieces) {
           newSaveState.context.protagonistKnowledge.informationPieces = [];
         }
-        newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+        // [남은 이슈 #3] 중복 체크 후 추가
+        addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
       });
       console.log(`📝 주인공 지식 업데이트: ${locations_discovered.length}개 장소 발견 정보 추가`);
     }
@@ -1328,6 +1344,33 @@ const updateSaveState = (
       }
       // revealed 상태면 변경 없음
     });
+  }
+
+  // [남은 이슈 #2] urgentMatters 업데이트 - 스탯이 위험 수준(40% 이하)일 때 긴급 사안으로 추가
+  if (newSaveState.context.actionContext) {
+    const statRanges: Record<string, { min: number; max: number }> = {};
+    const statNameMap: Record<string, string> = {};
+
+    for (const stat of scenario.scenarioStats) {
+      statRanges[stat.id] = { min: stat.range?.min ?? 0, max: stat.range?.max ?? 100 };
+      statNameMap[stat.id] = stat.name;
+    }
+
+    const urgentMatters: string[] = [];
+    const CRITICAL_THRESHOLD = 0.4;
+
+    for (const [statId, value] of Object.entries(newSaveState.context.scenarioStats)) {
+      const range = statRanges[statId];
+      if (!range) continue;
+
+      const percentage = (value - range.min) / (range.max - range.min);
+      if (percentage <= CRITICAL_THRESHOLD) {
+        const statName = statNameMap[statId] || statId;
+        urgentMatters.push(`${statName} 위험 수준 (${Math.round(percentage * 100)}%)`);
+      }
+    }
+
+    newSaveState.context.actionContext.urgentMatters = urgentMatters;
   }
 
   return newSaveState;
@@ -2251,7 +2294,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           if (!newSaveState.context.protagonistKnowledge.informationPieces) {
             newSaveState.context.protagonistKnowledge.informationPieces = [];
           }
-          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
           console.log(`📝 주인공 지식 업데이트: ${characterName}에게서 정보 획득`);
         }
 
@@ -2605,7 +2649,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           if (!newSaveState.context.protagonistKnowledge.informationPieces) {
             newSaveState.context.protagonistKnowledge.informationPieces = [];
           }
-          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
           console.log(`📝 주인공 지식 업데이트: ${location.name} 탐색으로 정보 획득`);
         }
       }
@@ -2630,7 +2675,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           if (!newSaveState.context.protagonistKnowledge.informationPieces) {
             newSaveState.context.protagonistKnowledge.informationPieces = [];
           }
-          newSaveState.context.protagonistKnowledge.informationPieces.push(newInfoPiece);
+          // [남은 이슈 #3] 중복 체크 후 추가
+          addInformationPiece(newSaveState.context.protagonistKnowledge.informationPieces, newInfoPiece);
         }
         console.log(`📝 주인공 지식 업데이트: ${worldStateResult.newDiscoveries.length}개 발견물 추가`);
 

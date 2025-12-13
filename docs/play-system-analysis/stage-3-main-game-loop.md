@@ -202,6 +202,41 @@ Stage 2 완료 상태
 
 **테스트**: `tests/unit/main-game-loop.test.ts` 12개 테스트 추가
 
+### 6.3 남은 이슈 해결 (추가 커밋)
+
+| 개선 | 설명 | 위치 |
+|------|------|------|
+| **#3** urgentMatters 자동 업데이트 | 스탯 40% 이하 시 위험 경고 자동 추가 | GameClient.tsx:1333-1358 (updateSaveState) |
+| **#4** informationPieces 중복 제거 | ID 기반 중복 체크 헬퍼 함수 | GameClient.tsx:602-615 (addInformationPiece) |
+
+**urgentMatters 로직**:
+```typescript
+// updateSaveState() 내부
+const CRITICAL_THRESHOLD = 0.4; // 40% 이하면 위험
+for (const [statId, value] of Object.entries(newStats)) {
+  const percentage = (value - range.min) / (range.max - range.min);
+  if (percentage <= CRITICAL_THRESHOLD) {
+    urgentMatters.push(`${statName} 위험 수준 (${Math.round(percentage * 100)}%)`);
+  }
+}
+```
+
+**informationPieces 중복 제거 로직**:
+```typescript
+// addInformationPiece() 헬퍼 함수
+const addInformationPiece = (pieces, newPiece) => {
+  const exists = pieces.some((p) => p.id === newPiece.id);
+  if (exists) {
+    console.log(`📝 중복 정보 무시: ${newPiece.id}`);
+    return false;
+  }
+  pieces.push(newPiece);
+  return true;
+};
+```
+
+**테스트**: `tests/unit/remaining-issues.test.ts` 10개 테스트 추가
+
 ---
 
 ## 7. 추가 개선 필요사항
@@ -213,7 +248,8 @@ Stage 2 완료 상태
 | ~~metCharacters 자동 추가 없음~~ | ✅ **해결됨** - Stage 3 개선 #1 | - |
 | discoveredRelationships 업데이트 없음 | 모든 핸들러에서 미구현 | NPC 관계 힌트 발견 시 업데이트 (Stage 4에서 일부 구현) |
 | ~~keyDecisions 대화/탐색 미기록~~ | ✅ **해결됨** - Stage 3 개선 #2 | - |
-| actionContext.urgentMatters 미사용 | 업데이트만 하고 활용 안 함 | AI 프롬프트에 긴급 상황 강조 |
+| ~~actionContext.urgentMatters 미사용~~ | ✅ **해결됨** - 스탯 40% 이하 시 자동 추가 | - |
+| ~~informationPieces 중복 추가~~ | ✅ **해결됨** - ID 기반 중복 체크 | - |
 
 ### 7.2 핸들러 간 차이점 (일관성 검토 필요)
 

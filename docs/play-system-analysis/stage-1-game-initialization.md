@@ -281,13 +281,16 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 
 | 이슈 | 현재 상태 | 우선순위 |
 |------|----------|---------|
-| worldState.locations 하드코딩 | 기본 5개 위치 고정 | 낮음 |
+| ~~worldState.locations 하드코딩~~ | ✅ **해결됨** - `scenario.locations` 지원 | - |
 | characterArcs.currentMood 항상 'anxious' | 시나리오별 커스텀 불가 | 낮음 |
 | getStoryOpeningWithDefaults() 미사용 | 헬퍼는 있으나 직접 호출 위치 확장 필요 | 중간 |
 
+**해결된 이슈 상세**:
+- `worldState.locations`: `lib/world-state-manager.ts`의 `createInitialLocations()`에서 `scenario.locations` 배열이 있으면 해당 위치를 사용, 없으면 기본 5개 위치 사용
+
 ### 7.2 향후 확장 고려사항
 
-1. **시나리오별 초기 위치 설정**: `gameplayConfig.initialLocations` 추가
+1. ~~**시나리오별 초기 위치 설정**: `gameplayConfig.initialLocations` 추가~~ → 이미 `scenario.locations`로 지원됨
 2. **캐릭터별 초기 mood 설정**: `storyOpening.characterInitialMoods` 추가
 3. **동적 AP 계산**: 장르/난이도에 따른 초기 AP 조정
 

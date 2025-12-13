@@ -257,6 +257,34 @@ export const updateContextAfterChoice = (
 };
 
 /**
+ * [남은 이슈 #2] 스탯 기반 urgentMatters 업데이트
+ * 스탯이 위험 수준(40% 이하)일 때 긴급 사안으로 추가
+ */
+export const updateUrgentMatters = (
+  stats: Record<string, number>,
+  statRanges: Record<string, { min: number; max: number }>,
+  statNameMap?: Record<string, string>
+): string[] => {
+  const urgentMatters: string[] = [];
+  const CRITICAL_THRESHOLD = 0.4; // 40% 이하면 위험
+
+  for (const [statId, value] of Object.entries(stats)) {
+    const range = statRanges[statId];
+    if (!range) continue;
+
+    const percentage = (value - range.min) / (range.max - range.min);
+
+    if (percentage <= CRITICAL_THRESHOLD) {
+      const statName = statNameMap?.[statId] || statId;
+      const percentDisplay = Math.round(percentage * 100);
+      urgentMatters.push(`⚠️ ${statName} 위험 수준 (${percentDisplay}%)`);
+    }
+  }
+
+  return urgentMatters;
+};
+
+/**
  * Day 전환 시 맥락 리셋 (단서는 유지)
  */
 export const resetContextForNewDay = (

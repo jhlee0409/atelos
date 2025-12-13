@@ -234,9 +234,11 @@
 
 | 이슈 | 현재 상태 | Stage |
 |------|----------|-------|
-| worldState 커스텀 위치 확장 | 기본 5개 고정 | 1 |
-| actionContext.urgentMatters 활용 | 업데이트만 | 3 |
-| informationPieces 중복 제거 | ID 있으나 중복 가능 | 3, 4 |
+| ~~worldState 커스텀 위치 확장~~ | ✅ **해결됨** - `scenario.locations` 지원 | 1 |
+| ~~actionContext.urgentMatters 활용~~ | ✅ **해결됨** - 스탯 40% 이하 시 자동 추가 | 3 |
+| ~~informationPieces 중복 제거~~ | ✅ **해결됨** - ID 기반 중복 체크 | 3, 4 |
+
+**모든 이슈 해결 완료!**
 
 ---
 
@@ -245,7 +247,7 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 252개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개, Stage 5: 11개 추가)
+├── pnpm test 262개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개, Stage 5: 11개, 남은 이슈: 10개)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -273,7 +275,10 @@
 ├── [Stage 4] 전체 상태 전환 통합 테스트 (1개)
 ├── [Stage 5] characterArcs 데이터 추출 테스트 (4개)
 ├── [Stage 5] character_arcs 프롬프트 섹션 생성 테스트 (6개)
-└── [Stage 5] characterArcs 전체 흐름 통합 테스트 (1개)
+├── [Stage 5] characterArcs 전체 흐름 통합 테스트 (1개)
+├── [남은 이슈] urgentMatters 업데이트 로직 테스트 (4개)
+├── [남은 이슈] informationPieces 중복 제거 테스트 (5개)
+└── [남은 이슈] 통합 테스트 (1개)
 
 ❌ 추가 검증 필요
 ├── hiddenNPCRelationships 빈 배열 시나리오
