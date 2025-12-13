@@ -1294,8 +1294,10 @@ const updateSaveState = (
 
       if (!relState) return;
 
-      // 관계에 연결된 두 캐릭터 이름을 찾음
-      const relatedChars = rel.relationId.split('-');
+      // [버그 수정] 관계에 연결된 두 캐릭터 이름을 찾음
+      // rel.relationId는 'REL_001' 형식이므로 split('-')으로 캐릭터 이름을 얻을 수 없음
+      // rel.characterA와 rel.characterB를 직접 사용해야 함
+      const relatedChars = [rel.characterA, rel.characterB].filter(Boolean);
       // 서사에서 두 캐릭터가 함께 언급되었는지 확인
       const bothMentioned = relatedChars.length >= 2 &&
         relatedChars.every((charName: string) => narrative.includes(charName));
@@ -1970,15 +1972,47 @@ export default function GameClient({ scenario }: GameClientProps) {
           );
         };
 
-        // 결과 요약 (50자 이내)
+        // 결과 요약 (50자 이내) - 개선: 장면 묘사 스킵, 의미있는 문장 선택
         const summarizeConsequence = (log: string): string => {
           // Day 태그 제거
           const cleanLog = log.replace(/\[Day \d+\]\s*/g, '').trim();
-          // 첫 문장 또는 50자까지
-          const firstSentence = cleanLog.split(/[.!?。]/)[0];
-          return firstSentence.length > 50
-            ? firstSentence.substring(0, 47) + '...'
-            : firstSentence;
+
+          // 문장 분리
+          const sentences = cleanLog.split(/(?<=[.!?。])\s*/).filter(s => s.trim().length > 5);
+
+          if (sentences.length === 0) {
+            return cleanLog.substring(0, 50);
+          }
+
+          // 장면 묘사 패턴 (스킵 대상)
+          const sceneDescPatterns = [
+            /^.{0,10}(대피소|창고|통로|공기|냄새|어둠|빛|바람|소리|침묵)/,
+            /^.{0,10}(차갑|따뜻|습|건조|퀴퀴|먼지|얼어붙)/,
+            /^.{0,10}(안은|속에서|사이로|위로|아래로)/,
+          ];
+
+          // 의미있는 문장 찾기 (캐릭터 언급, 대화, 감정 표현 우선)
+          const meaningfulSentence = sentences.find(sentence => {
+            // 장면 묘사는 스킵
+            if (sceneDescPatterns.some(pattern => pattern.test(sentence))) {
+              return false;
+            }
+            // 캐릭터 이름, 대화, 감정 포함 시 우선
+            const hasMeaning =
+              sentence.includes('라고') || // 대화
+              sentence.includes('느꼈다') || // 감정
+              sentence.includes('생각했다') || // 생각
+              /[가-힣]{2,}(이|가|은|는|을|를)/.test(sentence); // 주어+조사
+            return hasMeaning;
+          });
+
+          // 의미있는 문장이 없으면 마지막 문장 사용 (결론이 보통 마지막에)
+          const selectedSentence = meaningfulSentence || sentences[sentences.length - 1] || sentences[0];
+          const trimmed = selectedSentence.trim();
+
+          return trimmed.length > 50
+            ? trimmed.substring(0, 47) + '...'
+            : trimmed;
         };
 
         const keyDecision = {
