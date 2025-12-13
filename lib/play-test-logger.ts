@@ -333,7 +333,7 @@ class PlayTestLogger {
     const arcs = saveState.characterArcs || [];
     const hasNonZeroTrust = arcs.some((arc) => arc.trustLevel !== 0);
     const initialRels = scenario.initialRelationships?.filter(
-      (rel) => rel.pair.includes('(플레이어)')
+      (rel) => rel.personA === '(플레이어)' || rel.personB === '(플레이어)'
     );
     this.updateVerification(
       'Stage 1',
