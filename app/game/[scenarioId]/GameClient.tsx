@@ -199,26 +199,48 @@ const hasInsufficientAP = (
 };
 
 /**
- * 초기 만난 캐릭터 목록 생성 (storyOpening.firstCharacterToMeet 기반)
+ * 초기 만난 캐릭터 목록 생성 (storyOpening 설정 기반)
+ *
+ * characterIntroductionStyle에 따라:
+ * - 'gradual': 첫 번째 캐릭터만 (천천히 소개)
+ * - 'immediate': 모든 캐릭터 (즉시 소개)
+ * - 'contextual': firstCharacterToMeet만 (기본값)
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 초기에 만난 캐릭터 이름 배열
  */
 const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
-  const firstCharacter = scenario.storyOpening?.firstCharacterToMeet;
+  const storyOpening = scenario.storyOpening;
+  const introStyle = storyOpening?.characterIntroductionStyle || 'contextual';
+  const introSequence = storyOpening?.characterIntroductionSequence;
+  const firstCharacter = storyOpening?.firstCharacterToMeet;
 
-  // 캐릭터 소개 시퀀스가 있으면 첫 번째 캐릭터 사용
-  const introSequence = scenario.storyOpening?.characterIntroductionSequence;
-  if (introSequence && introSequence.length > 0) {
+  // 1. 'immediate' 스타일: 모든 캐릭터를 즉시 만남
+  if (introStyle === 'immediate') {
+    if (introSequence && introSequence.length > 0) {
+      return introSequence
+        .sort((a, b) => a.order - b.order)
+        .map((s) => s.characterName);
+    }
+    // introSequence가 없으면 모든 NPC
+    const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
+    return npcs.map((c) => c.characterName);
+  }
+
+  // 2. 'gradual' 스타일: 첫 번째 캐릭터만 (나머지는 게임 진행 중 추가)
+  if (introStyle === 'gradual' && introSequence && introSequence.length > 0) {
     const firstInSequence = introSequence.find((s) => s.order === 1);
     if (firstInSequence) {
       return [firstInSequence.characterName];
     }
   }
 
-  // firstCharacterToMeet이 설정되어 있으면 사용
+  // 3. 'contextual' 또는 기본: firstCharacterToMeet 사용
   if (firstCharacter) {
     return [firstCharacter];
   }
 
-  // 둘 다 없으면 첫 번째 NPC 캐릭터 사용
+  // 4. 폴백: 첫 번째 NPC 캐릭터
   const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
   return npcs.length > 0 ? [npcs[0].characterName] : [];
 };
@@ -240,6 +262,64 @@ const getInitialSurvivors = (
       traits: c.currentTrait ? [c.currentTrait.displayName || c.currentTrait.traitName] : [],
       status: 'normal',
     }));
+};
+
+/**
+ * 캐릭터 소개 시퀀스에서 다음에 만날 캐릭터 가져오기
+ *
+ * 'gradual' 스타일에서 게임 진행 중 순차적으로 캐릭터를 소개할 때 사용
+ * 이미 만난 캐릭터를 건너뛰고 다음 순서의 캐릭터를 반환
+ *
+ * @param scenario 시나리오 데이터
+ * @param metCharacters 이미 만난 캐릭터 목록
+ * @returns 다음에 만날 캐릭터 정보 또는 null
+ */
+const getNextCharacterToIntroduce = (
+  scenario: ScenarioData,
+  metCharacters: string[]
+): { characterName: string; encounterContext: string; order: number } | null => {
+  const introSequence = scenario.storyOpening?.characterIntroductionSequence;
+
+  if (!introSequence || introSequence.length === 0) {
+    return null;
+  }
+
+  // 순서대로 정렬 후 아직 만나지 않은 첫 캐릭터 찾기
+  const sortedSequence = [...introSequence].sort((a, b) => a.order - b.order);
+
+  for (const intro of sortedSequence) {
+    if (!metCharacters.includes(intro.characterName)) {
+      return {
+        characterName: intro.characterName,
+        encounterContext: intro.encounterContext,
+        order: intro.order,
+      };
+    }
+  }
+
+  return null; // 모든 캐릭터를 이미 만남
+};
+
+/**
+ * NPC 관계의 가시성 상태 업데이트
+ *
+ * 플레이어가 특정 관계를 발견했을 때 가시성 변경
+ *
+ * @param currentStates 현재 관계 상태 배열
+ * @param relationId 업데이트할 관계 ID
+ * @param newVisibility 새 가시성 ('hinted' | 'revealed')
+ * @returns 업데이트된 상태 배열
+ */
+const updateNPCRelationshipVisibility = (
+  currentStates: { relationId: string; visibility: string }[],
+  relationId: string,
+  newVisibility: 'hinted' | 'revealed'
+): { relationId: string; visibility: string }[] => {
+  return currentStates.map((state) =>
+    state.relationId === relationId
+      ? { ...state, visibility: newVisibility }
+      : state
+  );
 };
 
 // =============================================================================
@@ -348,13 +428,36 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       actionContext: initialActionContext,
       // 동적 월드 시스템 초기화
       worldState: initialWorldState,
-      // [2025 Enhanced] 주인공 지식 시스템 - 만난 캐릭터만 추적
+
+      // =======================================================================
+      // [2025 Enhanced] 주인공 지식 시스템
+      // 게임 진행 중 주인공이 알게 되는 정보를 추적
+      // =======================================================================
       protagonistKnowledge: {
         metCharacters: getInitialMetCharacters(scenario),
         discoveredRelationships: [],
         hintedRelationships: [],
         informationPieces: [],
+        // 시나리오에서 정의한 초기 지식 병합
+        ...scenario.storyOpening?.initialProtagonistKnowledge,
       },
+
+      // =======================================================================
+      // [2025 Enhanced] 숨겨진 NPC 관계 가시성 추적
+      // 플레이어가 아직 발견하지 못한 NPC 간의 관계를 추적
+      // AI 프롬프트에서 "이 관계는 아직 비밀" 등으로 활용
+      // =======================================================================
+      npcRelationshipStates:
+        scenario.storyOpening?.hiddenNPCRelationships?.map((rel) => ({
+          relationId: rel.relationId,
+          visibility: rel.visibility || 'hidden',
+        })) || [],
+
+      // =======================================================================
+      // [2025 Enhanced] 이머전트 내러티브 트리거 추적
+      // 발동된 스토리 이벤트 ID를 기록하여 중복 발동 방지
+      // =======================================================================
+      triggeredStoryEvents: [],
     },
     community: {
       // 처음에는 만난 캐릭터만 survivors에 포함 (나머지는 스토리 진행 중 추가)
