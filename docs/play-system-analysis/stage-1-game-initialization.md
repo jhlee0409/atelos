@@ -5,7 +5,9 @@
 게임이 시작될 때 `createInitialSaveState()` 함수가 호출되어 전체 게임 상태를 초기화합니다.
 이 단계에서 설정된 값들은 이후 모든 Stage에서 사용되므로 가장 중요한 기반입니다.
 
-**핵심 파일**: `app/game/[scenarioId]/GameClient.tsx` (lines 331-488)
+**핵심 파일**: `app/game/[scenarioId]/GameClient.tsx` (lines 387-556)
+
+**테스트 파일**: `tests/unit/game-initialization.test.ts` (19개 테스트)
 
 ---
 
@@ -32,45 +34,131 @@
 
 ### 2.2 protagonistKnowledge (주인공 지식 시스템)
 
+**[구현 완료]** 배열 깊은 병합으로 중복 없이 초기화됨
+
 ```typescript
-protagonistKnowledge: {
-  metCharacters: getInitialMetCharacters(scenario),  // 만난 캐릭터
-  discoveredRelationships: [],                        // 발견한 관계
-  hintedRelationships: [],                            // 힌트된 관계
-  informationPieces: [],                              // 정보 조각
-  ...scenario.storyOpening?.initialProtagonistKnowledge,  // 시나리오 정의 초기 지식
-}
+// GameClient.tsx:493-510
+protagonistKnowledge: (() => {
+  const baseMetCharacters = getInitialMetCharacters(scenario);
+  const initialKnowledge = scenario.storyOpening?.initialProtagonistKnowledge;
+
+  return {
+    // metCharacters: 기본값 + 시나리오 정의값 병합 (중복 제거)
+    metCharacters: [
+      ...new Set([
+        ...baseMetCharacters,
+        ...(initialKnowledge?.metCharacters || []),
+      ]),
+    ],
+    // 나머지 배열 필드: 시나리오 값 그대로 사용
+    discoveredRelationships: initialKnowledge?.discoveredRelationships || [],
+    hintedRelationships: initialKnowledge?.hintedRelationships || [],
+    informationPieces: initialKnowledge?.informationPieces || [],
+  };
+})(),
 ```
 
 **`getInitialMetCharacters()` 로직**:
-| characterIntroductionStyle | 초기 metCharacters |
-|---------------------------|-------------------|
-| `'immediate'` | 모든 NPC 또는 introSequence 전체 |
-| `'gradual'` | introSequence의 order=1 캐릭터만 |
-| `'contextual'` (기본) | firstCharacterToMeet 또는 첫 번째 NPC |
+| characterIntroductionStyle | 초기 metCharacters | 비고 |
+|---------------------------|-------------------|------|
+| `'immediate'` | 모든 NPC 또는 introSequence 전체 | order 순 정렬 |
+| `'gradual'` | introSequence의 order=1 캐릭터 | order=1 없으면 경고 로그 + 첫 항목 ★ |
+| `'contextual'` (기본) | firstCharacterToMeet 또는 첫 번째 NPC | 기본 동작 |
 
-### 2.3 SaveState.community (커뮤니티 상태)
+### 2.3 SaveState.characterArcs (캐릭터 발전 추적)
+
+**[구현 완료]** trustLevel이 initialRelationships에서 초기화됨
+
+```typescript
+// GameClient.tsx:543-552
+characterArcs: charactersWithTraits
+  .filter((c) => c.characterName !== '(플레이어)')
+  .map((c) => ({
+    characterName: c.characterName,
+    moments: [],
+    currentMood: 'anxious' as const,
+    trustLevel: getInitialTrustLevel(c.characterName, scenario), // ★ 개선됨
+  })),
+```
+
+**`getInitialTrustLevel()` 헬퍼** (GameClient.tsx:264-276):
+```typescript
+const getInitialTrustLevel = (characterName: string, scenario: ScenarioData): number => {
+  // initialRelationships에서 플레이어-캐릭터 관계 찾기
+  const playerRelation = scenario.initialRelationships.find(
+    (rel) =>
+      (rel.pair[0] === '(플레이어)' && rel.pair[1] === characterName) ||
+      (rel.pair[1] === '(플레이어)' && rel.pair[0] === characterName)
+  );
+  return playerRelation?.value ?? 0;
+};
+```
+
+### 2.4 SaveState.community (커뮤니티 상태)
 
 | 필드 | 초기값 | 설명 |
 |------|--------|------|
 | `survivors` | `getInitialSurvivors()` 결과 | 만난 캐릭터만 포함 |
 | `hiddenRelationships` | `initialRelationships` 매핑 | 캐릭터 간 관계값 |
 
-### 2.4 기타 SaveState 필드
+### 2.5 기타 SaveState 필드
 
 | 필드 | 초기값 | 설명 |
 |------|--------|------|
 | `log` | synopsis 기반 | 현재 서사 로그 |
 | `chatHistory` | `[]` | 채팅 기록 |
 | `dilemma` | 로딩 중 상태 | 현재 딜레마 |
-| `characterArcs` | 모든 NPC 초기화 | 캐릭터 발전 추적 |
 | `keyDecisions` | `[]` | 주요 결정 기록 |
 
 ---
 
 ## 3. 헬퍼 함수 분석
 
-### 3.1 createInitialContext() - lib/context-manager.ts
+### 3.1 getInitialMetCharacters() - GameClient.tsx:212-252
+
+**역할**: 캐릭터 소개 스타일에 따라 초기에 만난 캐릭터 목록 생성
+
+**[구현 완료]** 'gradual' 스타일 fallback 명확화
+
+```typescript
+// 'gradual' 스타일에서 order=1이 없는 경우 경고 로그 출력
+if (introStyle === 'gradual' && introSequence && introSequence.length > 0) {
+  const firstInSequence = introSequence.find((s) => s.order === 1);
+  if (firstInSequence) {
+    return [firstInSequence.characterName];
+  }
+  // [Stage 1 개선 #3] order=1이 없으면 경고 로그 출력 후 첫 번째 항목 사용
+  console.warn(
+    `⚠️ [getInitialMetCharacters] 'gradual' 스타일에서 order=1인 캐릭터가 없습니다. ` +
+    `첫 번째 시퀀스 항목을 사용합니다: ${introSequence[0].characterName}`
+  );
+  return [introSequence[0].characterName];
+}
+```
+
+### 3.2 getStoryOpeningWithDefaults() - GameClient.tsx:286-302
+
+**[신규 추가]** storyOpening undefined 케이스 통합 처리
+
+```typescript
+const getStoryOpeningWithDefaults = (scenario: ScenarioData): ScenarioData['storyOpening'] => {
+  const defaults = {
+    characterIntroductionStyle: 'contextual' as const,
+    npcRelationshipExposure: 'hidden' as const,
+  };
+
+  if (!scenario.storyOpening) {
+    return defaults;
+  }
+
+  return {
+    ...defaults,
+    ...scenario.storyOpening,
+  };
+};
+```
+
+### 3.3 createInitialContext() - lib/context-manager.ts
 
 **역할**: ActionContext 초기화 (맥락 연결 시스템)
 
@@ -87,7 +175,7 @@ ActionContext {
 }
 ```
 
-### 3.2 createInitialWorldState() - lib/world-state-manager.ts
+### 3.4 createInitialWorldState() - lib/world-state-manager.ts
 
 **역할**: WorldState 초기화 (동적 월드 시스템)
 
@@ -104,7 +192,7 @@ WorldState {
 }
 ```
 
-### 3.3 getInitialSurvivors()
+### 3.5 getInitialSurvivors() - GameClient.tsx:307-320
 
 **역할**: 초기 survivors 목록 생성 (만난 캐릭터만)
 
@@ -126,21 +214,26 @@ ScenarioData
     │
     ├─→ characters ────────→ characterArcs, survivors, characterPresences
     │
-    ├─→ initialRelationships → hiddenRelationships
+    ├─→ initialRelationships
+    │       ├─→ hiddenRelationships
+    │       └─→ characterArcs.trustLevel ★ [Stage 1 개선 #1]
     │
     ├─→ traitPool ─────────→ charactersWithTraits
     │
-    ├─→ storyOpening
+    ├─→ storyOpening (getStoryOpeningWithDefaults로 기본값 보장)
     │       ├─→ characterIntroductionStyle → getInitialMetCharacters()
+    │       │       └─→ 'gradual' fallback 경고 로그 ★ [Stage 1 개선 #3]
     │       ├─→ characterIntroductionSequence → protagonistKnowledge.metCharacters
     │       ├─→ firstCharacterToMeet ────→ protagonistKnowledge.metCharacters
     │       ├─→ hiddenNPCRelationships ──→ npcRelationshipStates
-    │       ├─→ initialProtagonistKnowledge → protagonistKnowledge (병합)
+    │       ├─→ initialProtagonistKnowledge → protagonistKnowledge (깊은 병합) ★ [Stage 1 개선 #2]
     │       └─→ openingLocation ─────────→ actionContext.currentLocation
     │
     ├─→ gameplayConfig ────→ actionPointsPerDay
     │
     └─→ endCondition ──────→ remainingHours
+
+★ = Stage 1 개선으로 추가/변경된 데이터 흐름
 ```
 
 ---
@@ -149,17 +242,19 @@ ScenarioData
 
 Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 
-| 데이터 | 용도 |
-|--------|------|
-| `protagonistKnowledge.metCharacters` | 첫 만남 대상 결정 |
-| `npcRelationshipStates` | AI에게 숨겨야 할 관계 전달 |
-| `community.survivors` | 대화 가능 캐릭터 목록 |
-| `actionContext.currentLocation` | 오프닝 장소 |
-| `characterArcs` | 캐릭터별 초기 mood/trust |
+| 데이터 | 용도 | Stage 1 개선 영향 |
+|--------|------|------------------|
+| `protagonistKnowledge.metCharacters` | 첫 만남 대상 결정 | #2 배열 병합으로 중복 없음 |
+| `npcRelationshipStates` | AI에게 숨겨야 할 관계 전달 | - |
+| `community.survivors` | 대화 가능 캐릭터 목록 | - |
+| `actionContext.currentLocation` | 오프닝 장소 | #4 기본값 보장 |
+| `characterArcs` | 캐릭터별 초기 mood/trust | #1 trustLevel 초기화 |
 
 ---
 
-## 6. 구현된 개선사항 (커밋 3d4669b)
+## 6. 구현된 개선사항
+
+### 6.1 커밋 3d4669b (초기 구현)
 
 | 항목 | 구현 내용 |
 |------|----------|
@@ -169,25 +264,32 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 | 시나리오별 AP 설정 | getActionPointsPerDay() 사용 |
 | triggeredStoryEvents 추적 | 중복 이벤트 발동 방지 준비 |
 
+### 6.2 Stage 1 개선 (현재 커밋)
+
+| # | 이슈 | 해결 내용 | 영향 Stage |
+|---|------|----------|-----------|
+| #1 | characterArcs.trustLevel 항상 0 | `getInitialTrustLevel()` 헬퍼 추가, initialRelationships 참조 | Stage 3, 5 |
+| #2 | initialProtagonistKnowledge 스프레드 덮어쓰기 | 배열 깊은 병합 (Set으로 중복 제거) | Stage 2, 5 |
+| #3 | 'gradual' 스타일 order=1 누락 시 무응답 | 경고 로그 출력 + 첫 번째 항목 fallback | Stage 2 |
+| #4 | storyOpening undefined 체크 산발적 | `getStoryOpeningWithDefaults()` 통합 헬퍼 | 전체 |
+
 ---
 
-## 7. 추가 개선 필요사항
+## 7. 추가 개선 필요사항 (향후)
 
 ### 7.1 잠재적 이슈
 
-| 이슈 | 현재 상태 | 개선 제안 |
-|------|----------|----------|
-| characterArcs 초기 trustLevel | 항상 0으로 시작 | initialRelationships 값 반영 고려 |
-| 'gradual' 스타일에서 order 누락 | order=1 없으면 첫 캐릭터 사용 | 명확한 fallback 로직 문서화 |
-| worldState.locations 하드코딩 | 기본 5개 위치 고정 | 시나리오별 커스텀 위치 지원 확장 |
-| initialProtagonistKnowledge 병합 | 스프레드 연산자로 덮어쓰기 | 배열 필드 깊은 병합 필요 여부 검토 |
+| 이슈 | 현재 상태 | 우선순위 |
+|------|----------|---------|
+| worldState.locations 하드코딩 | 기본 5개 위치 고정 | 낮음 |
+| characterArcs.currentMood 항상 'anxious' | 시나리오별 커스텀 불가 | 낮음 |
+| getStoryOpeningWithDefaults() 미사용 | 헬퍼는 있으나 직접 호출 위치 확장 필요 | 중간 |
 
-### 7.2 테스트 필요 케이스
+### 7.2 향후 확장 고려사항
 
-1. `characterIntroductionStyle = 'gradual'` + `introSequence` 없는 경우
-2. `hiddenNPCRelationships`가 빈 배열인 경우
-3. `initialProtagonistKnowledge`와 기본값 필드 충돌 시 동작
-4. `storyOpening` 자체가 undefined인 레거시 시나리오
+1. **시나리오별 초기 위치 설정**: `gameplayConfig.initialLocations` 추가
+2. **캐릭터별 초기 mood 설정**: `storyOpening.characterInitialMoods` 추가
+3. **동적 AP 계산**: 장르/난이도에 따른 초기 AP 조정
 
 ---
 
@@ -198,11 +300,11 @@ Stage 2 (스토리 오프닝)에서 필요한 초기화 결과:
 ```typescript
 // Stage 2에서 읽어야 할 초기화된 데이터
 const {
-  protagonistKnowledge,    // AI 프롬프트에 전달
+  protagonistKnowledge,    // AI 프롬프트에 전달 (배열 병합됨)
   npcRelationshipStates,   // AI가 숨겨야 할 관계 가이드
   community.survivors,     // 오프닝에 등장 가능한 캐릭터
   actionContext,           // 현재 위치/상황
-  characterArcs,           // 캐릭터 초기 상태
+  characterArcs,           // 캐릭터 초기 상태 (trustLevel 초기화됨)
 } = saveState;
 
 // Stage 2에서 업데이트할 데이터
@@ -215,9 +317,36 @@ const {
 
 ## 9. 검증 체크리스트
 
+### 기존 검증 (완료)
 - [x] protagonistKnowledge 모든 필드 초기화 확인
 - [x] npcRelationshipStates 초기화 확인
 - [x] characterIntroductionStyle 3가지 분기 처리 확인
 - [x] getActionPointsPerDay() 시나리오 설정 반영 확인
-- [ ] characterArcs.trustLevel 초기값 검토 (개선 검토 필요)
-- [ ] worldState 커스텀 위치 지원 확장 (향후 개선)
+
+### Stage 1 개선 검증 (완료)
+- [x] #1 characterArcs.trustLevel이 initialRelationships 값 반영
+- [x] #2 protagonistKnowledge.metCharacters 배열 깊은 병합 + 중복 제거
+- [x] #3 'gradual' 스타일 order=1 누락 시 경고 로그 + fallback
+- [x] #4 getStoryOpeningWithDefaults() 헬퍼 함수 추가
+
+### 테스트 커버리지
+- [x] `tests/unit/game-initialization.test.ts` - 19개 테스트 통과
+  - characterArcs.trustLevel 초기값 테스트 (3개)
+  - initialProtagonistKnowledge 배열 병합 테스트 (5개)
+  - 'gradual' 스타일 fallback 테스트 (4개)
+  - storyOpening undefined 통합 폴백 테스트 (3개)
+  - characterIntroductionStyle 전체 분기 테스트 (4개)
+
+---
+
+## 10. 코드 참조
+
+| 위치 | 함수/섹션 | 역할 |
+|------|----------|------|
+| GameClient.tsx:212-252 | getInitialMetCharacters() | 초기 만난 캐릭터 목록 생성 |
+| GameClient.tsx:264-276 | getInitialTrustLevel() | [신규] 초기 신뢰도 가져오기 |
+| GameClient.tsx:286-302 | getStoryOpeningWithDefaults() | [신규] storyOpening 기본값 병합 |
+| GameClient.tsx:307-320 | getInitialSurvivors() | 초기 survivors 목록 생성 |
+| GameClient.tsx:387-556 | createInitialSaveState() | 전체 게임 상태 초기화 |
+| GameClient.tsx:493-510 | protagonistKnowledge 초기화 | [개선] 배열 깊은 병합 |
+| GameClient.tsx:543-552 | characterArcs 초기화 | [개선] trustLevel 초기화 |

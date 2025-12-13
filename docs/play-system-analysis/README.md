@@ -146,10 +146,17 @@
 
 ## 구현된 개선사항 요약
 
-### 커밋 3d4669b (Stage 1)
+### 커밋 3d4669b (Stage 1 - 초기)
 - protagonistKnowledge 초기화 (metCharacters, hintedRelationships, informationPieces)
 - npcRelationshipStates 초기화
 - characterIntroductionStyle 3가지 분기 처리
+
+### Stage 1 개선 (현재 커밋)
+- **#1** characterArcs.trustLevel: initialRelationships에서 플레이어-캐릭터 관계값 반영
+- **#2** protagonistKnowledge.metCharacters: 배열 깊은 병합 + 중복 제거 (Set 사용)
+- **#3** 'gradual' 스타일 fallback: order=1 누락 시 경고 로그 + 첫 항목 사용
+- **#4** storyOpening undefined: `getStoryOpeningWithDefaults()` 통합 헬퍼 추가
+- **테스트**: `tests/unit/game-initialization.test.ts` 19개 테스트 추가
 
 ### 커밋 60ae7eb (Stage 2)
 - prompt-builder.ts에 npcRelationshipStates 옵션 추가
@@ -189,7 +196,7 @@
 
 | 이슈 | 현재 상태 | Stage |
 |------|----------|-------|
-| characterArcs.trustLevel 초기값 | 항상 0 | 1 |
+| ~~characterArcs.trustLevel 초기값~~ | ✅ **해결됨** - Stage 1 개선 #1 | 1 |
 | 오프닝 후 metCharacters 업데이트 없음 | Stage 3에서 간접 처리 | 2 |
 | keyDecisions 대화/탐색 미기록 | choice만 기록 | 3 |
 | characterArcs 엔딩 프롬프트 반영 | AI가 새로 생성 | 5 |
@@ -209,17 +216,21 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 180개 테스트 통과
+├── pnpm test 199개 테스트 통과 (19개 Stage 1 테스트 추가)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
 ├── npcRelationshipStates 힌트 감지
-└── discoveredInfo 엔딩 API 전달
+├── discoveredInfo 엔딩 API 전달
+├── [Stage 1] characterArcs.trustLevel 초기값 테스트 (3개)
+├── [Stage 1] initialProtagonistKnowledge 배열 병합 테스트 (5개)
+├── [Stage 1] 'gradual' 스타일 fallback 테스트 (4개)
+├── [Stage 1] storyOpening undefined 통합 폴백 테스트 (3개)
+└── [Stage 1] characterIntroductionStyle 전체 분기 테스트 (4개)
 
 ❌ 추가 검증 필요
-├── characterIntroductionStyle 'gradual' 테스트
 ├── hiddenNPCRelationships 빈 배열 시나리오
-├── 레거시 시나리오 (storyOpening 없음) 호환성
+├── 레거시 시나리오 (storyOpening 없음) 실제 플레이 테스트
 └── 동적 엔딩 SDT 점수 품질 평가
 ```
 

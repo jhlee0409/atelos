@@ -233,6 +233,12 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
     if (firstInSequence) {
       return [firstInSequence.characterName];
     }
+    // [Stage 1 개선 #3] order=1이 없으면 경고 로그 출력 후 첫 번째 항목 사용
+    console.warn(
+      `⚠️ [getInitialMetCharacters] 'gradual' 스타일에서 order=1인 캐릭터가 없습니다. ` +
+      `첫 번째 시퀀스 항목을 사용합니다: ${introSequence[0].characterName}`
+    );
+    return [introSequence[0].characterName];
   }
 
   // 3. 'contextual' 또는 기본: firstCharacterToMeet 사용
@@ -243,6 +249,56 @@ const getInitialMetCharacters = (scenario: ScenarioData): string[] => {
   // 4. 폴백: 첫 번째 NPC 캐릭터
   const npcs = scenario.characters.filter((c) => c.characterName !== '(플레이어)');
   return npcs.length > 0 ? [npcs[0].characterName] : [];
+};
+
+/**
+ * [Stage 1 개선 #1] 캐릭터의 초기 신뢰도를 initialRelationships에서 가져오기
+ *
+ * 플레이어-캐릭터 간 관계가 initialRelationships에 정의되어 있으면 해당 값 사용,
+ * 없으면 기본값 0 반환
+ *
+ * @param characterName 캐릭터 이름
+ * @param scenario 시나리오 데이터
+ * @returns 초기 trustLevel 값
+ */
+const getInitialTrustLevel = (
+  characterName: string,
+  scenario: ScenarioData
+): number => {
+  // initialRelationships에서 플레이어-캐릭터 관계 찾기
+  const playerRelation = scenario.initialRelationships.find(
+    (rel) =>
+      (rel.pair[0] === '(플레이어)' && rel.pair[1] === characterName) ||
+      (rel.pair[1] === '(플레이어)' && rel.pair[0] === characterName)
+  );
+
+  return playerRelation?.value ?? 0;
+};
+
+/**
+ * [Stage 1 개선 #4] storyOpening 기본값 병합 헬퍼
+ *
+ * storyOpening이 undefined이거나 부분적으로 정의된 경우 기본값으로 채움
+ *
+ * @param scenario 시나리오 데이터
+ * @returns 기본값이 병합된 StoryOpening
+ */
+const getStoryOpeningWithDefaults = (
+  scenario: ScenarioData
+): ScenarioData['storyOpening'] => {
+  const defaults = {
+    characterIntroductionStyle: 'contextual' as const,
+    npcRelationshipExposure: 'hidden' as const,
+  };
+
+  if (!scenario.storyOpening) {
+    return defaults;
+  }
+
+  return {
+    ...defaults,
+    ...scenario.storyOpening,
+  };
 };
 
 /**
@@ -432,15 +488,26 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       // =======================================================================
       // [2025 Enhanced] 주인공 지식 시스템
       // 게임 진행 중 주인공이 알게 되는 정보를 추적
+      // [Stage 1 개선 #2] 배열 깊은 병합 (스프레드 대신 concat + 중복 제거)
       // =======================================================================
-      protagonistKnowledge: {
-        metCharacters: getInitialMetCharacters(scenario),
-        discoveredRelationships: [],
-        hintedRelationships: [],
-        informationPieces: [],
-        // 시나리오에서 정의한 초기 지식 병합
-        ...scenario.storyOpening?.initialProtagonistKnowledge,
-      },
+      protagonistKnowledge: (() => {
+        const baseMetCharacters = getInitialMetCharacters(scenario);
+        const initialKnowledge = scenario.storyOpening?.initialProtagonistKnowledge;
+
+        return {
+          // metCharacters: 기본값 + 시나리오 정의값 병합 (중복 제거)
+          metCharacters: [
+            ...new Set([
+              ...baseMetCharacters,
+              ...(initialKnowledge?.metCharacters || []),
+            ]),
+          ],
+          // 나머지 배열 필드: 시나리오 값 그대로 사용
+          discoveredRelationships: initialKnowledge?.discoveredRelationships || [],
+          hintedRelationships: initialKnowledge?.hintedRelationships || [],
+          informationPieces: initialKnowledge?.informationPieces || [],
+        };
+      })(),
 
       // =======================================================================
       // [2025 Enhanced] 숨겨진 NPC 관계 가시성 추적
@@ -474,13 +541,14 @@ const createInitialSaveState = (scenario: ScenarioData): SaveState => {
       choice_b: '... 로딩 중 ...',
     },
     // 캐릭터 아크 초기화
+    // [Stage 1 개선 #1] trustLevel을 initialRelationships에서 가져옴
     characterArcs: charactersWithTraits
       .filter((c) => c.characterName !== '(플레이어)')
       .map((c) => ({
         characterName: c.characterName,
         moments: [],
         currentMood: 'anxious' as const,
-        trustLevel: 0,
+        trustLevel: getInitialTrustLevel(c.characterName, scenario),
       })),
     // 회상 시스템 - 주요 결정 기록 초기화
     keyDecisions: [],
