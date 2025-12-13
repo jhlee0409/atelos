@@ -197,10 +197,15 @@
 - **#2** discoveredRelationships 사용: revealed 상태 시 discoveredRelationships에 추가
 - **테스트**: `tests/unit/ai-response-processing.test.ts` 13개 테스트 추가
 
-### 커밋 76371dd (Stage 5)
+### 커밋 76371dd (Stage 5 - 초기)
 - generateDynamicEnding에서 discoveredInfo 추출
 - generate-ending API에 discoveredInfo 파라미터 추가
 - 프롬프트에 discovered_knowledge 섹션 추가
+
+### Stage 5 개선 (현재 커밋)
+- **#1** characterArcs 엔딩 프롬프트 반영: trustLevel, moments, currentMood를 엔딩 API에 전달
+- **#1** character_arcs 프롬프트 섹션: 캐릭터별 발전 기록을 AI 프롬프트에 포함
+- **테스트**: `tests/unit/dynamic-ending.test.ts` 11개 테스트 추가
 
 ---
 
@@ -223,7 +228,7 @@
 | ~~characterArcs 첫 만남 moment 없음~~ | ✅ **해결됨** - Stage 2 개선 #1 | 2 |
 | ~~actionContext 오프닝 미반영~~ | ✅ **해결됨** - Stage 2 개선 #2 | 2 |
 | ~~keyDecisions 대화/탐색 미기록~~ | ✅ **해결됨** - Stage 3 개선 #2 | 3 |
-| characterArcs 엔딩 프롬프트 반영 | AI가 새로 생성 | 5 |
+| ~~characterArcs 엔딩 프롬프트 반영~~ | ✅ **해결됨** - Stage 5 개선 #1 | 5 |
 
 ### 낮음 (향후 확장)
 
@@ -240,7 +245,7 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 241개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개 추가)
+├── pnpm test 252개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개, Stage 5: 11개 추가)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -265,7 +270,10 @@
 ├── [Stage 4] hinted → revealed 전환 테스트 (3개)
 ├── [Stage 4] 명시적 관계 키워드 감지 테스트 (3개)
 ├── [Stage 4] discoveredRelationships 업데이트 테스트 (3개)
-└── [Stage 4] 전체 상태 전환 통합 테스트 (1개)
+├── [Stage 4] 전체 상태 전환 통합 테스트 (1개)
+├── [Stage 5] characterArcs 데이터 추출 테스트 (4개)
+├── [Stage 5] character_arcs 프롬프트 섹션 생성 테스트 (6개)
+└── [Stage 5] characterArcs 전체 흐름 통합 테스트 (1개)
 
 ❌ 추가 검증 필요
 ├── hiddenNPCRelationships 빈 배열 시나리오

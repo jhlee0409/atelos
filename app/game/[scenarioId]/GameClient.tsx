@@ -1422,6 +1422,16 @@ export default function GameClient({ scenario }: GameClientProps) {
           .map((r: { relationId: string; visibility: string }) => `${r.relationId}(${r.visibility})`),
       };
 
+      // [Stage 5 개선 #1] characterArcs 요약 데이터 추출
+      const characterArcsSummary = (currentState.characterArcs || []).map(arc => ({
+        name: arc.characterName,
+        trustLevel: arc.trustLevel,
+        currentMood: arc.currentMood,
+        keyMoments: arc.moments
+          .slice(-5) // 최근 5개 모먼트만
+          .map(m => `Day${m.day}: ${m.description}`),
+      }));
+
       const response = await fetch('/api/generate-ending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1443,6 +1453,8 @@ export default function GameClient({ scenario }: GameClientProps) {
           },
           // [Stage 5] 추가 컨텍스트
           discoveredInfo,
+          // [Stage 5 개선 #1] 캐릭터 아크 정보
+          characterArcs: characterArcsSummary,
         }),
       });
 

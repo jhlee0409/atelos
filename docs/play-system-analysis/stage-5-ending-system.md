@@ -271,13 +271,25 @@ Stage 5: 엔딩
 
 ---
 
-## 8. 구현된 개선사항 (커밋 76371dd)
+## 8. 구현된 개선사항
+
+### 8.1 커밋 76371dd (초기)
 
 | 항목 | 이전 상태 | Stage 5 구현 |
 |------|----------|-------------|
 | discoveredInfo API 전달 | 없음 | protagonistKnowledge + npcRelationshipStates 요약 |
 | generate-ending 프롬프트 | 행동 히스토리만 | discovered_knowledge 섹션 추가 |
 | 엔딩에서 발견 정보 활용 | 없음 | AI가 플레이어 탐색/대화 노력 보상 |
+
+### 8.2 Stage 5 개선 (현재)
+
+| 개선 | 설명 | 위치 |
+|------|------|------|
+| **#1** characterArcs 추출 | characterArcs에서 trustLevel, moments, currentMood 추출 | GameClient.tsx:1425-1433 |
+| **#1** characterArcs API 전달 | 동적 엔딩 API에 characterArcs 요약 전달 | GameClient.tsx:1457 |
+| **#1** character_arcs 프롬프트 섹션 | 캐릭터별 발전 기록을 AI 프롬프트에 포함 | generate-ending/route.ts:352-369 |
+
+**테스트**: `tests/unit/dynamic-ending.test.ts` 11개 테스트 추가
 
 ---
 
@@ -288,13 +300,13 @@ Stage 5: 엔딩
 | 이슈 | 현재 상태 | 개선 제안 |
 |------|----------|----------|
 | informationPieces 중복 | 동일 정보 여러 번 추가 가능 | ID 기반 중복 제거 |
-| discoveredRelationships 미사용 | 빈 배열로 전달 | 명시적 발견 시 추가 로직 |
+| ~~discoveredRelationships 미사용~~ | ✅ **해결됨** - Stage 4 개선 #2 | - |
 | 레거시 엔딩과 동적 엔딩 혼용 | 조건 분기만 | 마이그레이션 가이드 필요 |
-| characterFates와 characterArcs 연동 | AI가 새로 생성 | characterArcs 데이터 반영 |
+| ~~characterFates와 characterArcs 연동~~ | ✅ **해결됨** - Stage 5 개선 #1 | - |
 
 ### 9.2 엔딩 품질 개선 고려사항
 
-1. **캐릭터 아크 반영**: characterArcs의 moments, trustLevel을 엔딩 프롬프트에 포함
+1. ~~**캐릭터 아크 반영**: characterArcs의 moments, trustLevel을 엔딩 프롬프트에 포함~~ → ✅ **해결됨** - Stage 5 개선 #1
 2. **관계 발견 보상 강화**: hinted → revealed 전환이 엔딩에서 드라마틱하게 표현
 3. **정보 조각 연결**: informationPieces가 엔딩에서 "복선 회수"로 활용
 
@@ -307,8 +319,10 @@ Stage 5: 엔딩
 - [x] generateDynamicEnding에서 discoveredInfo 추출 확인
 - [x] generate-ending API에서 discoveredInfo 수신 확인
 - [x] 프롬프트에 discovered_knowledge 섹션 포함 확인
+- [x] **[Stage 5 개선 #1]** characterArcs 데이터 추출 (trustLevel, moments, currentMood)
+- [x] **[Stage 5 개선 #1]** characterArcs API 전달
+- [x] **[Stage 5 개선 #1]** 프롬프트에 character_arcs 섹션 포함
 - [ ] informationPieces 중복 제거 (향후 개선)
-- [ ] characterArcs 엔딩 프롬프트 반영 (향후 개선)
 
 ---
 
@@ -316,9 +330,11 @@ Stage 5: 엔딩
 
 | 위치 | 함수/섹션 | 역할 |
 |------|----------|------|
-| GameClient.tsx:1293-1361 | generateDynamicEnding() | 동적 엔딩 생성 요청 |
-| GameClient.tsx:1866-1954 | handlePlayerChoice 엔딩 체크 | 레거시/동적 엔딩 분기 |
+| GameClient.tsx:1394-1472 | generateDynamicEnding() | 동적 엔딩 생성 요청 |
+| GameClient.tsx:1425-1433 | characterArcs 추출 | [Stage 5 개선 #1] characterArcs 요약 생성 |
+| GameClient.tsx:2020-2025 | handlePlayerChoice 엔딩 체크 | 레거시/동적 엔딩 분기 |
 | ending-checker.ts:29-85 | checkEndingConditions() | 레거시 엔딩 조건 체크 |
 | generate-ending/route.ts:91-181 | SDT_SYSTEM_PROMPT | SDT 기반 시스템 프롬프트 |
-| generate-ending/route.ts:187-344 | buildUserPrompt() | 유저 프롬프트 생성 |
-| generate-ending/route.ts:328-343 | discovered_knowledge 섹션 | [Stage 5] 발견 정보 |
+| generate-ending/route.ts:187-370 | buildUserPrompt() | 유저 프롬프트 생성 |
+| generate-ending/route.ts:335-350 | discovered_knowledge 섹션 | [Stage 5] 발견 정보 |
+| generate-ending/route.ts:352-369 | character_arcs 섹션 | [Stage 5 개선 #1] 캐릭터 아크 정보 |
