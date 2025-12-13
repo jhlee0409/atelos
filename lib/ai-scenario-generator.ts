@@ -1,12 +1,11 @@
 // AI 시나리오 생성 클라이언트 함수
 
-// v1.4: deprecated 카테고리 제거, 'flags' 카테고리 추가
+// v1.4: deprecated 카테고리 제거 (Dynamic Ending System 채택)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
   | 'relationships'
   | 'stats'
-  | 'flags'  // v1.4: flagDictionary 직접 생성
   | 'endings'
   | 'traits'
   | 'keywords'
@@ -50,19 +49,6 @@ export interface StatResult {
   max: number;
   initialValue: number;
   polarity: 'positive' | 'negative';
-}
-
-// v1.4: flagDictionary 직접 생성 지원
-export interface FlagResult {
-  flagName: string;
-  type: 'boolean' | 'count';
-  description: string;
-  triggerCondition: string;
-  initial?: boolean | number;  // 초기값 (boolean이면 false, count면 0이 기본)
-}
-
-export interface FlagsResult {
-  flags: FlagResult[];
 }
 
 export interface RelationshipResult {
@@ -229,12 +215,6 @@ export const CATEGORY_INFO: Record<
     label: '스탯',
     description: '게임 진행에 영향을 주는 수치 시스템을 생성합니다.',
     placeholder: '예: 자원 관리, 그룹의 사기, 안전도, 외부 위협 수준을 추적하고 싶어',
-  },
-  flags: {
-    label: '플래그',
-    description: '게임 진행을 추적하는 이벤트 플래그를 생성합니다.',
-    placeholder:
-      '예: 특정 캐릭터 구출 여부, 비밀 발견, 중요 선택 등을 추적하는 플래그',
   },
   endings: {
     label: '엔딩',

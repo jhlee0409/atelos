@@ -25,13 +25,12 @@ const getGeminiClient = (): GoogleGenerativeAI => {
 // 카테고리별 생성 타입
 // v1.2: 'locations' 카테고리 제거됨 (동적 위치 시스템으로 대체)
 // v1.3: deprecated 카테고리들 제거 (플레이 시스템에서 미사용)
-// v1.4: 'flags' 카테고리 추가 (flagDictionary 직접 생성)
+// v1.4: Dynamic Ending System 채택 - flags 카테고리 불필요 (ActionHistory로 대체)
 export type GenerationCategory =
   | 'scenario_overview'
   | 'characters'
   | 'relationships'
   | 'stats'
-  | 'flags'  // v1.4: flagDictionary 직접 생성
   | 'endings'
   | 'traits'
   | 'keywords'
@@ -134,32 +133,6 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
       },
     },
     required: ['stats'],
-  },
-
-  // v1.4: 플래그 생성 스키마 추가
-  flags: {
-    type: SchemaType.OBJECT,
-    properties: {
-      flags: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            flagName: { type: SchemaType.STRING, description: 'FLAG_ 접두사 + 영문 대문자 (예: FLAG_RESCUE_SUCCESS)' },
-            type: {
-              type: SchemaType.STRING,
-              format: 'enum',
-              description: 'boolean(참/거짓) 또는 count(카운트)',
-              enum: ['boolean', 'count'],
-            },
-            description: { type: SchemaType.STRING, description: '플래그 설명 (50자 이내)' },
-            triggerCondition: { type: SchemaType.STRING, description: '플래그가 획득되는 조건 설명 (AI 가이드용)' },
-          },
-          required: ['flagName', 'type', 'description', 'triggerCondition'],
-        },
-      },
-    },
-    required: ['flags'],
   },
 
   endings: {
@@ -399,13 +372,12 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
 
 // 카테고리별 최적 temperature 설정
 // 창의적 작업: 0.7-0.9, 구조적 작업: 0.3-0.5
-// v1.4: deprecated 카테고리 제거, flags 추가
+// v1.4: deprecated 카테고리 제거, Dynamic Ending System 채택
 const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   scenario_overview: 0.8, // 창의적 - 독특한 시나리오 생성
   characters: 0.75, // 창의적 - 개성있는 캐릭터
   relationships: 0.5, // 중간 - 논리적이면서 흥미로운 관계
   stats: 0.3, // 구조적 - 일관된 게임 시스템
-  flags: 0.4, // 구조적 - 일관된 플래그 시스템 (v1.4)
   endings: 0.6, // 중간 - 다양하면서 일관된 엔딩
   traits: 0.5, // 중간 - 균형잡힌 특성
   keywords: 0.6, // 중간 - 적절한 키워드
@@ -416,13 +388,12 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
 };
 
 // 카테고리별 maxOutputTokens 설정
-// v1.4: deprecated 카테고리 제거, flags 추가
+// v1.4: deprecated 카테고리 제거, Dynamic Ending System 채택
 const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   scenario_overview: 2000,
   characters: 4000, // 여러 캐릭터 생성
   relationships: 3000, // 다수의 관계
   stats: 2000,
-  flags: 2500, // 여러 플래그 + 트리거 조건 (v1.4)
   endings: 4000, // 여러 엔딩 + 조건
   traits: 3000, // 버프/디버프 각 3-4개
   keywords: 1000, // 간단한 목록
@@ -662,80 +633,6 @@ ${baseContext}
 - 플레이어 선택이 스탯 변화에 영향을 줄 수 있는 구조로 설계하세요.
 - positive/negative polarity를 명확히 하여 "높을수록 좋음" vs "낮을수록 좋음"을 구분하세요.
 </design_tips>`,
-    },
-
-    // v1.4: 플래그 생성 프롬프트 추가
-    flags: {
-      systemPrompt: `<role>게임 시스템 디자이너</role>
-
-<task>시나리오 진행을 추적하는 이벤트 플래그를 설계합니다.</task>
-
-<guidelines>
-  <guideline>flagName은 FLAG_ 접두사 + 영문 대문자 (예: FLAG_RESCUE_SUCCESS)</guideline>
-  <guideline>type은 boolean(참/거짓 이벤트) 또는 count(누적 횟수 추적)</guideline>
-  <guideline>description은 50자 이내 한글 설명</guideline>
-  <guideline>triggerCondition은 AI가 이 플래그를 부여할 조건 설명 (한글, 구체적으로)</guideline>
-</guidelines>
-
-<flag_types>
-- boolean: 단일 이벤트 발생 여부 (구출 성공, 비밀 발견 등)
-- count: 반복 가능한 행동 횟수 (탐색 횟수, 대화 횟수 등)
-</flag_types>
-
-<flag_categories>
-1. 주요 선택 관련: FLAG_CHOSE_COMBAT, FLAG_CHOSE_NEGOTIATION 등
-2. 캐릭터 관련: FLAG_SAVED_[NAME], FLAG_TRUST_[NAME] 등
-3. 탐색 관련: FLAG_FOUND_SECRET, FLAG_EXPLORED_ALL 등
-4. 이벤트 관련: FLAG_WITNESSED_BETRAYAL, FLAG_SURVIVED_ATTACK 등
-</flag_categories>
-
-<design_tips>
-- 엔딩 조건에서 사용될 수 있는 플래그를 우선 설계하세요.
-- 루트 분기에 영향을 줄 수 있는 플래그를 포함하세요 (탈출/항전/협상 관련).
-- 너무 세부적인 플래그보다는 서사적으로 의미있는 이벤트를 추적하세요.
-</design_tips>
-
-<example>
-{
-  "flags": [
-    {
-      "flagName": "FLAG_RESCUE_SUCCESS",
-      "type": "boolean",
-      "description": "포로 구출 작전 성공",
-      "triggerCondition": "플레이어가 위험을 감수하고 포로를 성공적으로 구출했을 때"
-    },
-    {
-      "flagName": "FLAG_EXPLORATION_COUNT",
-      "type": "count",
-      "description": "누적 탐색 횟수",
-      "triggerCondition": "탐색 행동을 할 때마다 1씩 증가"
-    },
-    {
-      "flagName": "FLAG_CHOSE_VIOLENCE",
-      "type": "boolean",
-      "description": "폭력적 해결 선택",
-      "triggerCondition": "대립 상황에서 무력 사용을 선택했을 때"
-    },
-    {
-      "flagName": "FLAG_ALLY_GAINED",
-      "type": "count",
-      "description": "획득한 동맹 수",
-      "triggerCondition": "새로운 캐릭터의 신뢰를 얻어 동맹이 되었을 때"
-    }
-  ]
-}
-</example>`,
-      userPrompt: `<request>다음 시나리오에 적합한 6-10개의 이벤트 플래그를 제안해주세요.</request>
-
-<scenario>${input}</scenario>
-${baseContext}
-
-<design_requirements>
-- 엔딩 분기에 영향을 줄 수 있는 중요한 선택/이벤트를 추적하세요.
-- 루트 분기(탈출/항전/협상 등)와 관련된 플래그를 포함하세요.
-- boolean과 count 타입을 적절히 혼합하세요.
-- triggerCondition은 AI가 서사 생성 시 참고할 수 있도록 구체적으로 작성하세요.
-</design_requirements>`,
     },
 
     endings: {
