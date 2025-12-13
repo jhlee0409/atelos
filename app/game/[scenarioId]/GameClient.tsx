@@ -60,6 +60,7 @@ import {
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
 import { calculateDynamicAPCost, getActionSynergy, type DynamicAPCost } from '@/lib/action-engagement-system';
 import type { WorldState, WorldLocation } from '@/types';
+import playTestLogger from '@/lib/play-test-logger';
 
 // 레거시 폴백용 정적 매핑 (시나리오 데이터에서 매핑 실패 시에만 사용)
 const LEGACY_STAT_MAPPING: Record<string, string> = {
@@ -1506,6 +1507,13 @@ export default function GameClient({ scenario }: GameClientProps) {
       if (result.success && result.ending) {
         console.log('✅ 동적 엔딩 생성 완료:', result.ending.title);
         setDynamicEnding(result.ending);
+
+        // [PlayTestLogger] Stage 5 로깅 (동적 엔딩)
+        playTestLogger.logStage5Ending('dynamic', {
+          title: result.ending.title,
+          sdtScore: result.ending.sdtScore,
+          satisfaction: result.ending.satisfaction,
+        });
       } else {
         console.error('❌ 동적 엔딩 생성 실패:', result.error);
       }
@@ -1556,6 +1564,9 @@ export default function GameClient({ scenario }: GameClientProps) {
       setError(null);
       try {
         const initialState = createInitialSaveState(scenario);
+        // [PlayTestLogger] Stage 1 로깅
+        playTestLogger.logStage1(scenario, initialState);
+
         const aiSettings = getOptimalAISettings(1, 'medium', 0, scenario);
 
         // 스토리 오프닝 시스템 사용 여부에 따라 다른 함수 호출
@@ -1747,6 +1758,9 @@ export default function GameClient({ scenario }: GameClientProps) {
               actionContextSituation: updatedActionContext.currentSituation?.substring(0, 50),
             });
 
+            // [PlayTestLogger] Stage 2 로깅
+            playTestLogger.logStage2(updatedState, true);
+
             setSaveState(updatedState);
           } else {
             // 기존 방식: 단일 메시지로 표시
@@ -1904,6 +1918,9 @@ export default function GameClient({ scenario }: GameClientProps) {
         cleanedResponse,
         scenario,
       );
+
+      // [PlayTestLogger] Stage 4 로깅 (AI 응답 처리)
+      playTestLogger.logStage4AIResponse(cleanedResponse, newSaveState, updatedSaveState);
 
       // 회상 시스템 - 주요 결정 기록
       // Bug fix: 상태 업데이트 전의 day/turn 사용 (newSaveState)
@@ -2063,6 +2080,14 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       setSaveState(stateAfterAP);
 
+      // [PlayTestLogger] Stage 3 로깅 (선택 액션)
+      playTestLogger.logStage3Action('choice', {
+        choice: choiceDetails,
+        isCustomInput,
+        synergyApplied: !!apCostInfo,
+        apCost: apCostInfo?.finalCost || 1,
+      }, stateAfterAP);
+
       console.log('🔄 상태 업데이트 완료, 엔딩 조건 확인 시작...');
       if (shouldAdvanceDay) {
         console.log(`🌅 Day ${newDay}로 전환됨 - AP 소진`);
@@ -2160,6 +2185,12 @@ export default function GameClient({ scenario }: GameClientProps) {
 
       if (ending) {
         console.log(`🎉 엔딩 발동! -> ${ending.title}`);
+        // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩)
+        playTestLogger.logStage5Ending('legacy', {
+          endingId: ending.endingId,
+          title: ending.title,
+          isGoalSuccess: ending.isGoalSuccess,
+        });
         setTriggeredEnding(ending);
       }
     } catch (err) {
@@ -2387,6 +2418,14 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 대화 후 선택 모드로 복귀
 
+      // [PlayTestLogger] Stage 3 로깅 (대화 액션)
+      playTestLogger.logStage3Action('dialogue', {
+        characterName,
+        topic: topic.id,
+        relationshipChange: dialogueResponse.relationshipChange,
+        infoGained: dialogueResponse.infoGained,
+      }, stateAfterAP);
+
       // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
       if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
         console.log(`💬 대화 비용 조정: ${apCostInfo.bonus}`);
@@ -2459,6 +2498,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
 
         if (ending) {
+          // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩 - 대화)
+          playTestLogger.logStage5Ending('legacy', {
+            endingId: ending.endingId,
+            title: ending.title,
+            isGoalSuccess: ending.isGoalSuccess,
+          });
           setTriggeredEnding(ending);
         }
       }
@@ -2776,6 +2821,13 @@ export default function GameClient({ scenario }: GameClientProps) {
       setSaveState(stateAfterAP);
       setGameMode('choice'); // 탐색 후 선택 모드로 복귀
 
+      // [PlayTestLogger] Stage 3 로깅 (탐색 액션)
+      playTestLogger.logStage3Action('exploration', {
+        locationId: location.locationId,
+        rewards: explorationResult.rewards,
+        newDiscoveries: worldStateResult?.newDiscoveries?.length || 0,
+      }, stateAfterAP);
+
       // 동적 비용 피드백 (보너스가 있으면 서사적 메시지로 표시)
       if (apCostInfo?.bonus && apCostInfo.adjustedCost !== 1) {
         console.log(`🗺️ 탐색 비용 조정: ${apCostInfo.bonus}`);
@@ -2848,6 +2900,12 @@ export default function GameClient({ scenario }: GameClientProps) {
         }
 
         if (ending) {
+          // [PlayTestLogger] Stage 5 로깅 (레거시 엔딩 - 탐색)
+          playTestLogger.logStage5Ending('legacy', {
+            endingId: ending.endingId,
+            title: ending.title,
+            isGoalSuccess: ending.isGoalSuccess,
+          });
           setTriggeredEnding(ending);
         }
       }
