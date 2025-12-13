@@ -12,6 +12,12 @@ export type Character = {
   isPlayable?: boolean;
   /** 시나리오의 기본 주인공인지 여부 */
   isDefaultProtagonist?: boolean;
+  /** 캐릭터의 개인적인 목표 (NPC: AI 행동 가이드, 플레이어 캐릭터: 게임 목표) */
+  personalGoal?: string;
+  /** 플레이어가 이 캐릭터로 플레이할 때 표시되는 목표 (미설정시 시나리오 기본 playerGoal 사용) */
+  playerGoalOverride?: string;
+  /** AI가 추천한 성격/특성 (이미지 생성용) */
+  suggestedTraits?: string[];
 };
 
 export type Relationship = {

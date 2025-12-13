@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, X, Sparkles, Loader2, UserCircle } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2, UserCircle, Crown, Gamepad2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Character, Relationship, ScenarioData } from '@/types';
 import { SetStateAction, useState } from 'react';
 import { generateCharacterImage, uploadImage, inferSettingFromScenario } from '@/lib/image-generator';
@@ -422,6 +424,7 @@ type CharacterCardProps = {
 
 const CharacterCard = ({
   scenario,
+  setScenario,
   character,
   index,
   saveCharacter,
@@ -535,6 +538,19 @@ const CharacterCard = ({
     setPendingImageBase64(null);
     toast.info('이미지가 취소되었습니다. 다시 생성해주세요.');
   };
+
+  // 기본 주인공 토글 핸들러 (한 명만 기본 주인공으로 설정 가능)
+  const handleDefaultProtagonistChange = (checked: boolean) => {
+    setScenario((prev) => ({
+      ...prev,
+      characters: prev.characters.map((char, i) => ({
+        ...char,
+        // 현재 캐릭터가 선택되면 true, 다른 캐릭터는 모두 false
+        isDefaultProtagonist: i === index ? checked : checked ? false : char.isDefaultProtagonist,
+      })),
+    }));
+  };
+
   return (
     <Card
       key={index}
@@ -629,6 +645,61 @@ const CharacterCard = ({
           </div>
         </div>
 
+        {/* 플레이 가능 설정 */}
+        <div className="mb-4 flex flex-wrap items-center gap-6 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`isPlayable-${index}`}
+              checked={character.isPlayable ?? false}
+              onCheckedChange={(checked) =>
+                updateCharacter(index, 'isPlayable', !!checked)
+              }
+              disabled={!character.isEditing}
+              className="border-blue-400 data-[state=checked]:bg-blue-600"
+            />
+            <Label
+              htmlFor={`isPlayable-${index}`}
+              className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-800"
+            >
+              <Gamepad2 className="h-4 w-4" />
+              플레이 가능
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`isDefaultProtagonist-${index}`}
+              checked={character.isDefaultProtagonist ?? false}
+              onCheckedChange={(checked) =>
+                handleDefaultProtagonistChange(!!checked)
+              }
+              disabled={!character.isEditing || !character.isPlayable}
+              className="border-amber-400 data-[state=checked]:bg-amber-600"
+            />
+            <Label
+              htmlFor={`isDefaultProtagonist-${index}`}
+              className={`flex cursor-pointer items-center gap-1.5 text-sm font-medium ${
+                character.isPlayable ? 'text-amber-800' : 'text-gray-400'
+              }`}
+            >
+              <Crown className="h-4 w-4" />
+              기본 주인공
+            </Label>
+            {!character.isPlayable && (
+              <span className="text-xs text-gray-400">
+                (플레이 가능 설정 필요)
+              </span>
+            )}
+          </div>
+
+          {character.isDefaultProtagonist && (
+            <Badge className="border-amber-300 bg-amber-100 text-amber-800">
+              <Crown className="mr-1 h-3 w-3" />
+              기본 주인공
+            </Badge>
+          )}
+        </div>
+
         <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-800">
@@ -646,6 +717,39 @@ const CharacterCard = ({
               disabled={!character.isEditing}
             />
           </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-800">
+              개인 목표
+              {character.isPlayable && (
+                <span className="ml-2 text-xs text-blue-600">
+                  (플레이어 목표로 사용됨)
+                </span>
+              )}
+            </label>
+            <Textarea
+              value={character.personalGoal || ''}
+              onChange={(e) =>
+                updateCharacter(index, 'personalGoal', e.target.value)
+              }
+              className="border-socratic-grey bg-white focus:border-kairos-gold focus:ring-kairos-gold/20"
+              placeholder={
+                character.isPlayable
+                  ? '이 캐릭터로 플레이할 때의 게임 목표 (예: 모든 생존자를 이끌어 탈출한다)'
+                  : 'NPC의 개인적 목표 (예: 가족을 찾아 재회하고 싶다)'
+              }
+              maxLength={200}
+              rows={3}
+              disabled={!character.isEditing}
+            />
+            <p className="mt-1 text-xs text-socratic-grey">
+              {character.isPlayable
+                ? '플레이어가 이 캐릭터를 선택했을 때 표시되는 목표입니다.'
+                : 'AI가 이 캐릭터의 행동을 결정할 때 참조합니다.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-800">
               캐릭터 이미지

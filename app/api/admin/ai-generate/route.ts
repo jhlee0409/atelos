@@ -81,8 +81,9 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
             },
             isPlayable: { type: SchemaType.BOOLEAN, description: '플레이어가 이 캐릭터로 플레이 가능한지 여부', nullable: true },
             isDefaultProtagonist: { type: SchemaType.BOOLEAN, description: '기본 주인공인지 여부 (하나만 true)', nullable: true },
+            personalGoal: { type: SchemaType.STRING, description: '캐릭터의 개인적 목표 (플레이어 캐릭터: 게임 목표, NPC: AI 행동 가이드)' },
           },
-          required: ['roleId', 'roleName', 'characterName', 'backstory', 'suggestedTraits'],
+          required: ['roleId', 'roleName', 'characterName', 'backstory', 'suggestedTraits', 'personalGoal'],
         },
       },
     },
@@ -471,7 +472,15 @@ ${baseContext}`,
   <guideline>characterName은 시나리오 배경에 맞는 한글 이름</guideline>
   <guideline>backstory는 100-200자로 동기와 과거를 포함</guideline>
   <guideline>suggestedTraits는 성격 특성 ID 2-3개</guideline>
+  <guideline>personalGoal은 캐릭터의 개인적 목표 (50-100자)</guideline>
 </guidelines>
+
+<personal_goal_guidelines>
+- 플레이어 캐릭터(isPlayable=true): 게임의 주요 목표가 됨. "생존자들을 안전하게 이끌어 탈출구를 찾는다" 같이 구체적으로.
+- NPC(isPlayable=false): AI가 캐릭터의 행동을 결정할 때 참조. "가족을 찾아 재회하고 싶다", "그룹의 안전을 위해 희생할 준비가 되어있다" 등.
+- 목표는 backstory와 연결되어 캐릭터의 동기를 명확히 해야 합니다.
+- 시나리오 전체 목표와 조화를 이루거나, 의도적으로 갈등을 만들 수 있습니다.
+</personal_goal_guidelines>
 
 <role_examples>LEADER, MEDIC, SOLDIER, SCIENTIST, SURVIVOR, MERCHANT, ANTAGONIST, MENTOR, CHILD, ELDER</role_examples>
 
@@ -485,7 +494,19 @@ ${baseContext}`,
       "roleName": "지도자",
       "characterName": "박준영",
       "backstory": "전직 소방관으로 재난 상황에서 침착하게 대처하는 능력을 갖추고 있다. 가족을 잃은 후 생존자들을 이끌며 새로운 삶의 의미를 찾고 있다.",
-      "suggestedTraits": ["brave", "charismatic", "responsible"]
+      "suggestedTraits": ["brave", "charismatic", "responsible"],
+      "isPlayable": true,
+      "isDefaultProtagonist": true,
+      "personalGoal": "모든 생존자들을 안전 지대까지 이끌고, 더 이상의 희생을 막는다."
+    },
+    {
+      "roleId": "MEDIC",
+      "roleName": "의료진",
+      "characterName": "김서연",
+      "backstory": "대학병원 응급실 간호사로 일했던 그녀는 재난 속에서도 부상자들을 돌보며 희망을 잃지 않는다.",
+      "suggestedTraits": ["compassionate", "calm", "dedicated"],
+      "isPlayable": false,
+      "personalGoal": "부상자들을 치료하고, 의료 물자를 확보하여 그룹의 생존율을 높인다."
     }
   ]
 }
@@ -493,7 +514,13 @@ ${baseContext}`,
       userPrompt: `<request>다음 설명을 바탕으로 2-4명의 캐릭터를 생성해주세요.</request>
 
 <input_description>${input}</input_description>
-${baseContext}`,
+${baseContext}
+
+<important>
+- 최소 한 명은 isPlayable=true, isDefaultProtagonist=true로 설정해주세요 (기본 주인공).
+- 각 캐릭터의 personalGoal은 backstory와 연결되어야 합니다.
+- 플레이어 캐릭터의 personalGoal은 게임의 주요 목표가 됩니다.
+</important>`,
     },
 
     relationships: {
