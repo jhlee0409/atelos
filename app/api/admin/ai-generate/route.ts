@@ -37,7 +37,8 @@ export type GenerationCategory =
   | 'genre'
   | 'idea_suggestions'
   | 'story_opening'
-  | 'gameplay_config';
+  | 'gameplay_config'
+  | 'character_openings';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -371,6 +372,21 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'reasoning'],
   },
+
+  // ==========================================================================
+  // 캐릭터별 오프닝 시스템 (동적 주인공 선택)
+  // ==========================================================================
+  character_openings: {
+    type: SchemaType.OBJECT,
+    properties: {
+      characterOpenings: {
+        type: SchemaType.OBJECT,
+        description: '캐릭터 이름을 키로 하는 오프닝 정보 객체',
+        additionalProperties: true,
+      },
+    },
+    required: ['characterOpenings'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -388,6 +404,7 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   idea_suggestions: 0.9, // 매우 창의적 - 다양하고 독특한 아이디어
   story_opening: 0.75, // 창의적 - 몰입감 있는 오프닝 생성
   gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
+  character_openings: 0.75, // 창의적 - 캐릭터별 몰입감 있는 오프닝
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -404,6 +421,7 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   idea_suggestions: 2000, // 여러 아이디어
   story_opening: 3000, // 프롤로그, 촉발 사건, 주인공 설정 포함
   gameplay_config: 2000, // 간소화된 게임 설정 + 설명
+  character_openings: 4000, // 여러 캐릭터의 오프닝 생성
 };
 
 interface AIGenerateRequestBody {
@@ -996,6 +1014,70 @@ ${baseContext}
 <requirements>
 - 시나리오의 장르, 분위기, 페이스에 맞는 설정 선택
 - 각 설정값에 대한 이유를 reasoning에 설명
+</requirements>`,
+    },
+
+    // ========================================================================
+    // 캐릭터별 오프닝 시스템 (동적 주인공 선택)
+    // ========================================================================
+    character_openings: {
+      systemPrompt: `<role>인터랙티브 게임 시나리오의 캐릭터별 오프닝 전문 작가</role>
+
+<task>플레이 가능한 각 캐릭터별로 고유한 스토리 오프닝을 생성합니다. 같은 시나리오지만 다른 시점에서 시작하는 개인화된 경험을 제공합니다.</task>
+
+<opening_structure>
+1. **prologue**: 이 캐릭터의 평범한 일상/시작 장면 (100-150자)
+   - 캐릭터의 성격과 배경이 드러나는 장면
+   - 플레이어가 캐릭터에 감정이입할 수 있는 요소
+
+2. **incitingIncident**: 이 캐릭터가 사건에 휘말리는 순간 (80-120자)
+   - 같은 사건이라도 캐릭터마다 다른 방식으로 경험
+   - 캐릭터의 위치/상황에 따른 개인적 관점
+
+3. **firstCharacterToMeet**: 처음 만나는 다른 캐릭터
+   - 자기 자신은 제외
+   - 논리적으로 만날 수 있는 캐릭터 선택
+
+4. **firstEncounterContext**: 첫 만남의 상황 설명 (50-100자)
+
+5. **openingLocation**: 오프닝이 시작되는 장소
+</opening_structure>
+
+<writing_principles>
+- 한국어로 자연스럽고 문학적인 문장
+- "보여주기"를 "말하기"보다 우선
+- 각 캐릭터의 고유한 시점과 경험 반영
+- 다른 캐릭터의 비밀이나 숨겨진 정보는 포함하지 않음
+</writing_principles>
+
+<output_format>
+{
+  "characterOpenings": {
+    "캐릭터이름1": {
+      "prologue": "...",
+      "incitingIncident": "...",
+      "firstCharacterToMeet": "...",
+      "firstEncounterContext": "...",
+      "openingLocation": "..."
+    },
+    "캐릭터이름2": {
+      ...
+    }
+  }
+}
+</output_format>`,
+      userPrompt: `<request>다음 플레이 가능한 캐릭터들에 대해 각각의 고유한 스토리 오프닝을 생성해주세요.</request>
+
+<scenario>
+${input}
+</scenario>
+${baseContext}
+
+<requirements>
+- 각 플레이 가능 캐릭터(isPlayable=true)에 대해 오프닝 생성
+- 캐릭터 이름을 키로 사용 (roleId가 아닌 characterName)
+- firstCharacterToMeet에는 자기 자신 제외
+- 같은 사건을 다른 시점에서 경험하도록 설계
 </requirements>`,
     },
   };

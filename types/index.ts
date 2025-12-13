@@ -584,6 +584,23 @@ export type GameplayConfig = {
   };
 };
 
+/**
+ * 캐릭터별 스토리 오프닝 설정
+ * 동적 주인공 선택 시스템에서 각 플레이 가능 캐릭터별 고유 오프닝을 정의
+ */
+export interface CharacterStoryOpening {
+  /** 프롤로그 (이 캐릭터 시점에서의 일상/시작 장면) */
+  prologue?: string;
+  /** 촉발 사건 (이 캐릭터가 사건에 휘말리는 순간) */
+  incitingIncident?: string;
+  /** 첫 번째로 만나는 캐릭터 (자신 제외) */
+  firstCharacterToMeet?: string;
+  /** 첫 만남 상황 설명 */
+  firstEncounterContext?: string;
+  /** 오프닝 장소 */
+  openingLocation?: string;
+}
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -607,6 +624,8 @@ export type ScenarioData = {
   playableCharacters?: string[];
   /** 기본 주인공 캐릭터 ID (시나리오 추천) */
   defaultProtagonist?: string;
+  /** 캐릭터별 스토리 오프닝 설정 (동적 주인공 선택 시스템) */
+  characterStoryOpenings?: Record<string, CharacterStoryOpening>;
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only

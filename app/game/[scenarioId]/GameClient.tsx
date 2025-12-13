@@ -274,6 +274,55 @@ const getProtagonistCharacter = (scenario: ScenarioData, selectedProtagonistId?:
 };
 
 /**
+ * 선택된 주인공에 맞는 스토리 오프닝 가져오기
+ *
+ * 우선순위:
+ * 1. characterStoryOpenings[characterName]이 있으면 기본 storyOpening과 병합
+ * 2. 없으면 기본 storyOpening 사용
+ *
+ * @param scenario 시나리오 데이터
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
+ * @returns 병합된 스토리 오프닝
+ */
+const getStoryOpeningForProtagonist = (
+  scenario: ScenarioData,
+  selectedProtagonistId?: string
+): ScenarioData['storyOpening'] => {
+  const baseOpening = scenario.storyOpening;
+
+  // 캐릭터별 오프닝이 없거나 선택된 주인공이 없으면 기본 오프닝 반환
+  if (!selectedProtagonistId || !scenario.characterStoryOpenings) {
+    return baseOpening;
+  }
+
+  // 선택된 캐릭터 이름 가져오기
+  const protagonistChar = scenario.characters.find(
+    (c) => c.roleId === selectedProtagonistId
+  );
+
+  if (!protagonistChar) {
+    return baseOpening;
+  }
+
+  const characterOpening = scenario.characterStoryOpenings[protagonistChar.characterName];
+
+  // 캐릭터별 오프닝이 없으면 기본 오프닝 반환
+  if (!characterOpening) {
+    return baseOpening;
+  }
+
+  // 기본 오프닝과 캐릭터별 오프닝 병합 (캐릭터별 값이 우선)
+  return {
+    ...baseOpening,
+    prologue: characterOpening.prologue || baseOpening?.prologue,
+    incitingIncident: characterOpening.incitingIncident || baseOpening?.incitingIncident,
+    firstCharacterToMeet: characterOpening.firstCharacterToMeet || baseOpening?.firstCharacterToMeet,
+    firstEncounterContext: characterOpening.firstEncounterContext || baseOpening?.firstEncounterContext,
+    openingLocation: characterOpening.openingLocation || baseOpening?.openingLocation,
+  };
+};
+
+/**
  * 초기 만난 캐릭터 목록 생성 (storyOpening 설정 기반)
  *
  * characterIntroductionStyle에 따라:
