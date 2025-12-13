@@ -1588,6 +1588,49 @@ export default function GameClient({ scenario }: GameClientProps) {
                 ]
               : initialInformationPieces;
 
+            // =================================================================
+            // [Stage 2 개선 #1] characterArcs 첫 만남 moment 기록
+            // =================================================================
+            const updatedCharacterArcs = metCharacterName
+              ? (initialState.characterArcs || []).map((arc) => {
+                  if (arc.characterName === metCharacterName) {
+                    return {
+                      ...arc,
+                      moments: [
+                        ...arc.moments,
+                        {
+                          day: 1,
+                          type: 'relationship' as const,
+                          description: `${metCharacterName}과(와) 처음 만났다.`,
+                          relatedCharacter: '(플레이어)',
+                          impact: 'positive' as const,
+                        },
+                      ],
+                    };
+                  }
+                  return arc;
+                })
+              : initialState.characterArcs;
+
+            // =================================================================
+            // [Stage 2 개선 #2] actionContext 오프닝 반영
+            // =================================================================
+            const updatedActionContext = {
+              ...initialState.context.actionContext,
+              // 현재 상황을 오프닝 상황으로 업데이트
+              currentSituation: storyOpening.incitingIncident || initialState.context.actionContext?.currentSituation,
+              // 첫 만남 대화 기록 추가
+              todayActions: metCharacterName
+                ? {
+                    ...initialState.context.actionContext?.todayActions,
+                    dialogues: [
+                      ...(initialState.context.actionContext?.todayActions?.dialogues || []),
+                      { characterName: metCharacterName, topic: 'first_encounter' },
+                    ],
+                  }
+                : initialState.context.actionContext?.todayActions,
+            };
+
             // 상태 업데이트 (log 대신 chatHistory 직접 설정)
             const updatedState: SaveState = {
               ...initialState,
@@ -1602,12 +1645,18 @@ export default function GameClient({ scenario }: GameClientProps) {
                   metCharacters: updatedMetCharacters,
                   informationPieces: newInformationPieces,
                 },
+                // [Stage 2 개선 #2] actionContext 업데이트
+                actionContext: updatedActionContext,
               },
+              // [Stage 2 개선 #1] characterArcs 업데이트
+              characterArcs: updatedCharacterArcs,
             };
 
-            console.log('📖 스토리 오프닝 완료 - 주인공 지식 업데이트:', {
+            console.log('📖 스토리 오프닝 완료 - 상태 업데이트:', {
               metCharacters: updatedMetCharacters,
               newInfo: newInformationPieces.length - initialInformationPieces.length,
+              characterArcsMoment: metCharacterName ? `${metCharacterName} 첫 만남 moment 추가` : '없음',
+              actionContextSituation: updatedActionContext.currentSituation?.substring(0, 50),
             });
 
             setSaveState(updatedState);

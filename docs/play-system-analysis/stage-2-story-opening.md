@@ -8,18 +8,21 @@
 **핵심 파일**:
 - `lib/game-ai-client.ts`: generateStoryOpening(), generateInitialDilemma()
 - `lib/prompt-builder.ts`: buildStoryOpeningPrompt()
+- `app/game/[scenarioId]/GameClient.tsx`: 오프닝 완료 후 상태 업데이트 (lines 1566-1662)
+
+**테스트 파일**: `tests/unit/story-opening.test.ts` (17개 테스트)
 
 ---
 
 ## 2. Stage 1에서 받는 데이터
 
-| 데이터 | 출처 | 용도 |
-|--------|------|------|
-| `protagonistKnowledge.metCharacters` | createInitialSaveState | 첫 만남 대상 결정 |
-| `npcRelationshipStates` | createInitialSaveState | AI에게 숨겨야 할 관계 |
-| `community.survivors` | createInitialSaveState | 오프닝 등장 캐릭터 |
-| `actionContext.currentLocation` | createInitialContext | 오프닝 장소 |
-| `characterArcs` | createInitialSaveState | 캐릭터 초기 mood |
+| 데이터 | 출처 | 용도 | Stage 1 개선 영향 |
+|--------|------|------|------------------|
+| `protagonistKnowledge.metCharacters` | createInitialSaveState | 첫 만남 대상 결정 | #2 배열 병합 |
+| `npcRelationshipStates` | createInitialSaveState | AI에게 숨겨야 할 관계 | - |
+| `community.survivors` | createInitialSaveState | 오프닝 등장 캐릭터 | - |
+| `actionContext.currentLocation` | createInitialContext | 오프닝 장소 | #4 기본값 보장 |
+| `characterArcs` | createInitialSaveState | 캐릭터 초기 mood | #1 trustLevel 초기화 |
 
 ---
 
@@ -95,7 +98,7 @@ ScenarioData.storyOpening
 firstCharacter → 오프닝의 firstEncounter에 등장
 ```
 
-### 4.3 [Stage 2] 구현된 숨겨진 관계 가이드라인
+### 4.3 구현된 숨겨진 관계 가이드라인
 
 ```typescript
 // prompt-builder.ts:588-603
@@ -112,7 +115,7 @@ if (options.npcRelationshipStates && options.npcRelationshipStates.length > 0) {
 }
 ```
 
-### 4.4 [Stage 2] 구현된 주인공 지식 가이드라인
+### 4.4 구현된 주인공 지식 가이드라인
 
 ```typescript
 // prompt-builder.ts:605-627
@@ -169,7 +172,79 @@ return {
 
 ---
 
-## 6. 데이터 흐름 (Stage 1 → Stage 2)
+## 6. 오프닝 완료 후 상태 업데이트
+
+### 6.1 [구현 완료] protagonistKnowledge 업데이트
+
+```typescript
+// GameClient.tsx:1571-1589
+// metCharacters 업데이트 (이미 포함되어 있지 않은 경우만)
+const updatedMetCharacters = metCharacterName && !currentMetCharacters.includes(metCharacterName)
+  ? [...currentMetCharacters, metCharacterName]
+  : currentMetCharacters;
+
+// 첫 만남에서 얻은 기본 정보 기록
+const newInformationPieces = [
+  ...initialInformationPieces,
+  {
+    id: `opening_meet_${metCharacterName}`,
+    content: `${metCharacterName}을(를) 처음 만났다.`,
+    source: 'story_opening',
+    discoveredAt: { day: 1, action: 'opening' },
+  },
+];
+```
+
+### 6.2 [Stage 2 개선 #1] characterArcs 첫 만남 moment 기록
+
+```typescript
+// GameClient.tsx:1591-1613
+const updatedCharacterArcs = metCharacterName
+  ? (initialState.characterArcs || []).map((arc) => {
+      if (arc.characterName === metCharacterName) {
+        return {
+          ...arc,
+          moments: [
+            ...arc.moments,
+            {
+              day: 1,
+              type: 'relationship' as const,
+              description: `${metCharacterName}과(와) 처음 만났다.`,
+              relatedCharacter: '(플레이어)',
+              impact: 'positive' as const,
+            },
+          ],
+        };
+      }
+      return arc;
+    })
+  : initialState.characterArcs;
+```
+
+### 6.3 [Stage 2 개선 #2] actionContext 오프닝 반영
+
+```typescript
+// GameClient.tsx:1615-1632
+const updatedActionContext = {
+  ...initialState.context.actionContext,
+  // 현재 상황을 오프닝 상황으로 업데이트
+  currentSituation: storyOpening.incitingIncident || initialState.context.actionContext?.currentSituation,
+  // 첫 만남 대화 기록 추가
+  todayActions: metCharacterName
+    ? {
+        ...initialState.context.actionContext?.todayActions,
+        dialogues: [
+          ...(initialState.context.actionContext?.todayActions?.dialogues || []),
+          { characterName: metCharacterName, topic: 'first_encounter' },
+        ],
+      }
+    : initialState.context.actionContext?.todayActions,
+};
+```
+
+---
+
+## 7. 데이터 흐름 (Stage 1 → Stage 2 → Stage 3)
 
 ```
 Stage 1 초기화
@@ -186,11 +261,30 @@ Stage 1 초기화
             ├─ characterIntroductionSequence
             ├─ hiddenNPCRelationships
             └─ characterRevelations
+                    │
+                    ▼
+            StoryOpeningResult
+                    │
+                    ▼
+            오프닝 완료 후 상태 업데이트 ★
+                    │
+                    ├─→ protagonistKnowledge.metCharacters 추가 ✅
+                    ├─→ protagonistKnowledge.informationPieces 추가 ✅
+                    ├─→ characterArcs.moments 추가 ★ [Stage 2 개선 #1]
+                    ├─→ actionContext.currentSituation 업데이트 ★ [Stage 2 개선 #2]
+                    └─→ actionContext.todayActions.dialogues 추가 ★ [Stage 2 개선 #2]
+                            │
+                            ▼
+                        Stage 3로 전달
+
+★ = Stage 2 개선으로 추가된 데이터 흐름
 ```
 
 ---
 
-## 7. 구현된 개선사항 (커밋 60ae7eb)
+## 8. 구현된 개선사항
+
+### 8.1 커밋 60ae7eb (초기 구현)
 
 | 항목 | 구현 내용 |
 |------|----------|
@@ -199,32 +293,43 @@ Stage 1 초기화
 | 숨겨진 관계 가이드라인 | AI가 관계 노출 레벨에 따라 서술 제한 |
 | 주인공 지식 가이드라인 | AI가 알려진 정보 범위 내에서만 서술 |
 
----
+### 8.2 기존 구현 (GameClient.tsx 내)
 
-## 8. 추가 개선 필요사항
+| 항목 | 구현 내용 |
+|------|----------|
+| metCharacters 업데이트 | 첫 만남 캐릭터 추가 |
+| informationPieces 추가 | 첫 만남 정보 기록 |
 
-### 8.1 잠재적 이슈
+### 8.3 Stage 2 개선 (현재 커밋)
 
-| 이슈 | 현재 상태 | 개선 제안 |
-|------|----------|----------|
-| 오프닝에서 protagonistKnowledge 업데이트 없음 | fullLog만 반환 | 첫 만남 캐릭터를 metCharacters에 추가 필요 |
-| characterArcs 오프닝 반영 없음 | 초기화 후 변경 없음 | 첫 만남 moment 기록 고려 |
-| storyOpening 폴백 품질 | 시나리오 데이터 기반 단순 텍스트 | 폴백 서사 품질 향상 |
-| 오프닝 중 스탯 변화 미지원 | statChanges 항상 비어있음 | 선택적 오프닝 스탯 변화 지원 고려 |
-
-### 8.2 Stage 3 전달 시 누락 가능 데이터
-
-1. **오프닝에서 만난 캐릭터**: metCharacters 업데이트 안됨
-   - `firstEncounter`에 등장한 캐릭터가 metCharacters에 없을 수 있음
-
-2. **첫 만남 컨텍스트**: actionContext 업데이트 안됨
-   - `characterPresences`가 오프닝 반영 안됨
+| # | 이슈 | 해결 내용 | 영향 Stage |
+|---|------|----------|-----------|
+| #1 | characterArcs 오프닝 반영 없음 | 첫 만남 캐릭터에 `type: 'relationship'` moment 추가 | Stage 3, 5 |
+| #2 | actionContext 오프닝 미반영 | currentSituation 업데이트, todayActions.dialogues 추가 | Stage 3 |
 
 ---
 
-## 9. Stage 3로 전달되는 데이터
+## 9. 추가 개선 필요사항 (향후)
 
-### 9.1 오프닝 완료 후 SaveState 상태
+### 9.1 잠재적 이슈
+
+| 이슈 | 현재 상태 | 우선순위 |
+|------|----------|---------|
+| storyOpening 폴백 품질 | 시나리오 데이터 기반 단순 텍스트 | 낮음 |
+| 오프닝 중 스탯 변화 미지원 | statChanges 항상 비어있음 | 낮음 |
+| characterPresences 오프닝 반영 | 캐릭터 위치 정보 미업데이트 | 낮음 |
+
+### 9.2 향후 확장 고려사항
+
+1. **오프닝 스탯 변화**: 프롤로그 선택에 따른 초기 스탯 조정
+2. **다중 캐릭터 첫 만남**: 여러 캐릭터를 한번에 만나는 오프닝 지원
+3. **오프닝 분기**: 플레이어 선택에 따른 다른 오프닝 경로
+
+---
+
+## 10. Stage 3로 전달되는 데이터
+
+### 10.1 오프닝 완료 후 SaveState 상태
 
 ```typescript
 // GameClient에서 오프닝 후 상태 업데이트
@@ -232,41 +337,62 @@ saveState = {
   ...initialState,
   log: storyOpeningResult.fullLog,           // 오프닝 서사
   dilemma: storyOpeningResult.dilemma,       // 첫 선택지
-  chatHistory: [
-    { type: 'ai', content: fullLog, timestamp },  // 오프닝 채팅 기록
+  chatHistory: [...],                        // 3단계 오프닝 메시지
+  context: {
+    ...initialState.context,
+    protagonistKnowledge: {
+      metCharacters: [..., firstCharacterName],      // ✅ 업데이트됨
+      informationPieces: [..., firstMeetInfo],       // ✅ 업데이트됨
+    },
+    actionContext: {
+      currentSituation: incitingIncident,            // ★ [Stage 2 개선 #2]
+      todayActions: { dialogues: [firstMeet] },      // ★ [Stage 2 개선 #2]
+    },
+  },
+  characterArcs: [
+    { moments: [firstEncounterMoment] },             // ★ [Stage 2 개선 #1]
   ],
-  // 아래 필드들은 Stage 1 초기화 그대로 유지됨:
-  // - protagonistKnowledge (업데이트 안됨 - 개선 필요)
-  // - npcRelationshipStates (visibility 그대로)
-  // - characterArcs (초기 상태 그대로)
 };
 ```
 
-### 9.2 Stage 3에서 사용할 데이터
+### 10.2 Stage 3에서 사용할 데이터
 
-| 데이터 | Stage 3 핸들러 용도 |
-|--------|-------------------|
-| `dilemma` | 첫 선택지 표시 |
-| `chatHistory` | 메시지 표시 |
-| `actionContext` | AI 프롬프트 맥락 (미변경) |
-| `npcRelationshipStates` | AI가 관계 숨김 유지 |
-| `protagonistKnowledge` | AI 선택지 생성 범위 제한 |
+| 데이터 | Stage 3 핸들러 용도 | Stage 2 개선 영향 |
+|--------|-------------------|------------------|
+| `dilemma` | 첫 선택지 표시 | - |
+| `chatHistory` | 메시지 표시 | - |
+| `actionContext` | AI 프롬프트 맥락 | #2 currentSituation, todayActions |
+| `npcRelationshipStates` | AI가 관계 숨김 유지 | - |
+| `protagonistKnowledge` | AI 선택지 생성 범위 제한 | - |
+| `characterArcs` | 캐릭터 상태 표시 | #1 첫 만남 moment |
 
 ---
 
-## 10. 검증 체크리스트
+## 11. 검증 체크리스트
 
+### 기존 검증 (완료)
 - [x] npcRelationshipStates AI 프롬프트 전달 확인
 - [x] protagonistKnowledge AI 프롬프트 전달 확인
 - [x] 숨겨진 관계 가이드라인 프롬프트 포함 확인
 - [x] 주인공 지식 가이드라인 프롬프트 포함 확인
-- [ ] 오프닝 후 metCharacters 업데이트 (개선 필요)
-- [ ] 오프닝 후 characterArcs 첫 만남 기록 (개선 필요)
-- [ ] actionContext 오프닝 반영 (향후 개선)
+- [x] 오프닝 후 metCharacters 업데이트
+
+### Stage 2 개선 검증 (완료)
+- [x] #1 오프닝 후 characterArcs 첫 만남 moment 기록
+- [x] #2 actionContext.currentSituation 오프닝 반영
+- [x] #2 actionContext.todayActions.dialogues 첫 만남 기록
+
+### 테스트 커버리지
+- [x] `tests/unit/story-opening.test.ts` - 17개 테스트 통과
+  - 첫 만남 캐릭터 결정 테스트 (3개)
+  - characterArcs 첫 만남 moment 테스트 (4개)
+  - actionContext 오프닝 반영 테스트 (5개)
+  - protagonistKnowledge 업데이트 테스트 (4개)
+  - 통합 테스트 (1개)
 
 ---
 
-## 11. 코드 참조
+## 12. 코드 참조
 
 | 위치 | 함수/섹션 | 역할 |
 |------|----------|------|
@@ -275,3 +401,7 @@ saveState = {
 | game-ai-client.ts:930-991 | generateInitialDilemma() | 오프닝 or 기존 방식 분기 |
 | prompt-builder.ts:588-627 | buildFullPrompt() 내 | 숨겨진 관계/주인공 지식 섹션 |
 | prompt-builder.ts:1106-1206+ | buildStoryOpeningPrompt() | 오프닝 전용 프롬프트 |
+| GameClient.tsx:1566-1576 | 첫 만남 캐릭터 결정 | order=1 또는 firstCharacterToMeet |
+| GameClient.tsx:1571-1589 | protagonistKnowledge 업데이트 | metCharacters, informationPieces |
+| GameClient.tsx:1591-1613 | characterArcs 업데이트 | [개선 #1] 첫 만남 moment |
+| GameClient.tsx:1615-1632 | actionContext 업데이트 | [개선 #2] currentSituation, todayActions |

@@ -46,7 +46,11 @@
 │                                │     - npcRelationshipStates               │
 │                                │     - protagonistKnowledge                │
 │                                │                                            │
-│                                └─→ chatHistory에 오프닝 서사 추가          │
+│                                ├─→ chatHistory에 오프닝 서사 추가          │
+│                                │                                            │
+│                                ├─→ metCharacters 업데이트 ★               │
+│                                ├─→ characterArcs 첫 만남 moment ★         │
+│                                └─→ actionContext 오프닝 반영 ★            │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
@@ -127,7 +131,7 @@
 | Stage | 업데이트 위치 | 업데이트 내용 |
 |-------|-------------|-------------|
 | 1 | createInitialSaveState | metCharacters 초기화 |
-| 2 | (미업데이트) | - |
+| 2 | 오프닝 완료 시 ★ | metCharacters에 첫 만남 캐릭터 추가 |
 | 3 | handleDialogueSelect, handleExplore | informationPieces 추가 |
 | 4 | updateSaveState | metCharacters 자동 추가, locations_discovered, hintedRelationships |
 | 5 | generateDynamicEnding | discoveredInfo로 추출 → AI 프롬프트 |
@@ -158,10 +162,16 @@
 - **#4** storyOpening undefined: `getStoryOpeningWithDefaults()` 통합 헬퍼 추가
 - **테스트**: `tests/unit/game-initialization.test.ts` 19개 테스트 추가
 
-### 커밋 60ae7eb (Stage 2)
+### 커밋 60ae7eb (Stage 2 - 초기)
 - prompt-builder.ts에 npcRelationshipStates 옵션 추가
 - prompt-builder.ts에 protagonistKnowledge 옵션 추가
 - AI 프롬프트에 숨겨진 관계 가이드라인, 주인공 지식 섹션 추가
+
+### Stage 2 개선 (현재 커밋)
+- **#1** characterArcs 첫 만남 moment: 오프닝에서 만난 캐릭터의 characterArcs에 첫 만남 moment 추가
+- **#2** actionContext 오프닝 반영: incitingIncident → currentSituation, 첫 대화 기록 추가
+- **기존 구현 확인**: metCharacters 업데이트 (이미 구현됨, 문서만 업데이트)
+- **테스트**: `tests/unit/story-opening.test.ts` 17개 테스트 추가
 
 ### 커밋 5e501f4 (Stage 3)
 - handleExplore에 시너지 보너스 체크 추가
@@ -197,7 +207,9 @@
 | 이슈 | 현재 상태 | Stage |
 |------|----------|-------|
 | ~~characterArcs.trustLevel 초기값~~ | ✅ **해결됨** - Stage 1 개선 #1 | 1 |
-| 오프닝 후 metCharacters 업데이트 없음 | Stage 3에서 간접 처리 | 2 |
+| ~~오프닝 후 metCharacters 업데이트 없음~~ | ✅ **해결됨** - 기존 구현 확인, 문서 업데이트 | 2 |
+| ~~characterArcs 첫 만남 moment 없음~~ | ✅ **해결됨** - Stage 2 개선 #1 | 2 |
+| ~~actionContext 오프닝 미반영~~ | ✅ **해결됨** - Stage 2 개선 #2 | 2 |
 | keyDecisions 대화/탐색 미기록 | choice만 기록 | 3 |
 | characterArcs 엔딩 프롬프트 반영 | AI가 새로 생성 | 5 |
 
@@ -216,7 +228,7 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 199개 테스트 통과 (19개 Stage 1 테스트 추가)
+├── pnpm test 216개 테스트 통과 (Stage 1: 19개, Stage 2: 17개 추가)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -226,7 +238,12 @@
 ├── [Stage 1] initialProtagonistKnowledge 배열 병합 테스트 (5개)
 ├── [Stage 1] 'gradual' 스타일 fallback 테스트 (4개)
 ├── [Stage 1] storyOpening undefined 통합 폴백 테스트 (3개)
-└── [Stage 1] characterIntroductionStyle 전체 분기 테스트 (4개)
+├── [Stage 1] characterIntroductionStyle 전체 분기 테스트 (4개)
+├── [Stage 2] 첫 만남 캐릭터 결정 테스트 (3개)
+├── [Stage 2] characterArcs 첫 만남 moment 테스트 (4개)
+├── [Stage 2] actionContext 오프닝 반영 테스트 (5개)
+├── [Stage 2] protagonistKnowledge 업데이트 테스트 (4개)
+└── [Stage 2] 오프닝 완료 시 상태 통합 테스트 (1개)
 
 ❌ 추가 검증 필요
 ├── hiddenNPCRelationships 빈 배열 시나리오
