@@ -119,7 +119,7 @@ atelos/
 │   │       ├── index.tsx             # Main editor component
 │   │       ├── BaseContent.tsx       # Basic scenario info
 │   │       ├── CharacterContent.tsx  # Character management
-│   │       ├── SystemRulesContent.tsx # Stats, flags, endings
+│   │       ├── SystemRulesContent.tsx # Stats, endings
 │   │       ├── CoreStoryElementsContent.tsx
 │   │       ├── ScenarioHeader.tsx
 │   │       └── StickySidebar.tsx
@@ -160,7 +160,7 @@ atelos/
 │   ├── scenario-api.ts               # Scenario API client functions
 │   └── scenario-mapping-utils.ts     # Scenario data transformations
 ├── constants/
-│   ├── korean-english-mapping.ts     # i18n mappings for stats/flags/roles
+│   ├── korean-english-mapping.ts     # i18n mappings for stats/roles
 │   ├── comparison-operators.ts       # Condition evaluation operators
 │   └── scenario.ts                   # Scenario constants
 ├── types/
@@ -205,11 +205,11 @@ atelos/
 
 Core types that define the game:
 - `ScenarioData`: Complete scenario definition (characters, stats, endings, story opening, etc.)
-- `PlayerState`: Current player stats, flags, traits, relationships
-- `SaveState`: Full game state including context, community, chat history
+- `PlayerState`: Current player stats, traits, relationships
+- `SaveState`: Full game state including context, community, chat history, action history
 - `AIResponse`: Structure of AI-generated content (log, dilemma, stat changes)
 - `EndingArchetype`: Ending conditions and descriptions
-- `SystemCondition`: Stat/flag/survivor conditions for endings
+- `SystemCondition`: Stat/survivor conditions for endings (v1.4: Dynamic Ending System)
 - `CharacterArc`: Character mood and trust tracking
 - `KeyDecision`: Player decision history for flashback system
 - `ActionContext`: Current action context for AI prompts (Phase 5)
@@ -219,7 +219,7 @@ Core types that define the game:
 #### Game State Management
 
 - **Stats**: Dynamic stat tracking with amplification based on current values (1.5x at extremes, 3.0x in mid-range)
-- **Flags**: Boolean or count-based event tracking
+- **Action History**: Player action tracking for Dynamic Ending System (v1.4: replaces legacy flags)
 - **Relationships**: Character relationship values with signed numeric values
 - **Time System**: Day-based progression (configurable days per scenario)
 - **Action Points**: Per-day action budget (Phase 4)
@@ -272,7 +272,7 @@ Language validation features:
 - `getActionPointsPerDay(scenario)`: 하루당 Action Points 가져오기
 - `isStatCritical(percentage, scenario)`: 스탯 위험 상태 체크
 - `isStatWarning(percentage, scenario)`: 스탯 경고 상태 체크
-- `calculateRouteScores(flags, stats, scenario)`: 동적 루트 점수 계산
+- `calculateRouteScores(actionHistory, stats, scenario)`: 동적 루트 점수 계산
 - `getFallbackChoices(scenario)`: 장르별 Fallback 선택지
 
 **설정 가능 항목 (ScenarioData.gameplayConfig):**
@@ -291,8 +291,8 @@ gameplayConfig?: {
 
 #### Ending System (`lib/ending-checker.ts`)
 
+- **Dynamic Ending System (v1.4)**: Uses ActionHistory and stat conditions for ending determination
 - Checks stat conditions with comparison operators (>=, <=, ==, >, <, !=)
-- Checks flag conditions (boolean true or count > 0)
 - Only checks endings after `endingCheckDay` (동적 계산, 기본: Day 5 for 7일 게임)
 - Time limit ending triggers after configured days (ENDING_TIME_UP)
 - Falls back to default "결단의 시간" ending if no conditions met
@@ -301,9 +301,9 @@ gameplayConfig?: {
 
 Determines narrative path based on scenario's `routeScores` configuration:
 - Default routes: 탈출 (Escape), 항전 (Defense), 협상 (Negotiation)
-- Route scores calculated from flags and stats defined in `gameplayConfig.routeScores`
+- Route scores calculated from action history and stats defined in `gameplayConfig.routeScores`
 
-Route is "미정" (undetermined) until `routeActivationDay` (동적 계산, 기본: Day 3 for 7일 게임), then calculated based on accumulated flag scores.
+Route is "미정" (undetermined) until `routeActivationDay` (동적 계산, 기본: Day 3 for 7일 게임), then calculated based on player action patterns.
 
 #### Character Arc System (`CharacterArcPanel.tsx`)
 
@@ -332,7 +332,7 @@ The game supports multiple interaction modes beyond standard choice selection:
 - Day-gated locations: storage, entrance, medical (Day 1+), roof (Day 3+), basement (Day 5+)
 - Genre-specific locations (e.g., crew quarters for SF scenarios)
 - AI generates exploration narratives and rewards
-- Rewards include: stat changes, flag acquisition, information
+- Rewards include: stat changes, significant discoveries, information
 
 **Free Text Input**:
 - Optional player-written actions (max 200 characters)
@@ -551,8 +551,8 @@ Key functions:
 6. AI generates narrative with world state updates
 7. State updates with amplified stat changes
 8. World events triggered based on conditions
-9. Route indicator updates based on flags
-10. Ending conditions checked (Day 5+)
+9. Route indicator updates based on action history patterns
+10. Ending conditions checked (Day 5+) via Dynamic Ending System
 11. Game continues until ending triggered
 
 ### API Routes
@@ -606,7 +606,6 @@ Korean is the primary user-facing language with English internal identifiers.
 
 - `STAT_MAPPING`: cityChaos → "도시 혼란도", etc.
 - `STAT_POLARITY`: Defines if high values are positive/negative
-- `FLAG_MAPPING`: Event flags with Korean names
 - `CHARACTER_ROLE_MAPPING`: Role IDs to Korean names
 - `CHARACTER_TRAIT_MAPPING`: Trait IDs to Korean names
 - `STATUS_MAPPING`: Character status values
@@ -614,10 +613,9 @@ Korean is the primary user-facing language with English internal identifiers.
 Utility functions:
 - `getStatIdByKorean()`: Reverse lookup for Korean → English
 - `getKoreanStatName()`: Forward lookup English → Korean
-- `getKoreanFlagName()`: Forward lookup with FLAG_ prefix handling
 - `getKoreanRoleName()`, `getKoreanTraitName()`, `getKoreanStatusName()`
-- `isValidStatId()`, `isValidFlagId()`: Type guard validation functions
-- `getAllStatIds()`, `getAllFlagIds()`: Get all available IDs
+- `isValidStatId()`: Type guard validation function
+- `getAllStatIds()`: Get all available stat IDs
 
 ## Development Patterns
 
@@ -651,17 +649,9 @@ Stats are amplified based on current percentage:
 1. Add to scenario's `endingArchetypes` array
 2. Define `systemConditions` array with:
    - `required_stat`: { statId, comparison, value }
-   - `required_flag`: { flagName }
    - `survivor_count`: { comparison, value }
 3. Set `isGoalSuccess` boolean for success/failure classification
-
-### Adding New Flags
-
-1. Add to scenario's `flagDictionary` array
-2. Define `flagName`, `description`, `type` (boolean/count), `initial`
-3. Optionally add `triggerCondition` for AI guidance
-4. Add to `FLAG_MAPPING` in `constants/korean-english-mapping.ts`
-5. If route-related, update `RouteIndicator.tsx` score calculations
+4. **Note**: v1.4 Dynamic Ending System uses ActionHistory for advanced ending determination
 
 ### Adding New Genre
 
@@ -677,10 +667,10 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 - `initialRelationships` between characters
 - `scenarioStats` with initial values and ranges
 - `traitPool` with buffs and debuffs
-- `flagDictionary` for trackable events
 - `endingArchetypes` with conditions
 - `endCondition` (time_limit with days/hours)
 - `storyOpening` for 3-phase opening configuration
+- **Note**: v1.4 Dynamic Ending System - `flagDictionary` is deprecated, use ActionHistory instead
 
 ### Scenario Data Validation (`lib/scenario-validator.ts`)
 
@@ -691,12 +681,10 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 | 검증 유형 | 심각도 | 설명 |
 |----------|--------|------|
 | 엔딩 스탯 참조 | error | 존재하지 않는 statId 참조 |
-| 엔딩 플래그 참조 | error | 존재하지 않는 flagName 참조 |
 | 관계 캐릭터 | error | 존재하지 않는 캐릭터 관계 설정 |
 | 스토리 오프닝 캐릭터 | error | firstCharacterToMeet 등이 캐릭터 목록에 없음 |
 | 스탯 범위 | error | initialValue가 min/max 범위 밖 |
 | 엔딩 조건 충돌 | warning | 같은 스탯에 충돌하는 조건 (>=80 AND <=20) |
-| 미사용 플래그 | warning | 정의되었지만 엔딩 조건에서 사용되지 않는 플래그 |
 
 **사용법:**
 ```typescript
@@ -785,7 +773,6 @@ From `next.config.mjs`:
   - 🎮 Game events
   - 🤖 AI operations
   - 📊 Stats/metrics
-  - 🏴 Flags
   - 🤝 Relationships
   - ⏳ Time progression
   - 🎉 Endings
@@ -827,8 +814,8 @@ Custom colors defined in `tailwind.config.ts`:
 3. Verify all `systemConditions` are satisfiable
 
 ### Route Not Displaying Correctly
-1. Check flag acquisition in game state
-2. Verify flag names match exactly (with FLAG_ prefix)
+1. Check action history patterns in game state
+2. Verify route score configuration in `gameplayConfig.routeScores`
 3. Check `RouteIndicator.tsx` score calculation logic
 
 ### Character Arc Issues
@@ -875,7 +862,7 @@ Custom colors defined in `tailwind.config.ts`:
 | DiscoveredClues | `context-manager.ts` | dialogue/exploration 핸들러 | `prompt-builder.ts` (v1.2) | `chatHistory` |
 | WorldState | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | `ExplorationPanel` |
 | Character Arc | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `CharacterArcPanel` |
-| Flags | `createInitialSaveState` | `updateSaveState` | `gemini-client.ts` | `RouteIndicator` |
+| Action History | `createInitialSaveState` | 4개 핸들러 | `gemini-client.ts` | `RouteIndicator` (v1.4) |
 | Action Engagement | N/A (런타임) | N/A | `prompt-builder.ts` | `ChoiceButtons` (콤보) |
 | AI Narrative Engine | N/A (런타임) | N/A | `prompt-builder.ts` | N/A |
 | Story Writer Persona | N/A (프롬프트) | N/A | `prompt-builder.ts` | N/A |
@@ -899,7 +886,6 @@ AI 생성 (ai-generate/route.ts) → Admin (ScenarioEditor/*) → 게임 (GameCl
 | `title`, `synopsis`, `playerGoal` | scenario_overview | BaseContent | GameClient |
 | `characters` | characters | CharacterContent | GameClient |
 | `scenarioStats` | stats | SystemRulesContent | StatsBar |
-| `flagDictionary` | flags | SystemRulesContent | RouteIndicator |
 | `endingArchetypes` | endings | CoreStoryElementsContent | ending-checker |
 | `storyOpening` | story_opening | StoryOpeningContent | GameClient |
 | `gameplayConfig` | gameplay_config | GameplayConfigContent | gameplay-config |

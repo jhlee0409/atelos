@@ -2,6 +2,9 @@
 
 > 작성일: 2025-12-12
 > 목적: 생성된 시나리오가 플레이될 때의 진행 방식 분석
+>
+> ⚠️ **v1.4 업데이트 노트**: `flags_acquired`, `flagDictionary` → `ActionHistory`로 대체됨.
+> Dynamic Ending System 도입으로 플래그 기반 엔딩 조건이 deprecated됨.
 
 ---
 

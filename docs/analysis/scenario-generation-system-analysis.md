@@ -2,6 +2,9 @@
 
 > 작성일: 2025-12-12
 > 목적: 추후 플로우 단계별 상세 분석 및 고도화를 위한 1차 분석
+>
+> ⚠️ **v1.4 업데이트 노트**: `flagDictionary` 생성 카테고리는 deprecated됨.
+> Dynamic Ending System에서 `ActionHistory`로 플래그 추적이 대체됨.
 
 ---
 

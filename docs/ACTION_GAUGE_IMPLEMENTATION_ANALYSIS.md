@@ -2,6 +2,9 @@
 
 > 작성일: 2025-12-10
 > 목적: 현재 ATELOS 시스템 분석 및 행동 게이지 시스템 적용 방안
+>
+> ⚠️ **v1.4 업데이트 노트**: `flags` 관련 내용은 deprecated됨.
+> Dynamic Ending System에서 `ActionHistory`로 대체됨.
 
 ---
 
