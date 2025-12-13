@@ -1266,34 +1266,67 @@ const updateSaveState = (
     const narrative = aiResponse.log || '';
     const hiddenRelationships = scenario.storyOpening.hiddenNPCRelationships;
 
+    // [Stage 4 개선] 명시적 관계 키워드 목록
+    const RELATIONSHIP_KEYWORDS = [
+      '사이', '관계', '실은', '알고 보니', '형제', '자매', '부모',
+      '연인', '친구였', '적이었', '동료였', '원수', '가족', '부부',
+    ];
+    const hasExplicitKeyword = RELATIONSHIP_KEYWORDS.some(keyword => narrative.includes(keyword));
+
     hiddenRelationships.forEach((rel) => {
       const relState = newSaveState.context.npcRelationshipStates?.find(
         (r: { relationId: string }) => r.relationId === rel.relationId
       );
 
-      if (relState && relState.visibility === 'hidden') {
-        // 관계에 연결된 두 캐릭터 이름을 찾음
-        const relatedChars = rel.relationId.split('-');
+      if (!relState) return;
 
-        // 서사에서 두 캐릭터가 함께 언급되면 힌트 상태로 변경
-        const bothMentioned = relatedChars.length >= 2 &&
-          relatedChars.every((charName: string) => narrative.includes(charName));
+      // 관계에 연결된 두 캐릭터 이름을 찾음
+      const relatedChars = rel.relationId.split('-');
+      // 서사에서 두 캐릭터가 함께 언급되었는지 확인
+      const bothMentioned = relatedChars.length >= 2 &&
+        relatedChars.every((charName: string) => narrative.includes(charName));
 
-        if (bothMentioned) {
+      if (!bothMentioned) return;
+
+      // protagonistKnowledge 초기화
+      if (!newSaveState.context.protagonistKnowledge) return;
+      if (!newSaveState.context.protagonistKnowledge.hintedRelationships) {
+        newSaveState.context.protagonistKnowledge.hintedRelationships = [];
+      }
+      if (!newSaveState.context.protagonistKnowledge.discoveredRelationships) {
+        newSaveState.context.protagonistKnowledge.discoveredRelationships = [];
+      }
+
+      const pk = newSaveState.context.protagonistKnowledge;
+
+      if (relState.visibility === 'hidden') {
+        // [Stage 4 개선 #1] hidden → hinted (또는 명시적 키워드 시 바로 revealed)
+        if (hasExplicitKeyword) {
+          relState.visibility = 'revealed';
+          console.log(`💡 NPC 관계 공개: ${rel.relationId} -> revealed (명시적 키워드)`);
+          // discoveredRelationships에 추가
+          if (!pk.discoveredRelationships.includes(rel.relationId)) {
+            pk.discoveredRelationships.push(rel.relationId);
+          }
+        } else {
           relState.visibility = 'hinted';
           console.log(`💡 NPC 관계 힌트: ${rel.relationId} -> hinted`);
-
-          // protagonistKnowledge에 힌트된 관계 추가
-          if (newSaveState.context.protagonistKnowledge) {
-            if (!newSaveState.context.protagonistKnowledge.hintedRelationships) {
-              newSaveState.context.protagonistKnowledge.hintedRelationships = [];
-            }
-            if (!newSaveState.context.protagonistKnowledge.hintedRelationships.includes(rel.relationId)) {
-              newSaveState.context.protagonistKnowledge.hintedRelationships.push(rel.relationId);
-            }
+          // hintedRelationships에 추가
+          if (!pk.hintedRelationships.includes(rel.relationId)) {
+            pk.hintedRelationships.push(rel.relationId);
           }
         }
+      } else if (relState.visibility === 'hinted') {
+        // [Stage 4 개선 #1] hinted → revealed (재언급 또는 명시적 키워드)
+        relState.visibility = 'revealed';
+        console.log(`💡 NPC 관계 공개: ${rel.relationId} -> revealed (재언급)`);
+        // [Stage 4 개선 #2] hintedRelationships에서 제거, discoveredRelationships에 추가
+        pk.hintedRelationships = pk.hintedRelationships.filter(id => id !== rel.relationId);
+        if (!pk.discoveredRelationships.includes(rel.relationId)) {
+          pk.discoveredRelationships.push(rel.relationId);
+        }
       }
+      // revealed 상태면 변경 없음
     });
   }
 

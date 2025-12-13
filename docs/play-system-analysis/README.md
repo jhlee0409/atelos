@@ -185,11 +185,17 @@
 - **#2** keyDecisions 탐색 기록: 발견물(newDiscoveries) 있을 때 keyDecisions에 기록
 - **테스트**: `tests/unit/main-game-loop.test.ts` 12개 테스트 추가
 
-### 커밋 1b11b62 (Stage 4)
+### 커밋 1b11b62 (Stage 4 - 초기)
 - locations_discovered → protagonistKnowledge.informationPieces 추가
 - NPC 관계 힌트 감지 (두 캐릭터 동시 언급 시)
 - npcRelationshipStates.visibility → 'hinted' 자동 전환
 - protagonistKnowledge.hintedRelationships 자동 추가
+
+### Stage 4 개선 (현재 커밋)
+- **#1** hinted → revealed 전환: 이미 hinted인 관계가 재언급되면 revealed로 전환
+- **#1** 명시적 키워드 감지: 관계 키워드(사이, 형제, 연인 등) 감지 시 바로 revealed
+- **#2** discoveredRelationships 사용: revealed 상태 시 discoveredRelationships에 추가
+- **테스트**: `tests/unit/ai-response-processing.test.ts` 13개 테스트 추가
 
 ### 커밋 76371dd (Stage 5)
 - generateDynamicEnding에서 discoveredInfo 추출
@@ -205,8 +211,8 @@
 | 이슈 | 현재 상태 | Stage |
 |------|----------|-------|
 | ~~handleDialogueSelect 대화 캐릭터 metCharacters 미추가~~ | ✅ **해결됨** - Stage 3 개선 #1 | 3 |
-| discoveredRelationships 미사용 | 빈 배열로만 전달 | 4, 5 |
-| 힌트 → 공개 전환 없음 | 'hinted' 설정만 | 4 |
+| ~~discoveredRelationships 미사용~~ | ✅ **해결됨** - Stage 4 개선 #2 | 4, 5 |
+| ~~힌트 → 공개 전환 없음~~ | ✅ **해결됨** - Stage 4 개선 #1 | 4 |
 
 ### 중간 (일관성 개선)
 
@@ -234,7 +240,7 @@
 ```
 ✅ 완료된 검증
 ├── pnpm build 성공
-├── pnpm test 228개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개 추가)
+├── pnpm test 241개 테스트 통과 (Stage 1: 19개, Stage 2: 17개, Stage 3: 12개, Stage 4: 13개 추가)
 ├── 3개 핸들러 Dynamic Ending 체크 일관성
 ├── 3개 핸들러 시너지 보너스 적용
 ├── protagonistKnowledge.informationPieces 업데이트
@@ -254,7 +260,12 @@
 ├── [Stage 3] keyDecisions 대화 기록 테스트 (3개)
 ├── [Stage 3] keyDecisions 탐색 기록 테스트 (3개)
 ├── [Stage 3] keyDecisions 최대 개수 유지 테스트 (1개)
-└── [Stage 3] 대화 후 상태 통합 테스트 (1개)
+├── [Stage 3] 대화 후 상태 통합 테스트 (1개)
+├── [Stage 4] hidden → hinted 전환 테스트 (3개)
+├── [Stage 4] hinted → revealed 전환 테스트 (3개)
+├── [Stage 4] 명시적 관계 키워드 감지 테스트 (3개)
+├── [Stage 4] discoveredRelationships 업데이트 테스트 (3개)
+└── [Stage 4] 전체 상태 전환 통합 테스트 (1개)
 
 ❌ 추가 검증 필요
 ├── hiddenNPCRelationships 빈 배열 시나리오

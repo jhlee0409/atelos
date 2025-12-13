@@ -212,13 +212,25 @@ Stage 5 (엔딩)에서 활용:
 
 ---
 
-## 6. 구현된 개선사항 (커밋 1b11b62)
+## 6. 구현된 개선사항
+
+### 6.1 커밋 1b11b62 (초기)
 
 | 항목 | 이전 상태 | Stage 4 구현 |
 |------|----------|-------------|
 | locations_discovered → protagonistKnowledge | worldState만 업데이트 | informationPieces에도 추가 |
 | NPC 관계 힌트 감지 | 없음 | 두 캐릭터 동시 언급 시 자동 힌트 |
 | hintedRelationships 업데이트 | 없음 | 관계 힌트 시 자동 추가 |
+
+### 6.2 Stage 4 개선 (현재)
+
+| 개선 | 설명 | 위치 |
+|------|------|------|
+| **#1** hinted → revealed 전환 | 이미 hinted인 관계가 재언급되면 revealed로 전환 | updateSaveState:1319-1328 |
+| **#1** 명시적 키워드 감지 | 관계 키워드(사이, 형제, 연인 등) 감지 시 바로 revealed | updateSaveState:1269-1274 |
+| **#2** discoveredRelationships 사용 | revealed 상태 시 discoveredRelationships에 추가, hintedRelationships에서 제거 | updateSaveState:1308-1327 |
+
+**테스트**: `tests/unit/ai-response-processing.test.ts` 13개 테스트 추가
 
 ---
 
@@ -228,9 +240,9 @@ Stage 5 (엔딩)에서 활용:
 
 | 이슈 | 현재 상태 | 개선 제안 |
 |------|----------|----------|
-| 힌트 → 공개 전환 없음 | 'hinted'만 설정 | 추가 증거 발견 시 'revealed'로 전환 로직 |
-| 관계 힌트 기준 단순 | 이름 동시 언급만 체크 | 관계 암시 키워드 감지 추가 |
-| discoveredRelationships 미사용 | hintedRelationships만 사용 | 명시적 발견 시 discoveredRelationships 추가 |
+| ~~힌트 → 공개 전환 없음~~ | ✅ **해결됨** - Stage 4 개선 #1 | - |
+| ~~관계 힌트 기준 단순~~ | ✅ **해결됨** - Stage 4 개선 #1 (명시적 키워드 감지) | - |
+| ~~discoveredRelationships 미사용~~ | ✅ **해결됨** - Stage 4 개선 #2 | - |
 | characterArcs.trustLevel 동기화 | 관계 변화 시 자동 업데이트 | 일관성 검증 로직 추가 |
 
 ### 7.2 handleDialogueSelect/handleExplore와의 일관성
@@ -239,10 +251,10 @@ Stage 5 (엔딩)에서 활용:
 |------|----------------|---------------------|---------------|
 | 관계 변화 | 복잡한 파싱 로직 | 직접 계산 | 없음 |
 | characterArcs 업데이트 | moments + mood | trustLevel + mood | 없음 |
-| metCharacters 업데이트 | 서사 기반 자동 감지 | 없음 (Stage 3에서 누락) | 없음 |
+| metCharacters 업데이트 | 서사 기반 자동 감지 | ✅ Stage 3 개선 #1에서 해결 | 없음 |
 
-**참고**: handleDialogueSelect에서 대화한 캐릭터가 metCharacters에 없어도 자동 추가되지 않음.
-updateSaveState의 서사 기반 감지에 의존하나, 대화 응답이 updateSaveState를 거치지 않음.
+**참고**: ~~handleDialogueSelect에서 대화한 캐릭터가 metCharacters에 없어도 자동 추가되지 않음.~~
+→ Stage 3 개선 #1에서 해결됨.
 
 ---
 
@@ -259,10 +271,11 @@ saveState = {
     protagonistKnowledge: {
       metCharacters: [...withNewChars],   // 새로 만난 캐릭터
       hintedRelationships: [...withHints], // ★ 힌트된 관계
+      discoveredRelationships: [...withDiscovered], // ★ Stage 4 개선: 공개된 관계
       informationPieces: [...withLocations], // ★ 발견 장소 포함
     },
     npcRelationshipStates: [
-      { relationId, visibility: 'hinted' }, // ★ 힌트 상태로 변경
+      { relationId, visibility: 'hinted' | 'revealed' }, // ★ Stage 4 개선: revealed 상태 추가
     ],
   },
   community: {
@@ -280,8 +293,9 @@ saveState = {
 |--------|-------------|
 | `protagonistKnowledge.metCharacters` | 엔딩 서사에 등장 가능 캐릭터 |
 | `protagonistKnowledge.hintedRelationships` | 엔딩에서 관계 암시 가능 |
+| `protagonistKnowledge.discoveredRelationships` | ★ Stage 4 개선: 엔딩에서 관계 명시 가능 |
 | `protagonistKnowledge.informationPieces` | 플레이어가 아는 정보 기반 엔딩 |
-| `npcRelationshipStates` | 공개된 관계만 엔딩에 명시 |
+| `npcRelationshipStates` | 공개된 관계(revealed)만 엔딩에 명시 |
 | `context.scenarioStats` | 엔딩 조건 체크 |
 | `context.flags` | 엔딩 조건 체크 |
 | `characterArcs` | 캐릭터별 엔딩 결과 |
@@ -297,8 +311,10 @@ saveState = {
 - [x] [v1.2] 새로 만난 캐릭터 자동 감지 확인
 - [x] [Stage 4] locations_discovered → informationPieces 추가 확인
 - [x] [Stage 4] NPC 관계 힌트 감지 확인
-- [ ] 힌트 → 공개 전환 로직 (향후 개선)
-- [ ] handleDialogueSelect의 대화 캐릭터 metCharacters 추가 (누락 확인)
+- [x] **[Stage 4 개선 #1]** hinted → revealed 전환 (재언급 시)
+- [x] **[Stage 4 개선 #1]** 명시적 관계 키워드 감지 (바로 revealed)
+- [x] **[Stage 4 개선 #2]** discoveredRelationships 업데이트
+- [x] handleDialogueSelect의 대화 캐릭터 metCharacters 추가 (Stage 3 개선 #1에서 해결)
 
 ---
 
