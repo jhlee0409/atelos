@@ -223,6 +223,8 @@ atelos/
 
 Core types that define the game:
 - `ScenarioData`: Complete scenario definition (characters, stats, endings, story opening, etc.)
+- `Character`: Character definition with `isPlayable`, `isDefaultProtagonist`, `personalGoal`, `playerGoalOverride` fields
+- `CharacterStoryOpening`: Per-character story opening overrides for dynamic protagonist selection
 - `PlayerState`: Current player stats, traits, relationships
 - `SaveState`: Full game state including context, community, chat history, action history
 - `AIResponse`: Structure of AI-generated content (log, dilemma, stat changes)
@@ -592,6 +594,73 @@ World state that changes based on player actions:
   - AI generation API (`ai-generate/route.ts`) instructs AI to avoid name collision
   - Fallback: AI uses pronouns or occupation title instead of name when collision detected
 
+#### Dynamic Protagonist Selection System (v1.5)
+
+플레이어가 시나리오 시작 전 플레이할 캐릭터를 선택할 수 있는 시스템:
+
+**핵심 컴포넌트:**
+- `ScenarioDetailClient.tsx`: 캐릭터 선택 UI (`PlayableCharacterCard`)
+- `GameClient.tsx`: 주인공 식별 함수, `getStoryOpeningForProtagonist()`
+- `prompt-builder.ts`: 선택된 주인공 시점 AI 프롬프트 생성
+- `CharacterContent.tsx`: Admin UI 체크박스
+- `scenario-validator.ts`: 검증 로직 ('playable' 카테고리)
+
+**Character 타입 확장:**
+```typescript
+export type Character = {
+  // ... 기존 필드
+  isPlayable?: boolean;           // 플레이 가능 여부
+  isDefaultProtagonist?: boolean; // 기본 주인공 여부 (1명만)
+  personalGoal?: string;          // 캐릭터 개인 목표
+  playerGoalOverride?: string;    // 플레이어 목표 오버라이드
+  suggestedTraits?: string[];     // 권장 특성 목록
+};
+```
+
+**캐릭터별 스토리 오프닝:**
+```typescript
+export interface CharacterStoryOpening {
+  prologue?: string;
+  incitingIncident?: string;
+  firstCharacterToMeet?: string;
+  firstEncounterContext?: string;
+  openingLocation?: string;
+}
+
+// ScenarioData에서 사용
+characterStoryOpenings?: Record<string, CharacterStoryOpening>;
+```
+
+**주인공 식별 우선순위:**
+1. `(플레이어)` 마커 → 항상 주인공
+2. `selectedProtagonistId`로 선택된 캐릭터
+3. `storyOpening.protagonistSetup.name` (레거시 호환)
+
+**UX 플로우:**
+```
+로비 → 시나리오 상세 → [게임 시작] → 캐릭터 선택 UI → 캐스팅 보드 → 게임
+                                    ?protagonist=ROLE_ID
+```
+
+**AI 생성 지원:**
+- `characters` 카테고리: `isPlayable`, `isDefaultProtagonist`, `personalGoal` 필드
+- `character_openings` 카테고리: 캐릭터별 오프닝 일괄 생성
+
+**주요 함수:**
+```typescript
+// GameClient.tsx
+getProtagonistName(scenario, selectedProtagonistId?)
+isProtagonist(characterName, scenario, selectedProtagonistId?)
+filterNPCs(characters, scenario, selectedProtagonistId?)
+getProtagonistCharacter(scenario, selectedProtagonistId?)
+getStoryOpeningForProtagonist(scenario, selectedProtagonistId?)
+
+// prompt-builder.ts
+getProtagonistNameForPrompt(scenario, selectedProtagonistId?)
+isProtagonistForPrompt(characterName, scenario, selectedProtagonistId?)
+filterNPCsForPrompt(characters, scenario, selectedProtagonistId?)
+```
+
 #### Genre Narrative Styles (`lib/genre-narrative-styles.ts`)
 
 Comprehensive genre-specific guidance for AI:
@@ -796,6 +865,9 @@ Use `mocks/ZERO_HOUR.json` as a reference for scenario structure. Key sections:
 | 스토리 오프닝 캐릭터 | error | firstCharacterToMeet 등이 캐릭터 목록에 없음 |
 | 스탯 범위 | error | initialValue가 min/max 범위 밖 |
 | 엔딩 조건 충돌 | warning | 같은 스탯에 충돌하는 조건 (>=80 AND <=20) |
+| 플레이 가능 캐릭터 없음 | warning | isPlayable=true인 캐릭터가 없음 (레거시 방식으로 동작) |
+| 기본 주인공 중복 | error | isDefaultProtagonist=true인 캐릭터가 2명 이상 |
+| 기본 주인공 설정 오류 | error | isDefaultProtagonist=true인데 isPlayable=false |
 
 **사용법:**
 ```typescript
@@ -1015,6 +1087,9 @@ AI 생성 (ai-generate/route.ts) → Admin (ScenarioEditor/*) → 게임 (GameCl
 |------|---------|------------|----------|
 | `title`, `synopsis`, `playerGoal` | scenario_overview | BaseContent | GameClient |
 | `characters` | characters | CharacterContent | GameClient |
+| `characters.isPlayable/isDefaultProtagonist` | characters | CharacterContent | ScenarioDetailClient |
+| `characters.personalGoal` | characters | CharacterContent | GameClient |
+| `characterStoryOpenings` | character_openings | (추후) | GameClient.getStoryOpeningForProtagonist |
 | `scenarioStats` | stats | SystemRulesContent | StatsBar |
 | `endingArchetypes` | endings | SystemRulesContent | ending-checker (레거시) |
 | `storyOpening` | story_opening | StoryOpeningContent | GameClient |

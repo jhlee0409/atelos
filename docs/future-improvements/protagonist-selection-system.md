@@ -1,7 +1,7 @@
 # 주인공 선택 시스템 개선
 
 ## 작성일: 2025-12-13
-## 상태: ✅ 구현 완료 (Phase 1 + Phase 2)
+## 상태: ✅ 구현 완료 (Phase 1 + Phase 2 + Phase 3)
 
 ---
 
@@ -11,12 +11,14 @@
 
 | 항목 | 파일 | 설명 |
 |------|------|------|
-| **타입 정의** | `types/index.ts` | `Character.isPlayable`, `Character.isDefaultProtagonist`, `ScenarioData.playableCharacters`, `ScenarioData.defaultProtagonist` |
+| **타입 정의** | `types/index.ts` | `Character.isPlayable`, `Character.isDefaultProtagonist`, `Character.personalGoal`, `Character.playerGoalOverride`, `CharacterStoryOpening`, `ScenarioData.characterStoryOpenings` |
 | **캐릭터 선택 UI** | `ScenarioDetailClient.tsx` | 시나리오 상세 → 게임 시작 사이에 캐릭터 선택 화면 |
 | **쿼리 파라미터 전달** | `game/[scenarioId]/page.tsx` | `?protagonist=ROLE_ID` 쿼리 파라미터 처리 |
-| **주인공 식별** | `GameClient.tsx` | `selectedProtagonistId` 기반 주인공 식별 함수 |
+| **주인공 식별** | `GameClient.tsx` | `selectedProtagonistId` 기반 주인공 식별 함수, `getStoryOpeningForProtagonist()` |
 | **AI 프롬프트** | `prompt-builder.ts` | 선택된 주인공 시점으로 프롬프트 생성 |
-| **AI 생성 지원** | `ai-generate/route.ts` | 캐릭터 생성 시 `isPlayable`, `isDefaultProtagonist` 필드 |
+| **AI 생성 지원** | `ai-generate/route.ts` | 캐릭터 생성 시 `isPlayable`, `isDefaultProtagonist`, `personalGoal` 필드, `character_openings` 카테고리 |
+| **Admin UI** | `CharacterContent.tsx` | 플레이 가능/기본 주인공 체크박스, personalGoal 입력 필드 |
+| **검증 로직** | `scenario-validator.ts` | 플레이 가능 캐릭터 및 기본 주인공 검증 |
 
 ### 1.2 주인공 식별 우선순위
 
@@ -138,9 +140,9 @@ generateInitialDilemmaWithOpening(saveState, scenario, useLiteVersion, selectedP
 
 ---
 
-## 4. 미구현 항목 (Phase 3 - 추후 검토)
+## 4. Phase 3 구현 완료 (2025-12-13)
 
-### 4.1 Admin UI 확장 - 캐릭터 편집
+### 4.1 ✅ Admin UI 확장 - 캐릭터 편집 (구현 완료)
 
 **파일**: `components/admin/ScenarioEditor/CharacterContent.tsx`
 
@@ -199,7 +201,7 @@ if (defaultProtagonists.length > 1) {
 
 ---
 
-### 4.2 시나리오 생성 시스템 확장
+### 4.2 ✅ 시나리오 생성 시스템 확장 (구현 완료)
 
 **파일**: `app/api/admin/ai-generate/route.ts`
 
@@ -246,7 +248,7 @@ export type Character = {
 
 ---
 
-### 4.3 캐릭터별 오프닝 시스템
+### 4.3 ✅ 캐릭터별 오프닝 시스템 (구현 완료)
 
 **타입 정의** (`types/index.ts`):
 ```typescript
@@ -337,7 +339,7 @@ const getStoryOpeningForProtagonist = (
 
 ---
 
-### 4.4 Admin UI - 캐릭터별 오프닝 편집
+### 4.4 ✅ Admin UI - 캐릭터별 오프닝 편집 (추후 구현)
 
 **파일**: `components/admin/ScenarioEditor/StoryOpeningContent.tsx`
 
@@ -364,15 +366,15 @@ const getStoryOpeningForProtagonist = (
 
 ---
 
-### 4.5 구현 우선순위
+### 4.5 구현 현황
 
-| 우선순위 | 항목 | 복잡도 | 영향 범위 |
-|---------|------|--------|----------|
-| 1 | Admin UI - isPlayable/isDefaultProtagonist 토글 | 낮음 | CharacterContent.tsx |
-| 2 | 시나리오 검증 로직 확장 | 낮음 | scenario-validator.ts |
-| 3 | Character.personalGoal 필드 추가 | 중간 | types, ai-generate, CharacterContent |
-| 4 | 캐릭터별 오프닝 타입/UI | 높음 | types, StoryOpeningContent, GameClient |
-| 5 | AI 생성 시점 중립적 시놉시스 | 높음 | ai-generate 프롬프트 전면 수정 |
+| 우선순위 | 항목 | 복잡도 | 상태 |
+|---------|------|--------|------|
+| 1 | Admin UI - isPlayable/isDefaultProtagonist 토글 | 낮음 | ✅ 완료 |
+| 2 | 시나리오 검증 로직 확장 | 낮음 | ✅ 완료 |
+| 3 | Character.personalGoal 필드 추가 | 중간 | ✅ 완료 |
+| 4 | 캐릭터별 오프닝 타입/UI | 높음 | ✅ 완료 (UI는 추후) |
+| 5 | AI 생성 character_openings 카테고리 | 높음 | ✅ 완료 |
 
 ---
 
@@ -455,4 +457,8 @@ Phase 3.3: 캐릭터별 오프닝 (4-6시간)
 ## 7. 구현 일자
 
 - **Phase 1 & 2 구현 완료**: 2025-12-13
-- **Phase 3 (시나리오 생성 확장)**: 추후 검토 예정
+- **Phase 3 구현 완료**: 2025-12-13
+  - Admin UI 체크박스 및 검증 로직
+  - Character.personalGoal 필드 및 AI 생성 지원
+  - CharacterStoryOpening 타입 및 AI 생성
+  - getStoryOpeningForProtagonist() 로직
