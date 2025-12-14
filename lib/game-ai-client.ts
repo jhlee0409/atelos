@@ -820,10 +820,14 @@ export interface StoryOpeningResult {
 /**
  * 스토리 오프닝 생성 함수
  * 3단계 구조: 프롤로그 → 촉발 사건 → 첫 캐릭터 만남 → 첫 딜레마
+ * @param scenario - 시나리오 데이터
+ * @param characters - 캐릭터 목록
+ * @param selectedProtagonistId - 선택된 주인공의 roleId (동적 선택 시스템)
  */
 export const generateStoryOpening = async (
   scenario: ScenarioData,
   characters: Character[],
+  selectedProtagonistId?: string,
 ): Promise<StoryOpeningResult> => {
   console.log('📖 스토리 오프닝 AI 생성 시작...');
   console.log(`📚 시나리오: ${scenario.title}`);
@@ -831,7 +835,8 @@ export const generateStoryOpening = async (
 
   try {
     // 스토리 오프닝 전용 프롬프트 빌드
-    const openingPrompt = buildStoryOpeningPrompt(scenario, characters);
+    // 2025-12-13: selectedProtagonistId로 동적 주인공 식별
+    const openingPrompt = buildStoryOpeningPrompt(scenario, characters, selectedProtagonistId);
 
     // AI 호출
     const aiResponse = await callGeminiAPI({
@@ -929,6 +934,7 @@ export const generateInitialDilemma = async (
   saveState: SaveState,
   scenario: ScenarioData,
   useLiteVersion = false,
+  selectedProtagonistId?: string,
 ): Promise<AIResponse> => {
   console.log('🤖 초기 딜레마 AI 생성 시작...');
 
@@ -951,8 +957,8 @@ export const generateInitialDilemma = async (
         };
       });
 
-      // 스토리 오프닝 생성
-      const storyOpening = await generateStoryOpening(scenario, characters);
+      // 스토리 오프닝 생성 (2025-12-13: selectedProtagonistId 전달)
+      const storyOpening = await generateStoryOpening(scenario, characters, selectedProtagonistId);
 
       // AIResponse 형식으로 변환
       return {
@@ -991,11 +997,16 @@ export const generateInitialDilemma = async (
 /**
  * 3단계 스토리 오프닝을 생성하고 구조화된 결과 반환 (GameClient용)
  * GameClient에서 각 단계를 순차적으로 표시할 수 있도록 함
+ * @param saveState - 현재 게임 상태
+ * @param scenario - 시나리오 데이터
+ * @param useLiteVersion - 라이트 버전 사용 여부
+ * @param selectedProtagonistId - 선택된 주인공의 roleId (동적 선택 시스템)
  */
 export const generateInitialDilemmaWithOpening = async (
   saveState: SaveState,
   scenario: ScenarioData,
   useLiteVersion = false,
+  selectedProtagonistId?: string,
 ): Promise<InitialDilemmaResult> => {
   console.log('🤖 초기 딜레마 AI 생성 시작 (확장)...');
 
@@ -1018,8 +1029,8 @@ export const generateInitialDilemmaWithOpening = async (
         };
       });
 
-      // 스토리 오프닝 생성
-      const storyOpeningResult = await generateStoryOpening(scenario, characters);
+      // 스토리 오프닝 생성 (2025-12-13: selectedProtagonistId 전달)
+      const storyOpeningResult = await generateStoryOpening(scenario, characters, selectedProtagonistId);
 
       // AIResponse 형식으로 변환
       const aiResponse: AIResponse = {

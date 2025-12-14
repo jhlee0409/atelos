@@ -37,7 +37,8 @@ export type GenerationCategory =
   | 'genre'
   | 'idea_suggestions'
   | 'story_opening'
-  | 'gameplay_config';
+  | 'gameplay_config'
+  | 'character_openings';
 
 // 카테고리별 JSON 스키마 정의 (Gemini responseSchema)
 const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
@@ -79,8 +80,11 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
               items: { type: SchemaType.STRING },
               description: '추천 특성 ID',
             },
+            isPlayable: { type: SchemaType.BOOLEAN, description: '플레이어가 이 캐릭터로 플레이 가능한지 여부', nullable: true },
+            isDefaultProtagonist: { type: SchemaType.BOOLEAN, description: '기본 주인공인지 여부 (하나만 true)', nullable: true },
+            personalGoal: { type: SchemaType.STRING, description: '캐릭터의 개인적 목표 (플레이어 캐릭터: 게임 목표, NPC: AI 행동 가이드)' },
           },
-          required: ['roleId', 'roleName', 'characterName', 'backstory', 'suggestedTraits'],
+          required: ['roleId', 'roleName', 'characterName', 'backstory', 'suggestedTraits', 'personalGoal'],
         },
       },
     },
@@ -368,6 +372,21 @@ const CATEGORY_SCHEMAS: Record<GenerationCategory, Schema> = {
     },
     required: ['routeActivationRatio', 'endingCheckRatio', 'narrativePhaseRatios', 'actionPointsPerDay', 'criticalStatThreshold', 'warningStatThreshold', 'reasoning'],
   },
+
+  // ==========================================================================
+  // 캐릭터별 오프닝 시스템 (동적 주인공 선택)
+  // ==========================================================================
+  character_openings: {
+    type: SchemaType.OBJECT,
+    properties: {
+      characterOpenings: {
+        type: SchemaType.OBJECT,
+        description: '캐릭터 이름을 키로 하는 오프닝 정보 객체',
+        additionalProperties: true,
+      },
+    },
+    required: ['characterOpenings'],
+  },
 };
 
 // 카테고리별 최적 temperature 설정
@@ -385,6 +404,7 @@ const CATEGORY_TEMPERATURE: Record<GenerationCategory, number> = {
   idea_suggestions: 0.9, // 매우 창의적 - 다양하고 독특한 아이디어
   story_opening: 0.75, // 창의적 - 몰입감 있는 오프닝 생성
   gameplay_config: 0.4, // 구조적 - 일관된 게임 밸런스 설정
+  character_openings: 0.75, // 창의적 - 캐릭터별 몰입감 있는 오프닝
 };
 
 // 카테고리별 maxOutputTokens 설정
@@ -401,6 +421,7 @@ const CATEGORY_MAX_TOKENS: Record<GenerationCategory, number> = {
   idea_suggestions: 2000, // 여러 아이디어
   story_opening: 3000, // 프롤로그, 촉발 사건, 주인공 설정 포함
   gameplay_config: 2000, // 간소화된 게임 설정 + 설명
+  character_openings: 4000, // 여러 캐릭터의 오프닝 생성
 };
 
 interface AIGenerateRequestBody {
@@ -469,7 +490,15 @@ ${baseContext}`,
   <guideline>characterName은 시나리오 배경에 맞는 한글 이름</guideline>
   <guideline>backstory는 100-200자로 동기와 과거를 포함</guideline>
   <guideline>suggestedTraits는 성격 특성 ID 2-3개</guideline>
+  <guideline>personalGoal은 캐릭터의 개인적 목표 (50-100자)</guideline>
 </guidelines>
+
+<personal_goal_guidelines>
+- 플레이어 캐릭터(isPlayable=true): 게임의 주요 목표가 됨. "생존자들을 안전하게 이끌어 탈출구를 찾는다" 같이 구체적으로.
+- NPC(isPlayable=false): AI가 캐릭터의 행동을 결정할 때 참조. "가족을 찾아 재회하고 싶다", "그룹의 안전을 위해 희생할 준비가 되어있다" 등.
+- 목표는 backstory와 연결되어 캐릭터의 동기를 명확히 해야 합니다.
+- 시나리오 전체 목표와 조화를 이루거나, 의도적으로 갈등을 만들 수 있습니다.
+</personal_goal_guidelines>
 
 <role_examples>LEADER, MEDIC, SOLDIER, SCIENTIST, SURVIVOR, MERCHANT, ANTAGONIST, MENTOR, CHILD, ELDER</role_examples>
 
@@ -483,7 +512,19 @@ ${baseContext}`,
       "roleName": "지도자",
       "characterName": "박준영",
       "backstory": "전직 소방관으로 재난 상황에서 침착하게 대처하는 능력을 갖추고 있다. 가족을 잃은 후 생존자들을 이끌며 새로운 삶의 의미를 찾고 있다.",
-      "suggestedTraits": ["brave", "charismatic", "responsible"]
+      "suggestedTraits": ["brave", "charismatic", "responsible"],
+      "isPlayable": true,
+      "isDefaultProtagonist": true,
+      "personalGoal": "모든 생존자들을 안전 지대까지 이끌고, 더 이상의 희생을 막는다."
+    },
+    {
+      "roleId": "MEDIC",
+      "roleName": "의료진",
+      "characterName": "김서연",
+      "backstory": "대학병원 응급실 간호사로 일했던 그녀는 재난 속에서도 부상자들을 돌보며 희망을 잃지 않는다.",
+      "suggestedTraits": ["compassionate", "calm", "dedicated"],
+      "isPlayable": false,
+      "personalGoal": "부상자들을 치료하고, 의료 물자를 확보하여 그룹의 생존율을 높인다."
     }
   ]
 }
@@ -491,7 +532,13 @@ ${baseContext}`,
       userPrompt: `<request>다음 설명을 바탕으로 2-4명의 캐릭터를 생성해주세요.</request>
 
 <input_description>${input}</input_description>
-${baseContext}`,
+${baseContext}
+
+<important>
+- 최소 한 명은 isPlayable=true, isDefaultProtagonist=true로 설정해주세요 (기본 주인공).
+- 각 캐릭터의 personalGoal은 backstory와 연결되어야 합니다.
+- 플레이어 캐릭터의 personalGoal은 게임의 주요 목표가 됩니다.
+</important>`,
     },
 
     relationships: {
@@ -967,6 +1014,70 @@ ${baseContext}
 <requirements>
 - 시나리오의 장르, 분위기, 페이스에 맞는 설정 선택
 - 각 설정값에 대한 이유를 reasoning에 설명
+</requirements>`,
+    },
+
+    // ========================================================================
+    // 캐릭터별 오프닝 시스템 (동적 주인공 선택)
+    // ========================================================================
+    character_openings: {
+      systemPrompt: `<role>인터랙티브 게임 시나리오의 캐릭터별 오프닝 전문 작가</role>
+
+<task>플레이 가능한 각 캐릭터별로 고유한 스토리 오프닝을 생성합니다. 같은 시나리오지만 다른 시점에서 시작하는 개인화된 경험을 제공합니다.</task>
+
+<opening_structure>
+1. **prologue**: 이 캐릭터의 평범한 일상/시작 장면 (100-150자)
+   - 캐릭터의 성격과 배경이 드러나는 장면
+   - 플레이어가 캐릭터에 감정이입할 수 있는 요소
+
+2. **incitingIncident**: 이 캐릭터가 사건에 휘말리는 순간 (80-120자)
+   - 같은 사건이라도 캐릭터마다 다른 방식으로 경험
+   - 캐릭터의 위치/상황에 따른 개인적 관점
+
+3. **firstCharacterToMeet**: 처음 만나는 다른 캐릭터
+   - 자기 자신은 제외
+   - 논리적으로 만날 수 있는 캐릭터 선택
+
+4. **firstEncounterContext**: 첫 만남의 상황 설명 (50-100자)
+
+5. **openingLocation**: 오프닝이 시작되는 장소
+</opening_structure>
+
+<writing_principles>
+- 한국어로 자연스럽고 문학적인 문장
+- "보여주기"를 "말하기"보다 우선
+- 각 캐릭터의 고유한 시점과 경험 반영
+- 다른 캐릭터의 비밀이나 숨겨진 정보는 포함하지 않음
+</writing_principles>
+
+<output_format>
+{
+  "characterOpenings": {
+    "캐릭터이름1": {
+      "prologue": "...",
+      "incitingIncident": "...",
+      "firstCharacterToMeet": "...",
+      "firstEncounterContext": "...",
+      "openingLocation": "..."
+    },
+    "캐릭터이름2": {
+      ...
+    }
+  }
+}
+</output_format>`,
+      userPrompt: `<request>다음 플레이 가능한 캐릭터들에 대해 각각의 고유한 스토리 오프닝을 생성해주세요.</request>
+
+<scenario>
+${input}
+</scenario>
+${baseContext}
+
+<requirements>
+- 각 플레이 가능 캐릭터(isPlayable=true)에 대해 오프닝 생성
+- 캐릭터 이름을 키로 사용 (roleId가 아닌 characterName)
+- firstCharacterToMeet에는 자기 자신 제외
+- 같은 사건을 다른 시점에서 경험하도록 설계
 </requirements>`,
     },
   };

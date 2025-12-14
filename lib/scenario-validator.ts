@@ -7,7 +7,7 @@ import type { ScenarioData, SystemCondition } from '@/types';
 
 export interface ValidationIssue {
   type: 'error' | 'warning';
-  category: 'ending' | 'stat' | 'character' | 'relationship' | 'trait' | 'duplicate';
+  category: 'ending' | 'stat' | 'character' | 'relationship' | 'trait' | 'duplicate' | 'playable';
   field: string;
   message: string;
   suggestion?: string;
@@ -349,6 +349,59 @@ function validateTraitPoolReferences(scenario: ScenarioData): ValidationIssue[] 
 }
 
 /**
+ * 플레이 가능 캐릭터 설정 검증
+ * - 최소 한 명의 플레이 가능 캐릭터가 있어야 함
+ * - 기본 주인공은 플레이 가능해야 함
+ * - 기본 주인공은 최대 한 명이어야 함
+ */
+function validatePlayableCharacters(scenario: ScenarioData): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  const playableCharacters = scenario.characters.filter((c) => c.isPlayable);
+  const defaultProtagonists = scenario.characters.filter((c) => c.isDefaultProtagonist);
+
+  // 플레이 가능 캐릭터가 없으면 경고
+  if (playableCharacters.length === 0 && scenario.characters.length > 0) {
+    issues.push({
+      type: 'warning',
+      category: 'playable',
+      field: 'characters.isPlayable',
+      message: '플레이 가능한 캐릭터가 설정되어 있지 않습니다.',
+      suggestion: '플레이어가 선택할 수 있도록 최소 한 명의 캐릭터에 "플레이 가능"을 체크해주세요.',
+      targetTab: 'characters',
+    });
+  }
+
+  // 기본 주인공이 2명 이상이면 에러
+  if (defaultProtagonists.length > 1) {
+    issues.push({
+      type: 'error',
+      category: 'playable',
+      field: 'characters.isDefaultProtagonist',
+      message: `기본 주인공이 ${defaultProtagonists.length}명 설정되어 있습니다.`,
+      suggestion: `기본 주인공은 한 명만 설정할 수 있습니다. 현재: ${defaultProtagonists.map((c) => c.characterName).join(', ')}`,
+      targetTab: 'characters',
+    });
+  }
+
+  // 기본 주인공이 플레이 가능하지 않으면 에러
+  defaultProtagonists.forEach((char) => {
+    if (!char.isPlayable) {
+      issues.push({
+        type: 'error',
+        category: 'playable',
+        field: `character.${char.characterName}.isDefaultProtagonist`,
+        message: `기본 주인공 "${char.characterName}"이(가) 플레이 가능으로 설정되어 있지 않습니다.`,
+        suggestion: '기본 주인공은 반드시 "플레이 가능"이 체크되어 있어야 합니다.',
+        targetTab: 'characters',
+      });
+    }
+  });
+
+  return issues;
+}
+
+/**
  * 전체 시나리오 검증 실행
  */
 export function validateScenario(scenario: ScenarioData): ValidationResult {
@@ -360,6 +413,7 @@ export function validateScenario(scenario: ScenarioData): ValidationResult {
     ...validateStatRanges(scenario),
     ...validateEndingConditionConflicts(scenario),
     ...validateTraitPoolReferences(scenario),
+    ...validatePlayableCharacters(scenario),
   ];
 
   const errors = issues.filter((i) => i.type === 'error').length;

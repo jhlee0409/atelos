@@ -8,6 +8,16 @@ export type Character = {
   weightedTraitTypes: string[];
   isEditing?: boolean;
   currentTrait: Trait | null;
+  /** 플레이어가 이 캐릭터로 플레이 가능한지 여부 */
+  isPlayable?: boolean;
+  /** 시나리오의 기본 주인공인지 여부 */
+  isDefaultProtagonist?: boolean;
+  /** 캐릭터의 개인적인 목표 (NPC: AI 행동 가이드, 플레이어 캐릭터: 게임 목표) */
+  personalGoal?: string;
+  /** 플레이어가 이 캐릭터로 플레이할 때 표시되는 목표 (미설정시 시나리오 기본 playerGoal 사용) */
+  playerGoalOverride?: string;
+  /** AI가 추천한 성격/특성 (이미지 생성용) */
+  suggestedTraits?: string[];
 };
 
 export type Relationship = {
@@ -574,6 +584,23 @@ export type GameplayConfig = {
   };
 };
 
+/**
+ * 캐릭터별 스토리 오프닝 설정
+ * 동적 주인공 선택 시스템에서 각 플레이 가능 캐릭터별 고유 오프닝을 정의
+ */
+export interface CharacterStoryOpening {
+  /** 프롤로그 (이 캐릭터 시점에서의 일상/시작 장면) */
+  prologue?: string;
+  /** 촉발 사건 (이 캐릭터가 사건에 휘말리는 순간) */
+  incitingIncident?: string;
+  /** 첫 번째로 만나는 캐릭터 (자신 제외) */
+  firstCharacterToMeet?: string;
+  /** 첫 만남 상황 설명 */
+  firstEncounterContext?: string;
+  /** 오프닝 장소 */
+  openingLocation?: string;
+}
+
 export type ScenarioData = {
   scenarioId: string;
   title: string;
@@ -593,6 +620,12 @@ export type ScenarioData = {
   gameplayConfig?: GameplayConfig;
   /** 동적 결말 설정 (Dynamic Ending System) - 새 시나리오의 기본 엔딩 시스템 */
   dynamicEndingConfig?: DynamicEndingConfig;
+  /** 플레이 가능한 캐릭터 ID 목록 (동적 주인공 선택용) */
+  playableCharacters?: string[];
+  /** 기본 주인공 캐릭터 ID (시나리오 추천) */
+  defaultProtagonist?: string;
+  /** 캐릭터별 스토리 오프닝 설정 (동적 주인공 선택 시스템) */
+  characterStoryOpenings?: Record<string, CharacterStoryOpening>;
 
   // =============================================================================
   // [DEPRECATED] Legacy fields - kept for backwards compatibility only
