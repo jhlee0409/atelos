@@ -1,9 +1,5 @@
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { buildOptimizedGamePrompt, PromptComplexity, buildStoryOpeningPrompt, StoryOpeningResponse } from './prompt-builder';
-import {
-  buildOptimizedGamePromptV2,
-  getDynamicComplexity,
-} from './prompt-builder-optimized';
 import { ChatHistoryManager } from './chat-history-manager';
 import {
   getScenarioMappingCache,
@@ -610,86 +606,42 @@ export const generateGameResponse = async (
     // 토큰 예산 계산 (남은 토큰 기준)
     const remainingTokenBudget = 20000 - sessionStats.totalTokensUsed;
 
-    // 동적 복잡도 조절
-    const dynamicSettings = getDynamicComplexity(
+    // AI 설정 결정
+    const aiSettings = getOptimalAISettings(
       saveState.context.currentDay || 1,
-      remainingTokenBudget,
-      undefined,
+      'medium',
+      sessionStats.totalTokensUsed,
       scenario,
     );
 
-    // 최적화 v2 사용 여부 결정
-    const useV2 =
-      remainingTokenBudget < 10000 || sessionStats.totalApiCalls > 15;
+    const promptComplexity: PromptComplexity = useLiteVersion
+      ? 'lite'
+      : aiSettings.promptComplexity;
 
-    let promptData;
-
-    if (useV2) {
-      console.log('🚀 최적화 v2 프롬프트 사용');
-
-      // 압축된 히스토리 가져오기
-      const compressedHistory = chatHistoryManager.getCompressedHistory(500);
-
-      promptData = buildOptimizedGamePromptV2(
-        scenario,
-        currentPlayerState,
-        playerAction,
-        compressedHistory || saveState.log,
-        {
-          ultraLite: dynamicSettings.useUltraLite,
-          currentDay: saveState.context.currentDay || 1,
-          includeRelationships: dynamicSettings.includeRelationships,
-          keyDecisions: saveState.keyDecisions,
-          actionContext: saveState.context.actionContext,
-          // v1.2: 시너지 분석용 데이터 전달
-          actionsThisDay: saveState.context.actionsThisDay || [],
-          actionType: 'choice',
-          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
-          worldState: saveState.context.worldState, // v1.2: 월드 상태
-          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
-          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
-          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
-          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
-        },
-      );
-    } else {
-      // 기존 프롬프트 시스템 사용
-      const aiSettings = getOptimalAISettings(
-        saveState.context.currentDay || 1,
-        'medium',
-        sessionStats.totalTokensUsed,
-        scenario,
-      );
-
-      const promptComplexity: PromptComplexity = useLiteVersion
-        ? 'lite'
-        : aiSettings.promptComplexity;
-
-      promptData = buildOptimizedGamePrompt(
-        scenario,
-        currentPlayerState,
-        playerAction,
-        saveState.log,
-        promptComplexity,
-        {
-          includeCharacterDetails: aiSettings.includeCharacterDetails,
-          includeRelationshipTracking: aiSettings.includeRelationshipTracking,
-          includeDetailedStats: aiSettings.includeDetailedStats,
-          currentDay: saveState.context.currentDay || 1,
-          keyDecisions: saveState.keyDecisions,
-          actionContext: saveState.context.actionContext,
-          // v1.2: 시너지 분석용 데이터 전달
-          actionsThisDay: saveState.context.actionsThisDay || [],
-          actionType: 'choice', // choice 핸들러에서 호출되므로 choice
-          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
-          worldState: saveState.context.worldState, // v1.2: 월드 상태
-          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
-          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
-          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
-          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
-        },
-      );
-    }
+    const promptData = buildOptimizedGamePrompt(
+      scenario,
+      currentPlayerState,
+      playerAction,
+      saveState.log,
+      promptComplexity,
+      {
+        includeCharacterDetails: aiSettings.includeCharacterDetails,
+        includeRelationshipTracking: aiSettings.includeRelationshipTracking,
+        includeDetailedStats: aiSettings.includeDetailedStats,
+        currentDay: saveState.context.currentDay || 1,
+        keyDecisions: saveState.keyDecisions,
+        actionContext: saveState.context.actionContext,
+        // v1.2: 시너지 분석용 데이터 전달
+        actionsThisDay: saveState.context.actionsThisDay || [],
+        actionType: 'choice', // choice 핸들러에서 호출되므로 choice
+        characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
+        worldState: saveState.context.worldState, // v1.2: 월드 상태
+        metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
+        // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
+        npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
+        protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
+      },
+    );
 
     console.log(
       `📊 예상 토큰: ${promptData.estimatedTokens}, 남은 예산: ${remainingTokenBudget}`,
@@ -704,7 +656,7 @@ export const generateGameResponse = async (
       model: 'gemini-2.5-flash-lite',
       temperature: 0.5,
       maxTokens: Math.min(
-        dynamicSettings.useUltraLite ? 1200 : 2000,
+        aiSettings.useLiteVersion ? 1200 : 2000,
         remainingTokenBudget,
       ),
     });
@@ -750,7 +702,7 @@ export const generateGameResponse = async (
     updateSessionStats(
       promptData.estimatedTokens,
       responseTime,
-      useV2 || dynamicSettings.useUltraLite,
+      aiSettings.useLiteVersion,
       false,
     );
 

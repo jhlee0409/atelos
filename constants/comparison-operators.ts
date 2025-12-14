@@ -49,23 +49,4 @@ export const compareValues = (
   }
 };
 
-// 연산자 표시명 (사용자에게 보여줄 때)
-export const OPERATOR_DISPLAY_NAMES = {
-  greater_than: '초과',
-  greater_equal: '이상',
-  less_than: '미만',
-  less_equal: '이하',
-  equal: '같음',
-  not_equal: '다름',
-} as const;
-
-export const getOperatorDisplayName = (operator: string): string => {
-  const englishOperator =
-    OPERATOR_TO_ENGLISH[operator as keyof typeof OPERATOR_TO_ENGLISH] ||
-    operator;
-  return (
-    OPERATOR_DISPLAY_NAMES[
-      englishOperator as keyof typeof OPERATOR_DISPLAY_NAMES
-    ] || operator
-  );
-};
+// 연산자 표시명 관련 함수는 현재 사용되지 않아 제거됨

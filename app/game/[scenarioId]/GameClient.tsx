@@ -44,16 +44,12 @@ import {
   updateContextAfterDialogue,
   updateContextAfterChoice,
   resetContextForNewDay,
-  generateDynamicLocations,
-  generateDynamicCharacters,
 } from '@/lib/context-manager';
 import {
   createInitialWorldState,
   processExploration,
-  processEvents,
   advanceWorldStateToNewDay,
   getLocationsForUI,
-  updateLocationStatus,
   addDiscoveredLocations,
 } from '@/lib/world-state-manager';
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
