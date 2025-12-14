@@ -332,10 +332,16 @@ const getStoryOpeningForProtagonist = (
  *
  * @param scenario 시나리오 데이터
  * @param selectedProtagonistId 플레이어가 선택한 주인공 ID
+ * @param storyOpeningOverride 캐릭터별 스토리 오프닝 (v1.5: 병합된 오프닝)
  * @returns 초기에 만난 캐릭터 이름 배열
  */
-const getInitialMetCharacters = (scenario: ScenarioData, selectedProtagonistId?: string): string[] => {
-  const storyOpening = scenario.storyOpening;
+const getInitialMetCharacters = (
+  scenario: ScenarioData,
+  selectedProtagonistId?: string,
+  storyOpeningOverride?: ScenarioData['storyOpening']
+): string[] => {
+  // v1.5: 캐릭터별 오프닝이 전달되면 사용, 아니면 시나리오 기본값
+  const storyOpening = storyOpeningOverride || scenario.storyOpening;
   const introStyle = storyOpening?.characterIntroductionStyle || 'contextual';
   const introSequence = storyOpening?.characterIntroductionSequence;
   const firstCharacter = storyOpening?.firstCharacterToMeet;
@@ -431,12 +437,18 @@ const getStoryOpeningWithDefaults = (
 
 /**
  * 초기 survivors 목록 생성 (만난 캐릭터만 포함)
+ * @param scenario 시나리오 데이터
+ * @param charactersWithTraits 특성이 할당된 캐릭터 목록
+ * @param selectedProtagonistId 플레이어가 선택한 주인공 ID (v1.5)
+ * @param storyOpeningOverride 캐릭터별 스토리 오프닝 (v1.5)
  */
 const getInitialSurvivors = (
   scenario: ScenarioData,
-  charactersWithTraits: typeof scenario.characters
+  charactersWithTraits: typeof scenario.characters,
+  selectedProtagonistId?: string,
+  storyOpeningOverride?: ScenarioData['storyOpening']
 ): { name: string; role: string; traits: string[]; status: string }[] => {
-  const metCharacters = getInitialMetCharacters(scenario);
+  const metCharacters = getInitialMetCharacters(scenario, selectedProtagonistId, storyOpeningOverride);
 
   return charactersWithTraits
     .filter((c) => metCharacters.includes(c.characterName))
@@ -515,6 +527,9 @@ interface GameClientProps {
 }
 
 const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: string): SaveState => {
+  // [v1.5] 캐릭터별 스토리 오프닝 병합 (선택된 주인공에 맞는 오프닝 사용)
+  const mergedStoryOpening = getStoryOpeningForProtagonist(scenario, selectedProtagonistId);
+
   const scenarioStats = scenario.scenarioStats.reduce(
     (acc, stat) => {
       acc[stat.id] = stat.initialValue ?? stat.current;
@@ -619,10 +634,11 @@ const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: 
       // [2025 Enhanced] 주인공 지식 시스템
       // 게임 진행 중 주인공이 알게 되는 정보를 추적
       // [Stage 1 개선 #2] 배열 깊은 병합 (스프레드 대신 concat + 중복 제거)
+      // [v1.5] mergedStoryOpening 사용 (캐릭터별 오프닝 지원)
       // =======================================================================
       protagonistKnowledge: (() => {
-        const baseMetCharacters = getInitialMetCharacters(scenario, selectedProtagonistId);
-        const initialKnowledge = scenario.storyOpening?.initialProtagonistKnowledge;
+        const baseMetCharacters = getInitialMetCharacters(scenario, selectedProtagonistId, mergedStoryOpening);
+        const initialKnowledge = mergedStoryOpening?.initialProtagonistKnowledge;
 
         return {
           // metCharacters: 기본값 + 시나리오 정의값 병합 (중복 제거)
@@ -658,7 +674,8 @@ const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: 
     },
     community: {
       // 처음에는 만난 캐릭터만 survivors에 포함 (나머지는 스토리 진행 중 추가)
-      survivors: getInitialSurvivors(scenario, charactersWithTraits),
+      // [v1.5] 캐릭터별 오프닝 사용
+      survivors: getInitialSurvivors(scenario, charactersWithTraits, selectedProtagonistId, mergedStoryOpening),
       hiddenRelationships,
     },
     log: scenario.synopsis
