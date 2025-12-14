@@ -695,6 +695,13 @@ const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: 
       })),
     // 회상 시스템 - 주요 결정 기록 초기화
     keyDecisions: [],
+    // AI Narrative Engine 초기 상태
+    narrativeEngine: {
+      endingPrediction: undefined,
+      lastQualityScore: undefined,
+      seedsPlanted: [],
+      regenerationCount: 0,
+    },
   };
 };
 
@@ -1498,6 +1505,59 @@ const updateSaveState = (
     }
 
     newSaveState.context.actionContext.urgentMatters = urgentMatters;
+  }
+
+  // [AI Narrative Engine] 서사 엔진 상태 업데이트
+  // 엔딩 예측, 복선 추적, 품질 기록
+  if (!newSaveState.narrativeEngine) {
+    newSaveState.narrativeEngine = {
+      endingPrediction: undefined,
+      lastQualityScore: undefined,
+      seedsPlanted: [],
+      regenerationCount: 0,
+    };
+  }
+
+  // calculateEndingProbabilities를 import 없이 가능한 범위에서 간단히 예측
+  // (실제 함수는 game-ai-client.ts에서 사용)
+  const endingArchetypes = scenario.endingArchetypes || [];
+  if (endingArchetypes.length > 0) {
+    // 간단한 엔딩 예측 로직: 가장 첫 번째 엔딩을 기본으로, 스탯 조건 체크
+    const stats = newSaveState.context.scenarioStats;
+    let bestEnding = endingArchetypes[0];
+    let highestScore = 0;
+
+    for (const ending of endingArchetypes) {
+      let score = 0;
+      if (ending.systemConditions) {
+        for (const cond of ending.systemConditions) {
+          if (cond.required_stat) {
+            const statValue = stats[cond.required_stat.statId] || 0;
+            const targetValue = cond.required_stat.value;
+            // 목표에 가까울수록 높은 점수
+            score += Math.max(0, 100 - Math.abs(statValue - targetValue));
+          }
+        }
+      }
+      if (score > highestScore) {
+        highestScore = score;
+        bestEnding = ending;
+      }
+    }
+
+    // 현재 궤적 판단
+    const isGoodEnding = bestEnding.isGoalSuccess;
+    const trajectory: 'positive' | 'negative' | 'neutral' | 'uncertain' =
+      highestScore > 50 ? (isGoodEnding ? 'positive' : 'negative') : 'uncertain';
+
+    newSaveState.narrativeEngine.endingPrediction = {
+      mostLikelyEnding: {
+        id: bestEnding.id,
+        name: bestEnding.description || bestEnding.id,
+        probability: Math.min(100, Math.round(highestScore)),
+      },
+      currentTrajectory: trajectory,
+    };
   }
 
   return newSaveState;

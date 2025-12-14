@@ -11,6 +11,11 @@ import {
   getGameplayConfig,
   DEFAULT_GAMEPLAY_CONFIG,
 } from './gameplay-config';
+import {
+  quickQualityCheck,
+  buildImprovementDirective,
+  calculateEndingProbabilities,
+} from './ai-narrative-engine';
 import type { ScenarioData, PlayerState, Character } from '@/types';
 
 // 언어 혼용 감지 및 정리 함수
@@ -673,7 +678,7 @@ export const generateGameResponse = async (
     const parsedResponse = parseGeminiJsonResponse<AIResponse>(geminiResponse);
 
     // 언어 혼용 감지 및 정리 + 선택지/스탯 검증 (gemini-2.5-flash-lite 강화 검증)
-    const {
+    let {
       cleanedResponse,
       hasLanguageIssues,
       languageIssues,
@@ -692,6 +697,62 @@ export const generateGameResponse = async (
     if (hasStatIssues) {
       console.warn('📊 스탯 변화 보정 완료:', statIssues);
     }
+
+    // ========== Self-Evaluation System (자기 평가 시스템) ==========
+    // AI 응답 품질 평가 및 필요시 재생성
+    const currentDay = saveState.context.currentDay || 1;
+    const qualityEval = quickQualityCheck(cleanedResponse, scenario, currentDay);
+
+    console.log(`🔍 응답 품질 평가: ${qualityEval.overallScore}/100점`);
+    if (qualityEval.issues.length > 0) {
+      console.log('⚠️ 발견된 이슈:', qualityEval.issues);
+    }
+
+    // 품질이 너무 낮으면 재생성 시도 (1회만)
+    if (qualityEval.shouldRegenerate && !useLiteVersion) {
+      console.log('🔄 품질 미달로 응답 재생성 시도...');
+
+      // 엔딩 예측 기반 복선 시드 생성
+      const endingPrediction = calculateEndingProbabilities(scenario, saveState);
+      const improvementDirective = buildImprovementDirective(
+        qualityEval,
+        endingPrediction.seedsForCurrentTurn,
+      );
+
+      // 개선된 프롬프트로 재생성
+      const improvedUserPrompt = `${promptData.userPrompt}\n\n${improvementDirective}`;
+
+      try {
+        const retryResponse = await callGeminiAPI({
+          systemPrompt: promptData.systemPrompt,
+          userPrompt: improvedUserPrompt,
+          model: 'gemini-2.5-flash-lite',
+          temperature: 0.6, // 약간 높여서 다양성 확보
+          maxTokens: Math.min(2500, remainingTokenBudget - 500),
+        });
+
+        const retryParsed = parseGeminiJsonResponse<AIResponse>(retryResponse);
+        const retryValidation = cleanAndValidateAIResponse(retryParsed);
+        const retryEval = quickQualityCheck(retryValidation.cleanedResponse, scenario, currentDay);
+
+        // 재생성된 응답이 더 좋으면 교체
+        if (retryEval.overallScore > qualityEval.overallScore) {
+          console.log(`✅ 재생성 성공! 품질 향상: ${qualityEval.overallScore} → ${retryEval.overallScore}`);
+          cleanedResponse = retryValidation.cleanedResponse;
+          hasLanguageIssues = retryValidation.hasLanguageIssues;
+          languageIssues = retryValidation.languageIssues;
+          hasChoiceIssues = retryValidation.hasChoiceIssues;
+          choiceIssues = retryValidation.choiceIssues;
+          hasStatIssues = retryValidation.hasStatIssues;
+          statIssues = retryValidation.statIssues;
+        } else {
+          console.log(`⚠️ 재생성 응답이 더 낫지 않음. 기존 응답 유지.`);
+        }
+      } catch (retryError) {
+        console.warn('⚠️ 재생성 실패, 기존 응답 사용:', retryError);
+      }
+    }
+    // ========== Self-Evaluation System 끝 ==========
 
     // 응답을 히스토리에 추가
     chatHistoryManager.addMessage({
