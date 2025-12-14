@@ -210,12 +210,18 @@ export const buildOptimizedGamePromptV2 = (
       .replace('{{STATS}}', compressStats(playerState.stats, scenario.scenarioStats))
       .replace('{{STAT_IDS}}', statIdList);
 
-    const userPrompt = `Action: ${playerAction.actionDescription}`;
+    // [Fix] ultraLite에도 최소 맥락 80자 추가
+    const briefContext = lastLog
+      ? lastLog.substring(0, 80) + (lastLog.length > 80 ? '...' : '')
+      : '';
+    const userPrompt = briefContext
+      ? `Previous: "${briefContext}"\nAction: ${playerAction.actionDescription}`
+      : `Action: ${playerAction.actionDescription}`;
 
     return {
       systemPrompt,
       userPrompt,
-      estimatedTokens: 150,
+      estimatedTokens: 180, // 맥락 추가로 약간 증가
     };
   }
 
@@ -261,8 +267,11 @@ Dilemma: ${genreStyle.dilemmaTypes[0]}`;
     ? `\nTODAY'S CONTEXT (이전 행동과 연결하세요):\n${formatContextForPrompt(actionContext)}`
     : '';
 
-  // 사용자 프롬프트 압축
-  const userPrompt = `Previous: "${lastLog.substring(0, 50)}..."
+  // [Fix] 사용자 프롬프트 - 맥락 200자로 확대
+  const previousContext = lastLog
+    ? lastLog.substring(0, 200) + (lastLog.length > 200 ? '...' : '')
+    : 'Game start';
+  const userPrompt = `Previous: "${previousContext}"
 Choice: ${playerAction.actionDescription}
 ${relationshipInfo ? `Relations: ${relationshipInfo}` : ''}
 ${pastDecisions ? `PastChoices: ${pastDecisions}` : ''}

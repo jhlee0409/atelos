@@ -315,9 +315,9 @@ export const buildOptimizedGamePrompt = (
 
   switch (complexity) {
     case 'minimal':
-      return buildMinimalPrompt(scenario, playerState, playerAction);
+      return buildMinimalPrompt(scenario, playerState, playerAction, lastLog);
     case 'lite':
-      return buildLitePrompt(scenario, playerState, playerAction, options);
+      return buildLitePrompt(scenario, playerState, playerAction, lastLog, options);
     case 'full':
       return buildFullPrompt(
         scenario,
@@ -350,23 +350,29 @@ const buildMinimalPrompt = (
   scenario: ScenarioData,
   playerState: PlayerState,
   playerAction: GamePlayerAction,
+  lastLog: string, // [Fix] 이전 맥락 파라미터 추가
 ): GamePromptData => {
   const stats = Object.entries(playerState.stats)
     .map(([k, v]) => `${k}:${v}`)
     .join(',');
+
+  // [Fix] 최소 맥락 100자 포함
+  const briefContext = lastLog
+    ? lastLog.substring(0, 100) + (lastLog.length > 100 ? '...' : '')
+    : '';
 
   const systemPrompt = `Korean survival game AI. Scenario: ${scenario.title}
 Stats: ${stats}
 Rules: 1) Korean narrative 2) JSON format 3) 3 choices (active/cautious/wait)
 JSON: {"log":"story","dilemma":{"prompt":"?","choice_a":"적극적","choice_b":"신중한","choice_c":"대기/관망"},"statChanges":{"scenarioStats":{}}}`;
 
-  const userPrompt = `Action: ${playerAction.actionDescription}
+  const userPrompt = `${briefContext ? `Previous: "${briefContext}"\n` : ''}Action: ${playerAction.actionDescription}
 Result in Korean (50 words max):`;
 
   return {
     systemPrompt,
     userPrompt,
-    estimatedTokens: 300,
+    estimatedTokens: 350, // 맥락 추가로 약간 증가
   };
 };
 
@@ -375,6 +381,7 @@ const buildLitePrompt = (
   scenario: ScenarioData,
   playerState: PlayerState,
   playerAction: GamePlayerAction,
+  lastLog: string, // [Fix] 이전 맥락 필수 파라미터로 추가
   options: any,
 ): GamePromptData => {
   const currentDay = options.currentDay || 1;
@@ -807,7 +814,12 @@ ${qualityEnhancementSection}`;
     ? `\n\n### 오늘의 맥락 (CONTEXT - 이전 행동과 연결할 것) ###\n${formatContextForPrompt(options.actionContext)}`
     : '';
 
-  const userPrompt = `Previous situation: "${playerAction.playerFeedback || 'Game start'}"
+  // [Fix] lastLog를 사용하여 이전 맥락 200자 포함
+  const previousContext = lastLog
+    ? lastLog.substring(0, 200) + (lastLog.length > 200 ? '...' : '')
+    : 'Game start';
+
+  const userPrompt = `Previous situation: "${previousContext}"
 Player chose: ${playerAction.actionDescription}
 ${contextSection}
 
