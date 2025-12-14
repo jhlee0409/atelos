@@ -242,6 +242,97 @@ NARRATIVE PHASE: ACT 3 - CLIMAX & RESOLUTION
 - 조건 미달 시 → "결단의 시간" (기본 엔딩)`
 };
 
+// v1.5: 채팅 히스토리를 AI 컨텍스트용으로 포맷팅
+const formatChatHistoryForPrompt = (
+  chatHistory?: { type: string; content: string; timestamp: number }[],
+  maxEntries: number = 8,
+): string => {
+  if (!chatHistory || chatHistory.length === 0) {
+    return '';
+  }
+
+  // 최근 메시지들 (AI와 player 타입만, change-summary 제외)
+  const relevantMessages = chatHistory
+    .filter((msg) => msg.type === 'ai' || msg.type === 'player')
+    .slice(-maxEntries);
+
+  if (relevantMessages.length === 0) {
+    return '';
+  }
+
+  const formattedMessages = relevantMessages.map((msg) => {
+    const role = msg.type === 'player' ? '플레이어 행동' : '이야기 전개';
+    // 내용 압축 (너무 길면 앞부분만)
+    const content = msg.content.length > 150
+      ? msg.content.substring(0, 150) + '...'
+      : msg.content;
+    return `[${role}] ${content}`;
+  }).join('\n');
+
+  return `
+### 📖 RECENT STORY CONTEXT (최근 스토리 흐름 - 반드시 참조하여 연속성 유지) ###
+아래는 지금까지의 이야기 흐름입니다. 새로운 서사를 생성할 때 반드시 이 맥락을 자연스럽게 이어가세요.
+
+${formattedMessages}
+
+**중요 지시**:
+- 위 스토리 흐름에서 언급된 인물, 장소, 사건을 자연스럽게 참조하세요
+- 이전에 발생한 일을 무시하거나 모순되는 내용을 생성하지 마세요
+- 캐릭터들이 이전 대화/사건을 기억하고 있는 것처럼 서술하세요
+`;
+};
+
+// v1.5: actionHistory를 AI 컨텍스트용으로 포맷팅 (Issue 8 fix)
+const formatActionHistoryForPrompt = (
+  actionHistory?: import('@/types').ActionHistoryEntry[],
+  maxEntries: number = 10,
+): string => {
+  if (!actionHistory || actionHistory.length === 0) {
+    return '';
+  }
+
+  // 최근 행동들만 포함 (토큰 절약)
+  const recentActions = actionHistory.slice(-maxEntries);
+
+  const formattedActions = recentActions.map((entry) => {
+    const actionTypeKor: Record<string, string> = {
+      'choice': '선택',
+      'dialogue': '대화',
+      'exploration': '탐색',
+    };
+    const typeLabel = actionTypeKor[entry.actionType] || entry.actionType;
+
+    // 행동 결과 요약
+    let consequenceStr = '';
+    if (entry.consequence) {
+      const statChanges = entry.consequence.statsChanged
+        ?.slice(0, 2) // 주요 2개만
+        ?.map((s) => `${s.statId}:${s.delta > 0 ? '+' : ''}${s.delta}`)
+        ?.join(', ');
+      if (statChanges) {
+        consequenceStr = ` → [${statChanges}]`;
+      }
+      if (entry.consequence.significantEvents?.length) {
+        consequenceStr += ` (${entry.consequence.significantEvents[0]})`;
+      }
+    }
+
+    // 대상이 있으면 포함
+    const targetStr = entry.target ? ` @${entry.target}` : '';
+
+    return `Day${entry.day} [${typeLabel}${targetStr}] ${entry.content.substring(0, 60)}${consequenceStr}`;
+  }).join('\n');
+
+  return `
+### 🎮 PLAYER ACTION HISTORY (플레이어 행동 이력 - 루트/엔딩 결정에 참조) ###
+${formattedActions}
+
+**서사 반영 지시**:
+- 위 행동들의 결과가 현재 상황에 영향을 미치고 있음을 자연스럽게 묘사하세요
+- 반복된 행동 패턴(예: 탐색 위주, 대화 위주)에 따른 서사 방향을 고려하세요
+`;
+};
+
 // 회상 시스템 - 주요 결정 요약 (토큰 효율적)
 interface KeyDecision {
   day: number;
@@ -304,6 +395,10 @@ export const buildOptimizedGamePrompt = (
     protagonistKnowledge?: import('@/types').ProtagonistKnowledge; // 주인공이 아는 정보
     // 2025-12-13: 동적 주인공 선택 시스템
     selectedProtagonistId?: string; // 선택된 주인공의 roleId
+    // v1.5: AI 컨텍스트 유지 - chatHistory 전달
+    chatHistory?: { type: string; content: string; timestamp: number }[];
+    // v1.5: actionHistory 전달 (Issue 8 fix)
+    actionHistory?: import('@/types').ActionHistoryEntry[];
   } = {},
 ): GamePromptData => {
   const {
@@ -800,7 +895,9 @@ ${actionEngagementSection}
 ${discoveredInfoSection}
 ${hiddenRelationshipSection}
 ${protagonistKnowledgeSection}
-${qualityEnhancementSection}`;
+${qualityEnhancementSection}
+${formatChatHistoryForPrompt(options.chatHistory, 6)}
+${formatActionHistoryForPrompt(options.actionHistory, 8)}`;
 
   // 맥락 정보 추가 (Phase 5)
   const contextSection = options.actionContext
@@ -865,6 +962,28 @@ const buildFullPrompt = (
     options.keyDecisions,
     5,
   );
+
+  // v1.5: chatHistory 섹션
+  const chatHistorySection = formatChatHistoryForPrompt(options.chatHistory, 8);
+
+  // v1.5 Fix: discoveredClues 섹션 (Issue 4 - buildFullPrompt에도 추가)
+  let discoveredInfoSection = '';
+  if (options.actionContext?.discoveredClues && options.actionContext.discoveredClues.length > 0) {
+    const recentClues = options.actionContext.discoveredClues.slice(-7); // 풀모드에서는 7개
+    const clueTexts = recentClues.map((clue: any) => {
+      const sourceDesc = clue.source?.type === 'dialogue'
+        ? `${clue.source.characterName}와(과)의 대화`
+        : clue.source?.type === 'exploration'
+          ? `${clue.source.locationId} 탐색`
+          : '선택 결과';
+      return `- [${sourceDesc}] ${clue.content}`;
+    });
+    discoveredInfoSection = `
+### 📋 DISCOVERED INFORMATION (플레이어가 알아낸 정보) ###
+${clueTexts.join('\n')}
+**AI 지시**: 발견한 정보를 서사와 선택지에 자연스럽게 활용하세요.
+`;
+  }
 
   // 현재 상태 정보 구성
   const currentStats = Object.entries(playerState.stats)
@@ -963,7 +1082,10 @@ const buildFullPrompt = (
 ${genreGuide}
 
 ${phaseGuideline}
-${keyDecisionsSection}`;
+${keyDecisionsSection}
+${discoveredInfoSection}
+${chatHistorySection}
+${formatActionHistoryForPrompt(options.actionHistory, 10)}`;
 
   return {
     systemPrompt,

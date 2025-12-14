@@ -571,11 +571,15 @@ export interface AIResponse {
 }
 
 // 제미나이 API를 통한 게임 AI 응답 생성 (최적화 v2)
+// v1.5: actionType 파라미터 추가 (Issue 11 fix)
+// v1.5: actionHistory 파라미터 추가 (Issue 8 fix)
 export const generateGameResponse = async (
   saveState: SaveState,
   playerAction: PlayerAction,
   scenario: ScenarioData,
   useLiteVersion = false,
+  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText' = 'choice',
+  actionHistory?: import('@/types').ActionHistoryEntry[],
 ): Promise<AIResponse> => {
   try {
     const startTime = Date.now();
@@ -633,13 +637,17 @@ export const generateGameResponse = async (
         actionContext: saveState.context.actionContext,
         // v1.2: 시너지 분석용 데이터 전달
         actionsThisDay: saveState.context.actionsThisDay || [],
-        actionType: 'choice', // choice 핸들러에서 호출되므로 choice
+        actionType, // v1.5: 동적으로 전달받은 actionType 사용 (Issue 11 fix)
         characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
         worldState: saveState.context.worldState, // v1.2: 월드 상태
         metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
         // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
         npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
         protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
+        // v1.5: chatHistory 전달 (Issue 1 fix - AI 컨텍스트 유지)
+        chatHistory: saveState.chatHistory,
+        // v1.5: actionHistory 전달 (Issue 8 fix - 플레이어 행동 패턴 추적)
+        actionHistory,
       },
     );
 

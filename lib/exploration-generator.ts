@@ -175,10 +175,12 @@ const generateFallbackExplorationResult = (
 };
 
 // 탐색 결과 생성 (기본 버전 - 하위 호환성 유지)
+// v1.5: selectedProtagonistId 추가 (Issue 3 fix)
 export const generateExplorationResult = async (
   location: ExplorationLocation,
   saveState: SaveState,
-  scenario: ScenarioData
+  scenario: ScenarioData,
+  selectedProtagonistId?: string
 ): Promise<ExplorationResult> => {
   try {
     const worldState = saveState.context.worldState;
@@ -266,11 +268,13 @@ export interface EnhancedExplorationResult extends ExplorationResult {
 
 /**
  * WorldState를 활용한 향상된 탐색 결과 생성
+ * v1.5: selectedProtagonistId 추가 (Issue 3 fix)
  */
 export const generateEnhancedExplorationResult = async (
   location: WorldLocation,
   saveState: SaveState,
-  scenario: ScenarioData
+  scenario: ScenarioData,
+  selectedProtagonistId?: string
 ): Promise<EnhancedExplorationResult> => {
   const worldState = saveState.context.worldState;
 
