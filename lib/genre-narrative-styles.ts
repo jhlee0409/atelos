@@ -688,12 +688,4 @@ ${style.writingTechniques}
   return prompt;
 }
 
-/**
- * 압축된 장르 스타일 (토큰 최적화용)
- */
-export function getCompactGenreStyle(genres: string[]): string {
-  const style = getNarrativeStyleFromGenres(genres);
-  const genreText = genres.length > 0 ? genres[0] : '드라마';
-
-  return `Genre(${genreText}): ${style.thematicFocus}. Tone: ${style.emotionalRange}. Dilemma: ${style.dilemmaTypes[0]}`;
-}
+// 압축된 장르 스타일 함수는 현재 사용되지 않아 제거됨

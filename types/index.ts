@@ -755,6 +755,17 @@ export interface SaveState {
   characterArcs?: CharacterArc[]; // 캐릭터 아크 트래킹
   keyDecisions?: KeyDecision[]; // 회상 시스템 - 주요 결정 기록
   lastChangeSummary?: ChangeSummaryData; // 마지막 변화 요약
+  // --- AI Narrative Engine 상태 ---
+  /** AI 서사 엔진 상태 (엔딩 예측, 복선 추적, 일관성 검증) */
+  narrativeEngine?: {
+    endingPrediction?: {
+      mostLikelyEnding: { id: string; name: string; probability: number };
+      currentTrajectory: 'positive' | 'negative' | 'neutral' | 'uncertain';
+    };
+    lastQualityScore?: number;
+    seedsPlanted?: string[];
+    regenerationCount?: number;
+  };
 }
 
 export interface AIResponse {

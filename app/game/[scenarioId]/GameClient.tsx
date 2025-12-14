@@ -44,16 +44,12 @@ import {
   updateContextAfterDialogue,
   updateContextAfterChoice,
   resetContextForNewDay,
-  generateDynamicLocations,
-  generateDynamicCharacters,
 } from '@/lib/context-manager';
 import {
   createInitialWorldState,
   processExploration,
-  processEvents,
   advanceWorldStateToNewDay,
   getLocationsForUI,
-  updateLocationStatus,
   addDiscoveredLocations,
 } from '@/lib/world-state-manager';
 import { canCheckEnding, getActionPointsPerDay } from '@/lib/gameplay-config';
@@ -699,6 +695,13 @@ const createInitialSaveState = (scenario: ScenarioData, selectedProtagonistId?: 
       })),
     // 회상 시스템 - 주요 결정 기록 초기화
     keyDecisions: [],
+    // AI Narrative Engine 초기 상태
+    narrativeEngine: {
+      endingPrediction: undefined,
+      lastQualityScore: undefined,
+      seedsPlanted: [],
+      regenerationCount: 0,
+    },
   };
 };
 
@@ -1504,6 +1507,59 @@ const updateSaveState = (
     newSaveState.context.actionContext.urgentMatters = urgentMatters;
   }
 
+  // [AI Narrative Engine] 서사 엔진 상태 업데이트
+  // 엔딩 예측, 복선 추적, 품질 기록
+  if (!newSaveState.narrativeEngine) {
+    newSaveState.narrativeEngine = {
+      endingPrediction: undefined,
+      lastQualityScore: undefined,
+      seedsPlanted: [],
+      regenerationCount: 0,
+    };
+  }
+
+  // calculateEndingProbabilities를 import 없이 가능한 범위에서 간단히 예측
+  // (실제 함수는 game-ai-client.ts에서 사용)
+  const endingArchetypes = scenario.endingArchetypes || [];
+  if (endingArchetypes.length > 0) {
+    // 간단한 엔딩 예측 로직: 가장 첫 번째 엔딩을 기본으로, 스탯 조건 체크
+    const stats = newSaveState.context.scenarioStats;
+    let bestEnding = endingArchetypes[0];
+    let highestScore = 0;
+
+    for (const ending of endingArchetypes) {
+      let score = 0;
+      if (ending.systemConditions) {
+        for (const cond of ending.systemConditions) {
+          if (cond.required_stat) {
+            const statValue = stats[cond.required_stat.statId] || 0;
+            const targetValue = cond.required_stat.value;
+            // 목표에 가까울수록 높은 점수
+            score += Math.max(0, 100 - Math.abs(statValue - targetValue));
+          }
+        }
+      }
+      if (score > highestScore) {
+        highestScore = score;
+        bestEnding = ending;
+      }
+    }
+
+    // 현재 궤적 판단
+    const isGoodEnding = bestEnding.isGoalSuccess;
+    const trajectory: 'positive' | 'negative' | 'neutral' | 'uncertain' =
+      highestScore > 50 ? (isGoodEnding ? 'positive' : 'negative') : 'uncertain';
+
+    newSaveState.narrativeEngine.endingPrediction = {
+      mostLikelyEnding: {
+        id: bestEnding.id,
+        name: bestEnding.description || bestEnding.id,
+        probability: Math.min(100, Math.round(highestScore)),
+      },
+      currentTrajectory: trajectory,
+    };
+  }
+
   return newSaveState;
 };
 
@@ -2030,11 +2086,16 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
       );
 
       // 제미나이 API를 통한 게임 응답 생성
+      // v1.5: actionType과 actionHistory 전달 (Issue 8, 11 fix)
+      // v1.6: selectedProtagonistId 전달 (동적 주인공 선택 지원)
       const aiResponse = await generateGameResponse(
         newSaveState,
         playerAction,
         scenario,
         aiSettings.useLiteVersion,
+        'choice',
+        actionHistory,
+        selectedProtagonistId,
       );
 
       // 언어 품질 추가 검증 (generateGameResponse에서 이미 처리되지만 추가 확인)
@@ -2441,11 +2502,13 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
     try {
       console.log(`💬 대화 시작: ${characterName} - ${topic.label}`);
 
+      // v1.5: selectedProtagonistId 전달 (Issue 3 fix)
       const dialogueResponse = await generateDialogueResponse(
         characterName,
         topic,
         saveState,
-        scenario
+        scenario,
+        selectedProtagonistId,
       );
 
       // 대화 내용을 채팅 히스토리에 추가
@@ -2744,10 +2807,12 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
         });
       }
 
+      // v1.5: selectedProtagonistId 전달 (Issue 3 fix)
       const explorationResult = await generateExplorationResult(
         location,
         saveState,
-        scenario
+        scenario,
+        selectedProtagonistId,
       );
 
       // 탐색 결과를 채팅 히스토리에 추가

@@ -18,8 +18,9 @@ export interface StatMapping {
 
 /**
  * 시나리오 데이터에서 스탯 매핑 추출
+ * @internal 내부에서만 사용됨
  */
-export const extractStatMappings = (scenario: ScenarioData): StatMapping[] => {
+const extractStatMappings = (scenario: ScenarioData): StatMapping[] => {
   return scenario.scenarioStats.map((stat) => ({
     id: stat.id,
     name: stat.name,
@@ -64,8 +65,9 @@ export const getAllStatIdsFromScenario = (scenario: ScenarioData): string[] => {
 
 /**
  * 시나리오에서 ID → 이름 맵 생성
+ * @internal 내부에서만 사용됨
  */
-export const buildStatIdToNameMap = (
+const buildStatIdToNameMap = (
   scenario: ScenarioData
 ): Record<string, string> => {
   const map: Record<string, string> = {};
@@ -75,57 +77,7 @@ export const buildStatIdToNameMap = (
   return map;
 };
 
-// ===== 플래그 매핑 관련 =====
-
-/** @deprecated Flags system removed - kept for backwards compatibility */
-export interface FlagMapping {
-  id: string;
-  name: string;
-  description?: string;
-}
-
-/**
- * @deprecated Flags system removed - returns empty array
- */
-export const extractFlagMappings = (_scenario: ScenarioData): FlagMapping[] => {
-  return [];
-};
-
-/**
- * @deprecated Flags system removed - returns placeholder
- */
-export const getFlagNameFromScenario = (
-  flagId: string,
-  _scenario: ScenarioData
-): string => {
-  return `[${flagId}]`;
-};
-
-/**
- * @deprecated Flags system removed - returns empty array
- */
-export const getAllFlagIdsFromScenario = (_scenario: ScenarioData): string[] => {
-  return [];
-};
-
-// ===== 캐릭터 매핑 관련 =====
-
-export interface CharacterMapping {
-  roleId: string;      // 역할 ID (예: "ENGINEER")
-  roleName: string;    // 역할 한글 이름 (예: "기관사")
-  characterName: string; // 캐릭터 이름 (예: "카이 첸")
-}
-
-/**
- * 시나리오 데이터에서 캐릭터 매핑 추출
- */
-export const extractCharacterMappings = (scenario: ScenarioData): CharacterMapping[] => {
-  return scenario.characters.map((char) => ({
-    roleId: char.roleId,
-    roleName: char.roleName,
-    characterName: char.characterName,
-  }));
-};
+// ===== 캐릭터 관련 =====
 
 /**
  * 시나리오에서 캐릭터 이름 목록 추출
@@ -139,8 +91,9 @@ export const getAllCharacterNamesFromScenario = (scenario: ScenarioData): string
 /**
  * 시나리오 기반 스탯 ID 필터링 패턴 생성
  * cleanNarrativeFormatting에서 사용
+ * @internal 내부에서만 사용됨
  */
-export const buildStatFilterPatterns = (scenario: ScenarioData): RegExp[] => {
+const buildStatFilterPatterns = (scenario: ScenarioData): RegExp[] => {
   const statIds = getAllStatIdsFromScenario(scenario);
   const statNames = scenario.scenarioStats.map((s) => s.name);
 
@@ -240,7 +193,8 @@ export const getScenarioMappingCache = (): ScenarioMappingCache | null => {
 
 /**
  * 캐시 초기화
+ * @internal 내부에서만 사용됨
  */
-export const clearScenarioMappingCache = (): void => {
+const clearScenarioMappingCache = (): void => {
   mappingCache = null;
 };

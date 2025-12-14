@@ -8,18 +8,19 @@
 import { PlayerState, SystemCondition, EndingArchetype } from '@/types';
 import { compareValues } from '@/constants/comparison-operators';
 
-export const checkStatCondition = (
+// Internal helper - checks stat condition
+const checkStatCondition = (
   condition: Extract<SystemCondition, { type: 'required_stat' }>,
   stats: PlayerState['stats'],
 ): boolean => {
   const statValue = stats[condition.statId];
   if (statValue === undefined) return false;
 
-  // 개선된 비교 연산자 함수 사용
   return compareValues(statValue, condition.comparison, condition.value);
 };
 
-export const checkSurvivorCountCondition = (
+// Internal helper - checks survivor count condition
+const checkSurvivorCountCondition = (
   condition: Extract<SystemCondition, { type: 'survivor_count' }>,
   survivorCount: number,
 ): boolean => {

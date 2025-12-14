@@ -1,9 +1,5 @@
 import { callGeminiAPI, parseGeminiJsonResponse } from './gemini-client';
 import { buildOptimizedGamePrompt, PromptComplexity, buildStoryOpeningPrompt, StoryOpeningResponse } from './prompt-builder';
-import {
-  buildOptimizedGamePromptV2,
-  getDynamicComplexity,
-} from './prompt-builder-optimized';
 import { ChatHistoryManager } from './chat-history-manager';
 import {
   getScenarioMappingCache,
@@ -15,6 +11,11 @@ import {
   getGameplayConfig,
   DEFAULT_GAMEPLAY_CONFIG,
 } from './gameplay-config';
+import {
+  quickQualityCheck,
+  buildImprovementDirective,
+  calculateEndingProbabilities,
+} from './ai-narrative-engine';
 import type { ScenarioData, PlayerState, Character } from '@/types';
 
 // 언어 혼용 감지 및 정리 함수
@@ -575,11 +576,17 @@ export interface AIResponse {
 }
 
 // 제미나이 API를 통한 게임 AI 응답 생성 (최적화 v2)
+// v1.5: actionType 파라미터 추가 (Issue 11 fix)
+// v1.5: actionHistory 파라미터 추가 (Issue 8 fix)
+// v1.6: selectedProtagonistId 파라미터 추가 (동적 주인공 선택 지원)
 export const generateGameResponse = async (
   saveState: SaveState,
   playerAction: PlayerAction,
   scenario: ScenarioData,
   useLiteVersion = false,
+  actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText' = 'choice',
+  actionHistory?: import('@/types').ActionHistoryEntry[],
+  selectedProtagonistId?: string,
 ): Promise<AIResponse> => {
   try {
     const startTime = Date.now();
@@ -610,86 +617,48 @@ export const generateGameResponse = async (
     // 토큰 예산 계산 (남은 토큰 기준)
     const remainingTokenBudget = 20000 - sessionStats.totalTokensUsed;
 
-    // 동적 복잡도 조절
-    const dynamicSettings = getDynamicComplexity(
+    // AI 설정 결정
+    const aiSettings = getOptimalAISettings(
       saveState.context.currentDay || 1,
-      remainingTokenBudget,
-      undefined,
+      'medium',
+      sessionStats.totalTokensUsed,
       scenario,
     );
 
-    // 최적화 v2 사용 여부 결정
-    const useV2 =
-      remainingTokenBudget < 10000 || sessionStats.totalApiCalls > 15;
+    const promptComplexity: PromptComplexity = useLiteVersion
+      ? 'lite'
+      : aiSettings.promptComplexity;
 
-    let promptData;
-
-    if (useV2) {
-      console.log('🚀 최적화 v2 프롬프트 사용');
-
-      // 압축된 히스토리 가져오기
-      const compressedHistory = chatHistoryManager.getCompressedHistory(500);
-
-      promptData = buildOptimizedGamePromptV2(
-        scenario,
-        currentPlayerState,
-        playerAction,
-        compressedHistory || saveState.log,
-        {
-          ultraLite: dynamicSettings.useUltraLite,
-          currentDay: saveState.context.currentDay || 1,
-          includeRelationships: dynamicSettings.includeRelationships,
-          keyDecisions: saveState.keyDecisions,
-          actionContext: saveState.context.actionContext,
-          // v1.2: 시너지 분석용 데이터 전달
-          actionsThisDay: saveState.context.actionsThisDay || [],
-          actionType: 'choice',
-          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
-          worldState: saveState.context.worldState, // v1.2: 월드 상태
-          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
-          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
-          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
-          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
-        },
-      );
-    } else {
-      // 기존 프롬프트 시스템 사용
-      const aiSettings = getOptimalAISettings(
-        saveState.context.currentDay || 1,
-        'medium',
-        sessionStats.totalTokensUsed,
-        scenario,
-      );
-
-      const promptComplexity: PromptComplexity = useLiteVersion
-        ? 'lite'
-        : aiSettings.promptComplexity;
-
-      promptData = buildOptimizedGamePrompt(
-        scenario,
-        currentPlayerState,
-        playerAction,
-        saveState.log,
-        promptComplexity,
-        {
-          includeCharacterDetails: aiSettings.includeCharacterDetails,
-          includeRelationshipTracking: aiSettings.includeRelationshipTracking,
-          includeDetailedStats: aiSettings.includeDetailedStats,
-          currentDay: saveState.context.currentDay || 1,
-          keyDecisions: saveState.keyDecisions,
-          actionContext: saveState.context.actionContext,
-          // v1.2: 시너지 분석용 데이터 전달
-          actionsThisDay: saveState.context.actionsThisDay || [],
-          actionType: 'choice', // choice 핸들러에서 호출되므로 choice
-          characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
-          worldState: saveState.context.worldState, // v1.2: 월드 상태
-          metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
-          // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
-          npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
-          protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
-        },
-      );
-    }
+    const promptData = buildOptimizedGamePrompt(
+      scenario,
+      currentPlayerState,
+      playerAction,
+      saveState.log,
+      promptComplexity,
+      {
+        includeCharacterDetails: aiSettings.includeCharacterDetails,
+        includeRelationshipTracking: aiSettings.includeRelationshipTracking,
+        includeDetailedStats: aiSettings.includeDetailedStats,
+        currentDay: saveState.context.currentDay || 1,
+        keyDecisions: saveState.keyDecisions,
+        actionContext: saveState.context.actionContext,
+        // v1.2: 시너지 분석용 데이터 전달
+        actionsThisDay: saveState.context.actionsThisDay || [],
+        actionType, // v1.5: 동적으로 전달받은 actionType 사용 (Issue 11 fix)
+        characterArcs: saveState.characterArcs, // v1.2: 캐릭터 발전 상태
+        worldState: saveState.context.worldState, // v1.2: 월드 상태
+        metCharacters: saveState.context.protagonistKnowledge?.metCharacters, // v1.2: 만난 캐릭터
+        // [Stage 2] 2025 Enhanced - 숨겨진 관계 및 주인공 지식 시스템
+        npcRelationshipStates: saveState.context.npcRelationshipStates, // 관계 가시성 상태
+        protagonistKnowledge: saveState.context.protagonistKnowledge, // 주인공이 아는 정보
+        // v1.5: chatHistory 전달 (Issue 1 fix - AI 컨텍스트 유지)
+        chatHistory: saveState.chatHistory,
+        // v1.5: actionHistory 전달 (Issue 8 fix - 플레이어 행동 패턴 추적)
+        actionHistory,
+        // v1.6: selectedProtagonistId 전달 (동적 주인공 선택 지원)
+        selectedProtagonistId,
+      },
+    );
 
     console.log(
       `📊 예상 토큰: ${promptData.estimatedTokens}, 남은 예산: ${remainingTokenBudget}`,
@@ -704,7 +673,7 @@ export const generateGameResponse = async (
       model: 'gemini-2.5-flash-lite',
       temperature: 0.5,
       maxTokens: Math.min(
-        dynamicSettings.useUltraLite ? 1200 : 2000,
+        aiSettings.useLiteVersion ? 1200 : 2000,
         remainingTokenBudget,
       ),
     });
@@ -713,7 +682,7 @@ export const generateGameResponse = async (
     const parsedResponse = parseGeminiJsonResponse<AIResponse>(geminiResponse);
 
     // 언어 혼용 감지 및 정리 + 선택지/스탯 검증 (gemini-2.5-flash-lite 강화 검증)
-    const {
+    let {
       cleanedResponse,
       hasLanguageIssues,
       languageIssues,
@@ -733,6 +702,62 @@ export const generateGameResponse = async (
       console.warn('📊 스탯 변화 보정 완료:', statIssues);
     }
 
+    // ========== Self-Evaluation System (자기 평가 시스템) ==========
+    // AI 응답 품질 평가 및 필요시 재생성
+    const currentDay = saveState.context.currentDay || 1;
+    const qualityEval = quickQualityCheck(cleanedResponse, scenario, currentDay);
+
+    console.log(`🔍 응답 품질 평가: ${qualityEval.overallScore}/100점`);
+    if (qualityEval.issues.length > 0) {
+      console.log('⚠️ 발견된 이슈:', qualityEval.issues);
+    }
+
+    // 품질이 너무 낮으면 재생성 시도 (1회만)
+    if (qualityEval.shouldRegenerate && !useLiteVersion) {
+      console.log('🔄 품질 미달로 응답 재생성 시도...');
+
+      // 엔딩 예측 기반 복선 시드 생성
+      const endingPrediction = calculateEndingProbabilities(scenario, saveState);
+      const improvementDirective = buildImprovementDirective(
+        qualityEval,
+        endingPrediction.seedsForCurrentTurn,
+      );
+
+      // 개선된 프롬프트로 재생성
+      const improvedUserPrompt = `${promptData.userPrompt}\n\n${improvementDirective}`;
+
+      try {
+        const retryResponse = await callGeminiAPI({
+          systemPrompt: promptData.systemPrompt,
+          userPrompt: improvedUserPrompt,
+          model: 'gemini-2.5-flash-lite',
+          temperature: 0.6, // 약간 높여서 다양성 확보
+          maxTokens: Math.min(2500, remainingTokenBudget - 500),
+        });
+
+        const retryParsed = parseGeminiJsonResponse<AIResponse>(retryResponse);
+        const retryValidation = cleanAndValidateAIResponse(retryParsed);
+        const retryEval = quickQualityCheck(retryValidation.cleanedResponse, scenario, currentDay);
+
+        // 재생성된 응답이 더 좋으면 교체
+        if (retryEval.overallScore > qualityEval.overallScore) {
+          console.log(`✅ 재생성 성공! 품질 향상: ${qualityEval.overallScore} → ${retryEval.overallScore}`);
+          cleanedResponse = retryValidation.cleanedResponse;
+          hasLanguageIssues = retryValidation.hasLanguageIssues;
+          languageIssues = retryValidation.languageIssues;
+          hasChoiceIssues = retryValidation.hasChoiceIssues;
+          choiceIssues = retryValidation.choiceIssues;
+          hasStatIssues = retryValidation.hasStatIssues;
+          statIssues = retryValidation.statIssues;
+        } else {
+          console.log(`⚠️ 재생성 응답이 더 낫지 않음. 기존 응답 유지.`);
+        }
+      } catch (retryError) {
+        console.warn('⚠️ 재생성 실패, 기존 응답 사용:', retryError);
+      }
+    }
+    // ========== Self-Evaluation System 끝 ==========
+
     // 응답을 히스토리에 추가
     chatHistoryManager.addMessage({
       role: 'assistant',
@@ -750,7 +775,7 @@ export const generateGameResponse = async (
     updateSessionStats(
       promptData.estimatedTokens,
       responseTime,
-      useV2 || dynamicSettings.useUltraLite,
+      aiSettings.useLiteVersion,
       false,
     );
 
@@ -986,11 +1011,15 @@ export const generateInitialDilemma = async (
   };
 
   // generateGameResponse를 재사용하되, 초기 상황임을 명시하는 action을 전달
+  // v1.6: selectedProtagonistId 전달
   return generateGameResponse(
     saveState,
     initialPlayerAction,
     scenario,
     useLiteVersion,
+    'choice',
+    undefined, // actionHistory
+    selectedProtagonistId,
   );
 };
 
@@ -1063,11 +1092,15 @@ export const generateInitialDilemmaWithOpening = async (
     playerFeedback: '플레이어가 게임을 시작했습니다.',
   };
 
+  // v1.6: selectedProtagonistId 전달
   const aiResponse = await generateGameResponse(
     saveState,
     initialPlayerAction,
     scenario,
     useLiteVersion,
+    'choice',
+    undefined, // actionHistory
+    selectedProtagonistId,
   );
 
   return {

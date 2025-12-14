@@ -197,11 +197,13 @@ const generateFallbackDialogue = (
 };
 
 // 대화 응답 생성
+// v1.5: selectedProtagonistId 추가 (Issue 3 fix)
 export const generateDialogueResponse = async (
   characterName: string,
   topic: DialogueTopic,
   saveState: SaveState,
-  scenario: ScenarioData
+  scenario: ScenarioData,
+  selectedProtagonistId?: string
 ): Promise<DialogueResponse> => {
   try {
     const userPrompt = buildDialoguePrompt(characterName, topic, saveState, scenario);

@@ -142,8 +142,9 @@ export const createInitialWorldState = (
 
 /**
  * 위치의 현재 접근 가능 여부 확인
+ * @internal 내부에서만 사용됨
  */
-export const isLocationAccessible = (
+const isLocationAccessible = (
   location: WorldLocation,
   worldState: WorldState,
   saveState: SaveState
@@ -204,22 +205,10 @@ export const isLocationAccessible = (
 };
 
 /**
- * 접근 가능한 위치 목록 반환
- */
-export const getAccessibleLocations = (
-  worldState: WorldState,
-  saveState: SaveState
-): WorldLocation[] => {
-  return worldState.locations.filter((loc) => {
-    const { accessible } = isLocationAccessible(loc, worldState, saveState);
-    return accessible;
-  });
-};
-
-/**
  * 위치 상태 변경
+ * @internal 내부에서만 사용됨
  */
-export const updateLocationStatus = (
+const updateLocationStatus = (
   worldState: WorldState,
   locationId: string,
   newStatus: LocationStatus,
@@ -245,8 +234,9 @@ export const updateLocationStatus = (
 /**
  * v1.2: 동적으로 새로운 위치 추가
  * AI 서사에서 발견된 장소를 WorldState에 추가
+ * @internal addDiscoveredLocations에서 사용됨
  */
-export const addDiscoveredLocation = (
+const addDiscoveredLocation = (
   worldState: WorldState,
   locationName: string,
   description?: string,
@@ -348,8 +338,9 @@ export const getDiscoverableItems = (
 
 /**
  * 발견물을 발견 상태로 변경하고 효과 적용
+ * @internal 내부에서만 사용됨
  */
-export const discoverItem = (
+const discoverItem = (
   worldState: WorldState,
   discoveryId: string,
   currentDay: number
@@ -414,8 +405,9 @@ export const discoverItem = (
 
 /**
  * 이벤트 트리거 조건 확인
+ * @internal 내부에서만 사용됨
  */
-export const checkEventTrigger = (
+const checkEventTrigger = (
   event: WorldEvent,
   saveState: SaveState,
   exploredLocationId?: string
@@ -468,8 +460,9 @@ export const checkEventTrigger = (
 
 /**
  * 모든 대기 이벤트 확인 및 트리거
+ * @internal 내부에서만 사용됨
  */
-export const processEvents = (
+const processEvents = (
   worldState: WorldState,
   saveState: SaveState,
   exploredLocationId?: string
@@ -610,49 +603,6 @@ export const processExploration = (
     changedLocations: eventResult.changedLocations,
     notifications,
   };
-};
-
-// =============================================================================
-// 관계 관리
-// =============================================================================
-
-/**
- * 캐릭터-위치 관계 업데이트
- */
-export const updateCharacterLocation = (
-  worldState: WorldState,
-  characterName: string,
-  locationId: string
-): WorldState => {
-  return {
-    ...worldState,
-    relations: worldState.relations.map((rel) =>
-      rel.type === 'character-location' && rel.subject.id === characterName
-        ? {
-            ...rel,
-            object: { type: 'location' as const, id: locationId },
-            description: `${characterName}이(가) ${locationId}에 있음`,
-          }
-        : rel
-    ),
-  };
-};
-
-/**
- * 특정 위치에 있는 캐릭터 목록
- */
-export const getCharactersAtLocation = (
-  worldState: WorldState,
-  locationId: string
-): string[] => {
-  return worldState.relations
-    .filter(
-      (rel) =>
-        rel.type === 'character-location' &&
-        rel.object.id === locationId &&
-        rel.active
-    )
-    .map((rel) => rel.subject.id);
 };
 
 // =============================================================================
