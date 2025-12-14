@@ -2087,6 +2087,7 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
 
       // 제미나이 API를 통한 게임 응답 생성
       // v1.5: actionType과 actionHistory 전달 (Issue 8, 11 fix)
+      // v1.6: selectedProtagonistId 전달 (동적 주인공 선택 지원)
       const aiResponse = await generateGameResponse(
         newSaveState,
         playerAction,
@@ -2094,6 +2095,7 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
         aiSettings.useLiteVersion,
         'choice',
         actionHistory,
+        selectedProtagonistId,
       );
 
       // 언어 품질 추가 검증 (generateGameResponse에서 이미 처리되지만 추가 확인)

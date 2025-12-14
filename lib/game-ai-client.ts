@@ -578,6 +578,7 @@ export interface AIResponse {
 // 제미나이 API를 통한 게임 AI 응답 생성 (최적화 v2)
 // v1.5: actionType 파라미터 추가 (Issue 11 fix)
 // v1.5: actionHistory 파라미터 추가 (Issue 8 fix)
+// v1.6: selectedProtagonistId 파라미터 추가 (동적 주인공 선택 지원)
 export const generateGameResponse = async (
   saveState: SaveState,
   playerAction: PlayerAction,
@@ -585,6 +586,7 @@ export const generateGameResponse = async (
   useLiteVersion = false,
   actionType: 'choice' | 'dialogue' | 'exploration' | 'freeText' = 'choice',
   actionHistory?: import('@/types').ActionHistoryEntry[],
+  selectedProtagonistId?: string,
 ): Promise<AIResponse> => {
   try {
     const startTime = Date.now();
@@ -653,6 +655,8 @@ export const generateGameResponse = async (
         chatHistory: saveState.chatHistory,
         // v1.5: actionHistory 전달 (Issue 8 fix - 플레이어 행동 패턴 추적)
         actionHistory,
+        // v1.6: selectedProtagonistId 전달 (동적 주인공 선택 지원)
+        selectedProtagonistId,
       },
     );
 
@@ -1007,11 +1011,15 @@ export const generateInitialDilemma = async (
   };
 
   // generateGameResponse를 재사용하되, 초기 상황임을 명시하는 action을 전달
+  // v1.6: selectedProtagonistId 전달
   return generateGameResponse(
     saveState,
     initialPlayerAction,
     scenario,
     useLiteVersion,
+    'choice',
+    undefined, // actionHistory
+    selectedProtagonistId,
   );
 };
 
@@ -1084,11 +1092,15 @@ export const generateInitialDilemmaWithOpening = async (
     playerFeedback: '플레이어가 게임을 시작했습니다.',
   };
 
+  // v1.6: selectedProtagonistId 전달
   const aiResponse = await generateGameResponse(
     saveState,
     initialPlayerAction,
     scenario,
     useLiteVersion,
+    'choice',
+    undefined, // actionHistory
+    selectedProtagonistId,
   );
 
   return {
