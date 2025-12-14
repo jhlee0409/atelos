@@ -2026,11 +2026,14 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
       );
 
       // 제미나이 API를 통한 게임 응답 생성
+      // v1.5: actionType과 actionHistory 전달 (Issue 8, 11 fix)
       const aiResponse = await generateGameResponse(
         newSaveState,
         playerAction,
         scenario,
         aiSettings.useLiteVersion,
+        'choice',
+        actionHistory,
       );
 
       // 언어 품질 추가 검증 (generateGameResponse에서 이미 처리되지만 추가 확인)
@@ -2437,11 +2440,13 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
     try {
       console.log(`💬 대화 시작: ${characterName} - ${topic.label}`);
 
+      // v1.5: selectedProtagonistId 전달 (Issue 3 fix)
       const dialogueResponse = await generateDialogueResponse(
         characterName,
         topic,
         saveState,
-        scenario
+        scenario,
+        selectedProtagonistId,
       );
 
       // 대화 내용을 채팅 히스토리에 추가
@@ -2740,10 +2745,12 @@ export default function GameClient({ scenario, selectedProtagonistId }: GameClie
         });
       }
 
+      // v1.5: selectedProtagonistId 전달 (Issue 3 fix)
       const explorationResult = await generateExplorationResult(
         location,
         saveState,
-        scenario
+        scenario,
+        selectedProtagonistId,
       );
 
       // 탐색 결과를 채팅 히스토리에 추가
