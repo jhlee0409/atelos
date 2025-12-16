@@ -1,10 +1,11 @@
 'use client';
 
-import { SetStateAction } from 'react';
+import { SetStateAction, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScenarioData } from '@/types';
-import { MapPin, Sparkles, Info } from 'lucide-react';
+import { MapPin, Sparkles, Info, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 type Props = {
   scenario: ScenarioData;
@@ -18,8 +19,20 @@ type Props = {
  * 위치는 AI 서사를 통해 자연스럽게 발견되며, 시작 위치만 storyOpening에서 설정.
  */
 export default function LocationsContent({ scenario, setScenario }: Props) {
+  const [isRemoved, setIsRemoved] = useState(false);
   const openingLocation = scenario.storyOpening?.openingLocation || '본부';
   const hasLegacyLocations = scenario.locations && scenario.locations.length > 0;
+
+  const handleRemoveLegacyLocations = () => {
+    // 명시적으로 빈 배열로 설정 (undefined 대신)
+    setScenario(prev => {
+      // locations 필드를 완전히 제거하기 위해 나머지 필드만 복사
+      const { locations, ...rest } = prev;
+      return rest as ScenarioData;
+    });
+    setIsRemoved(true);
+    toast.success('레거시 위치 데이터가 제거되었습니다. "저장" 버튼을 눌러 변경사항을 저장하세요.');
+  };
 
   return (
     <Card className="border-socratic-grey/20 bg-parchment-white shadow-lg">
@@ -68,21 +81,38 @@ export default function LocationsContent({ scenario, setScenario }: Props) {
         </div>
 
         {/* 레거시 데이터 경고 */}
-        {hasLegacyLocations && (
+        {hasLegacyLocations && !isRemoved && (
           <Alert className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
               <strong>레거시 위치 데이터 감지</strong>
               <p className="text-sm mt-1">
                 이 시나리오에는 기존 정적 위치 데이터({scenario.locations?.length}개)가 있습니다.
-                이 데이터는 호환성을 위해 유지되지만, 새로운 동적 시스템이 우선 적용됩니다.
+                이 데이터가 있으면 게임 시작 시 모든 장소가 바로 활성화됩니다.
+              </p>
+              <p className="text-sm mt-1 text-amber-600 font-medium">
+                동적 위치 시스템을 사용하려면 레거시 데이터를 제거하세요.
               </p>
               <button
-                onClick={() => setScenario(prev => ({ ...prev, locations: undefined }))}
-                className="mt-2 text-sm text-amber-700 underline hover:text-amber-900"
+                onClick={handleRemoveLegacyLocations}
+                className="mt-2 px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
               >
                 레거시 데이터 제거하기
               </button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* 제거 완료 메시지 */}
+        {isRemoved && (
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              <strong>레거시 데이터 제거 완료</strong>
+              <p className="text-sm mt-1">
+                레거시 위치 데이터가 제거되었습니다.
+                <strong className="text-green-700"> "저장 및 활성화" 또는 "임시 저장" 버튼</strong>을 눌러 변경사항을 저장하세요.
+              </p>
             </AlertDescription>
           </Alert>
         )}
