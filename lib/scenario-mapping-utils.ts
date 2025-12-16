@@ -86,6 +86,16 @@ export const getAllCharacterNamesFromScenario = (scenario: ScenarioData): string
   return scenario.characters.map((c) => c.characterName);
 };
 
+// ===== 플래그 관련 (Deprecated) =====
+
+/**
+ * @deprecated Flags system has been removed. Use ActionHistory instead.
+ * Returns empty array for backwards compatibility.
+ */
+export const getAllFlagIdsFromScenario = (_scenario: ScenarioData): string[] => {
+  return [];
+};
+
 // ===== 서사 정리용 정규식 패턴 생성 =====
 
 /**
